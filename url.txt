@@ -1,0 +1,42 @@
+
+Security Questions:
+
+Security Questions Setup:
+POST /api/security-questions: Set up security questions and answers.
+Security Questions Verification:
+POST /api/security-questions/verify: Verify security questions during login.
+Social Login:
+
+Social Login:
+POST /api/social-login: Authenticate using a social provider (e.g., Facebook, Google).
+Social Account Linking:
+POST /api/social-link: Link a social provider account to the user's account.
+Role-Based Access Control:
+
+User Roles Management:
+GET /api/roles: List available roles.
+PUT /api/user/{userId}/roles: Assign roles to a user.
+Email Verification:
+
+Email Verification Request:
+POST /api/email-verification/request: Initiate an email verification request.
+Email Verification Confirmation:
+POST /api/email-verification/confirm: Confirm email verification with a verification token.
+Notifications:
+
+Notification Management:
+GET /api/notifications: Retrieve user notifications.
+POST /api/notifications: Send a new notification.
+Security and Logging:
+
+Login Failures and Lockout:
+These operations may be logged and monitored in the background.
+API Keys:
+
+API Key Management:
+GET /api/api-keys: Retrieve user's API keys.
+POST /api/api-keys: Create a new API key.
+PUT /api/api-keys/{apiKeyId}: Update an API key.
+DELETE /api/api-keys/{apiKeyId}: Delete an API key.
+Sessions:
+
