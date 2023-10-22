@@ -1,6 +1,6 @@
 -- name: CreateUser :one
-INSERT INTO users (id, name, email, username, password_hash, created_at, updated_at, last_login, is_suspended, is_deleted, login_attempts, lockout_duration, lockout_until)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+INSERT INTO users (id, name, email, username, password_hash, created_at, updated_at, last_login, is_suspended, is_deleted, login_attempts, lockout_duration, lockout_until, password_changed_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 RETURNING *;
 
 -- name: GetUserByID :one

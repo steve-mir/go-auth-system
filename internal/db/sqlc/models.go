@@ -11,17 +11,18 @@ import (
 )
 
 type User struct {
-	ID              uuid.UUID      `json:"id"`
-	Name            sql.NullString `json:"name"`
-	Email           sql.NullString `json:"email"`
-	Username        sql.NullString `json:"username"`
-	PasswordHash    sql.NullString `json:"password_hash"`
-	CreatedAt       interface{}    `json:"created_at"`
-	UpdatedAt       sql.NullTime   `json:"updated_at"`
-	LastLogin       sql.NullTime   `json:"last_login"`
-	IsSuspended     sql.NullBool   `json:"is_suspended"`
-	IsDeleted       sql.NullBool   `json:"is_deleted"`
-	LoginAttempts   sql.NullInt32  `json:"login_attempts"`
-	LockoutDuration sql.NullInt32  `json:"lockout_duration"`
-	LockoutUntil    sql.NullTime   `json:"lockout_until"`
+	ID                uuid.UUID      `json:"id"`
+	Name              sql.NullString `json:"name"`
+	Email             sql.NullString `json:"email"`
+	Username          sql.NullString `json:"username"`
+	PasswordHash      string         `json:"password_hash"`
+	CreatedAt         sql.NullTime   `json:"created_at"`
+	UpdatedAt         sql.NullTime   `json:"updated_at"`
+	LastLogin         sql.NullTime   `json:"last_login"`
+	IsSuspended       sql.NullBool   `json:"is_suspended"`
+	IsDeleted         sql.NullBool   `json:"is_deleted"`
+	LoginAttempts     sql.NullInt32  `json:"login_attempts"`
+	LockoutDuration   sql.NullInt32  `json:"lockout_duration"`
+	LockoutUntil      sql.NullTime   `json:"lockout_until"`
+	PasswordChangedAt sql.NullTime   `json:"password_changed_at"`
 }

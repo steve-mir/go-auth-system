@@ -49,3 +49,8 @@ run:
 .PHONY: postgres createdb dropdb migrateup migrateup1 migratedown migratedown1 sqlc test run environ air_init air_run
 
 # migrate create -ext sql -dir db/migration -seq add_user_session
+
+# instal swagger
+# brew tap go-swagger/go-swagger
+# brew install go-swagger
+# goswagger.io

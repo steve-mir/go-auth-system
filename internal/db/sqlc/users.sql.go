@@ -13,25 +13,26 @@ import (
 )
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (id, name, email, username, password_hash, created_at, updated_at, last_login, is_suspended, is_deleted, login_attempts, lockout_duration, lockout_until)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-RETURNING id, name, email, username, password_hash, created_at, updated_at, last_login, is_suspended, is_deleted, login_attempts, lockout_duration, lockout_until
+INSERT INTO users (id, name, email, username, password_hash, created_at, updated_at, last_login, is_suspended, is_deleted, login_attempts, lockout_duration, lockout_until, password_changed_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+RETURNING id, name, email, username, password_hash, created_at, updated_at, last_login, is_suspended, is_deleted, login_attempts, lockout_duration, lockout_until, password_changed_at
 `
 
 type CreateUserParams struct {
-	ID              uuid.UUID      `json:"id"`
-	Name            sql.NullString `json:"name"`
-	Email           sql.NullString `json:"email"`
-	Username        sql.NullString `json:"username"`
-	PasswordHash    sql.NullString `json:"password_hash"`
-	CreatedAt       interface{}    `json:"created_at"`
-	UpdatedAt       sql.NullTime   `json:"updated_at"`
-	LastLogin       sql.NullTime   `json:"last_login"`
-	IsSuspended     sql.NullBool   `json:"is_suspended"`
-	IsDeleted       sql.NullBool   `json:"is_deleted"`
-	LoginAttempts   sql.NullInt32  `json:"login_attempts"`
-	LockoutDuration sql.NullInt32  `json:"lockout_duration"`
-	LockoutUntil    sql.NullTime   `json:"lockout_until"`
+	ID                uuid.UUID      `json:"id"`
+	Name              sql.NullString `json:"name"`
+	Email             sql.NullString `json:"email"`
+	Username          sql.NullString `json:"username"`
+	PasswordHash      string         `json:"password_hash"`
+	CreatedAt         sql.NullTime   `json:"created_at"`
+	UpdatedAt         sql.NullTime   `json:"updated_at"`
+	LastLogin         sql.NullTime   `json:"last_login"`
+	IsSuspended       sql.NullBool   `json:"is_suspended"`
+	IsDeleted         sql.NullBool   `json:"is_deleted"`
+	LoginAttempts     sql.NullInt32  `json:"login_attempts"`
+	LockoutDuration   sql.NullInt32  `json:"lockout_duration"`
+	LockoutUntil      sql.NullTime   `json:"lockout_until"`
+	PasswordChangedAt sql.NullTime   `json:"password_changed_at"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
@@ -49,6 +50,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		arg.LoginAttempts,
 		arg.LockoutDuration,
 		arg.LockoutUntil,
+		arg.PasswordChangedAt,
 	)
 	var i User
 	err := row.Scan(
@@ -65,6 +67,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.LoginAttempts,
 		&i.LockoutDuration,
 		&i.LockoutUntil,
+		&i.PasswordChangedAt,
 	)
 	return i, err
 }
@@ -79,7 +82,7 @@ func (q *Queries) DeleteUserByID(ctx context.Context, id uuid.UUID) error {
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, name, email, username, password_hash, created_at, updated_at, last_login, is_suspended, is_deleted, login_attempts, lockout_duration, lockout_until FROM users WHERE email = $1
+SELECT id, name, email, username, password_hash, created_at, updated_at, last_login, is_suspended, is_deleted, login_attempts, lockout_duration, lockout_until, password_changed_at FROM users WHERE email = $1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email sql.NullString) (User, error) {
@@ -99,12 +102,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email sql.NullString) (Use
 		&i.LoginAttempts,
 		&i.LockoutDuration,
 		&i.LockoutUntil,
+		&i.PasswordChangedAt,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, name, email, username, password_hash, created_at, updated_at, last_login, is_suspended, is_deleted, login_attempts, lockout_duration, lockout_until FROM users WHERE id = $1
+SELECT id, name, email, username, password_hash, created_at, updated_at, last_login, is_suspended, is_deleted, login_attempts, lockout_duration, lockout_until, password_changed_at FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
@@ -124,12 +128,13 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.LoginAttempts,
 		&i.LockoutDuration,
 		&i.LockoutUntil,
+		&i.PasswordChangedAt,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, name, email, username, password_hash, created_at, updated_at, last_login, is_suspended, is_deleted, login_attempts, lockout_duration, lockout_until FROM users WHERE username = $1
+SELECT id, name, email, username, password_hash, created_at, updated_at, last_login, is_suspended, is_deleted, login_attempts, lockout_duration, lockout_until, password_changed_at FROM users WHERE username = $1
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username sql.NullString) (User, error) {
@@ -149,6 +154,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username sql.NullString
 		&i.LoginAttempts,
 		&i.LockoutDuration,
 		&i.LockoutUntil,
+		&i.PasswordChangedAt,
 	)
 	return i, err
 }
@@ -157,7 +163,7 @@ const updateUser = `-- name: UpdateUser :one
 UPDATE users
 SET name = $2, email = $3, username = $4, password_hash = $5, updated_at = $6, last_login = $7, is_suspended = $8, is_deleted = $9, login_attempts = $10, lockout_duration = $11, lockout_until = $12
 WHERE id = $1
-RETURNING id, name, email, username, password_hash, created_at, updated_at, last_login, is_suspended, is_deleted, login_attempts, lockout_duration, lockout_until
+RETURNING id, name, email, username, password_hash, created_at, updated_at, last_login, is_suspended, is_deleted, login_attempts, lockout_duration, lockout_until, password_changed_at
 `
 
 type UpdateUserParams struct {
@@ -165,7 +171,7 @@ type UpdateUserParams struct {
 	Name            sql.NullString `json:"name"`
 	Email           sql.NullString `json:"email"`
 	Username        sql.NullString `json:"username"`
-	PasswordHash    sql.NullString `json:"password_hash"`
+	PasswordHash    string         `json:"password_hash"`
 	UpdatedAt       sql.NullTime   `json:"updated_at"`
 	LastLogin       sql.NullTime   `json:"last_login"`
 	IsSuspended     sql.NullBool   `json:"is_suspended"`
@@ -205,6 +211,7 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		&i.LoginAttempts,
 		&i.LockoutDuration,
 		&i.LockoutUntil,
+		&i.PasswordChangedAt,
 	)
 	return i, err
 }
