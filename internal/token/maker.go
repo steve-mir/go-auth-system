@@ -18,4 +18,7 @@ type Maker interface {
 
 	// VerifyCustomToken checks if the token is valid or not
 	VerifyCustomToken(token string) (*CustomPayload, error)
+
+	// Add a revoke endpoint
+	RevokeToken(token string) error
 }

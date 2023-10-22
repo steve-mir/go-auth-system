@@ -11,18 +11,21 @@ import (
 	"github.com/steve-mir/go-auth-system/internal/app/auth/services"
 	"github.com/steve-mir/go-auth-system/internal/db/sqlc"
 	"github.com/steve-mir/go-auth-system/internal/utils"
+	"go.uber.org/zap"
 )
 
-type user struct {
+type registerRequest struct {
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required,min=8,max=64,strong_password"`
 }
 
 func Register(config utils.Config) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		var req user
+		l, _ := zap.NewProduction()
+		var req registerRequest
 		if err := ctx.ShouldBindJSON(&req); err != nil {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			l.Error("Invalid fields error", zap.Error(err))
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "email and password fields required", "status": err.Error()})
 			return
 		}
 
@@ -30,6 +33,7 @@ func Register(config utils.Config) gin.HandlerFunc {
 		validate := validator.New()
 		validate.RegisterValidation("strong_password", strongPasswordValidation)
 		if err := validate.Struct(req); err != nil {
+			l.Error("Go validator error", zap.Error(err))
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -37,18 +41,24 @@ func Register(config utils.Config) gin.HandlerFunc {
 		// Open a database connection
 		db, err := sql.Open(config.DBDriver, config.DBSource)
 		if err != nil {
+			l.Error("DB connection error", zap.Error(err))
 			log.Fatal("Cannot connect to db:", err)
 		}
 		defer db.Close()
 
 		store := sqlc.NewStore(db)
 
-		user, _, err := services.CreateUser(config, store, req.Email, req.Password)
-		if err != nil {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		newUserResp := services.CreateUser(config, store, req.Email, req.Password)
+		if newUserResp.Error != nil {
+			l.Error("Create User error", zap.Error(newUserResp.Error))
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": newUserResp.Error.Error()})
 			return
 		}
-		ctx.JSON(http.StatusOK, gin.H{"msg": "User registered successfully. ", "user": user})
+
+		// Record logs/metrics
+		l.Info("User registered", zap.Any("uid", newUserResp.User.ID))
+		// metrics.Registrations.Inc()
+		ctx.JSON(http.StatusOK, gin.H{"msg": "User registered successfully. ", "user": newUserResp.User})
 
 	}
 }

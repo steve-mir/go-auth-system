@@ -1,0 +1,30 @@
+FOR REGISTRATION: Follow OAuth2 flows for standardized authentication and authorization.
+
+func RegisterUser(req RegisterUserRequest) RegisterUserResponse {
+
+  // start db txn
+
+  if dupUser := checkDuplicateEmail(req.Email); dupUser != nil {
+    // return error
+  }
+
+  // generate UUID 
+  // hash password
+  // create user 
+  // commit txn
+
+  // create token
+  token := createToken(user) 
+  
+  // record metrics
+  metrics.RegisterUser()
+  
+  return RegisterUserResponse{
+    User: user,
+    Token: token
+  }
+}
+
+func createToken(user User) string {
+  // paseto token creation...
+}

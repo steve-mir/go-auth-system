@@ -34,6 +34,7 @@ func TestPasetoMaker(t *testing.T) {
 }
 
 func TestExpiredPasetoToken(t *testing.T) {
+	// symmetricKey, _ := utils.GenerateRandomKey(minSecretKeySize)
 	maker, err := NewPasetoMaker(utils.RandomString(32))
 	require.NoError(t, err)
 

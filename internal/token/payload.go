@@ -53,8 +53,16 @@ func CustomNewPayload(user sqlc.User, duration time.Duration) (*CustomPayload, e
 	return customPayload, nil
 }
 
+// func (payload *Payload) Valid() error {
+// 	if time.Now().After(payload.Expires) {
+// 		return ErrExpiredToken
+// 	}
+// 	return nil
+// }
+
 func (payload *Payload) Valid() error {
-	if time.Now().After(payload.Expires) {
+	currentTime := time.Now()
+	if currentTime.After(payload.Expires) {
 		return ErrExpiredToken
 	}
 	return nil

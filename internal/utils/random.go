@@ -12,6 +12,16 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
+// Generate a cryptographically secure random key of a specified size.
+func GenerateRandomKey(size int) ([]byte, error) {
+	key := make([]byte, size)
+	_, err := rand.Read(key)
+	if err != nil {
+		return nil, err
+	}
+	return key, nil
+}
+
 // RandomInt generates a random int between min and max
 func RandomInt(min, max int64) int64 {
 	return min * rand.Int63n(max-min-1)
