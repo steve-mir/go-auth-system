@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/steve-mir/go-auth-system/internal/db/sqlc"
+	"github.com/sqlc-dev/pqtype"
 )
 
 var (
@@ -13,45 +13,72 @@ var (
 	ErrExpiredToken = errors.New("token has expired")
 )
 
+// User ID - The unique identifier of the logged in user. This allows fetching the user's attributes like roles/permissions from the database for authorization.
+// Session ID - The id of the user's session in the sessions table. Used to validate the session is valid on each request.
+// Issued at timestamp - When the token was issued. Used to calculate expiry.
+// Expiry timestamp - When the token expires.
+
+// Not before timestamp - Earliest time the token can be used (optional).
+// Issuer - Your service's ID, e.g. https://myapp.com.
+// Audience - Intended API audience, e.g. https://myapp.com/api.
+// IP Address - The IP address of the client issued to. Can be used to detect suspicious usage.
+// User agent - The user agent string of the client. Can be used to identify clients.
+
+type PayloadData struct {
+	// Role     string    `json:"role"`
+	UserId         uuid.UUID   `json:"user_id"`
+	Username       string      `json:"username"`
+	IsUserVerified bool        `json:"is_user_verified"` // End of user part
+	SessionID      uuid.UUID   `json:"session_id"`
+	Type           string      `json:"type"`
+	Issuer         string      `json:"issuer"`
+	Audience       string      `json:"audience"`
+	IP             pqtype.Inet `json:"ip"`
+	UserAgent      string      `json:"user_agent"`
+}
+
 type Payload struct {
-	ID       uuid.UUID `json:"id"`
-	Username string    `json:"username"`
-	Expires  time.Time `json:"expires"`
-	IssuedAt time.Time `json:"issued_at"`
+	PayloadData
+
+	// ID           uuid.UUID `json:"id"` // Used in refresh token to identify the session. Serves as session Id too
+	RefreshAfter time.Time `json:"not_before"`
+	Expires      time.Time `json:"expires"`
+	IssuedAt     time.Time `json:"issued_at"`
 }
 
-type CustomPayload struct {
-	Payload
-	User sqlc.User
-}
+// type CustomPayload struct {
+// 	Payload
+// 	User sqlc.User
+// }
 
-func NewPayload(username string, duration time.Duration) (*Payload, error) {
-	tokenID, err := uuid.NewRandom()
-	if err != nil {
-		return nil, err
-	}
+func NewPayload(payload PayloadData, duration time.Duration) (*Payload, error) {
+	// tokenID, err := uuid.NewRandom()
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	return &Payload{
-		ID:       tokenID,
-		Username: username,
-		Expires:  time.Now().Add(duration),
-		IssuedAt: time.Now(),
+		PayloadData: payload,
+		// ID:           tokenID,
+		Expires:      time.Now().Add(duration),
+		RefreshAfter: time.Now().Add(duration), // TODO: Fix refresh after
+		IssuedAt:     time.Now(),
 	}, nil
+
 }
 
-func CustomNewPayload(user sqlc.User, duration time.Duration) (*CustomPayload, error) {
-	payload, err := NewPayload(user.Email.String, duration)
-	if err != nil {
-		return nil, err
-	}
+// func CustomNewPayload(user Payload, duration time.Duration) (*Payload, error) {
+// 	payload, err := NewPayload(user, duration)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	customPayload := &CustomPayload{
-		Payload: *payload,
-		User:    user,
-	}
+// 	customPayload := &Payload{
+// 		// Payload: user,
+// 	}
 
-	return customPayload, nil
-}
+// 	return customPayload, nil
+// }
 
 // func (payload *Payload) Valid() error {
 // 	if time.Now().After(payload.Expires) {

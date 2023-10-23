@@ -13,9 +13,14 @@ import (
 )
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (id, name, email, username, password_hash, created_at, updated_at, last_login, is_suspended, is_deleted, login_attempts, lockout_duration, lockout_until, password_changed_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-RETURNING id, name, email, username, password_hash, created_at, updated_at, last_login, is_suspended, is_deleted, login_attempts, lockout_duration, lockout_until, password_changed_at
+INSERT INTO users (
+    id, name, email, username, password_hash, created_at,
+    updated_at, last_login, is_suspended, is_deleted,
+    login_attempts, lockout_duration, lockout_until,
+    password_changed_at, is_verified
+    )
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+RETURNING id, name, email, username, password_hash, created_at, updated_at, last_login, is_suspended, is_verified, is_deleted, login_attempts, lockout_duration, lockout_until, password_changed_at
 `
 
 type CreateUserParams struct {
@@ -33,6 +38,7 @@ type CreateUserParams struct {
 	LockoutDuration   sql.NullInt32  `json:"lockout_duration"`
 	LockoutUntil      sql.NullTime   `json:"lockout_until"`
 	PasswordChangedAt sql.NullTime   `json:"password_changed_at"`
+	IsVerified        sql.NullBool   `json:"is_verified"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
@@ -51,6 +57,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		arg.LockoutDuration,
 		arg.LockoutUntil,
 		arg.PasswordChangedAt,
+		arg.IsVerified,
 	)
 	var i User
 	err := row.Scan(
@@ -63,6 +70,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.UpdatedAt,
 		&i.LastLogin,
 		&i.IsSuspended,
+		&i.IsVerified,
 		&i.IsDeleted,
 		&i.LoginAttempts,
 		&i.LockoutDuration,
@@ -82,7 +90,7 @@ func (q *Queries) DeleteUserByID(ctx context.Context, id uuid.UUID) error {
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, name, email, username, password_hash, created_at, updated_at, last_login, is_suspended, is_deleted, login_attempts, lockout_duration, lockout_until, password_changed_at FROM users WHERE email = $1
+SELECT id, name, email, username, password_hash, created_at, updated_at, last_login, is_suspended, is_verified, is_deleted, login_attempts, lockout_duration, lockout_until, password_changed_at FROM users WHERE email = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email sql.NullString) (User, error) {
@@ -98,6 +106,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email sql.NullString) (Use
 		&i.UpdatedAt,
 		&i.LastLogin,
 		&i.IsSuspended,
+		&i.IsVerified,
 		&i.IsDeleted,
 		&i.LoginAttempts,
 		&i.LockoutDuration,
@@ -108,7 +117,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email sql.NullString) (Use
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, name, email, username, password_hash, created_at, updated_at, last_login, is_suspended, is_deleted, login_attempts, lockout_duration, lockout_until, password_changed_at FROM users WHERE id = $1
+SELECT id, name, email, username, password_hash, created_at, updated_at, last_login, is_suspended, is_verified, is_deleted, login_attempts, lockout_duration, lockout_until, password_changed_at FROM users WHERE id = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
@@ -124,6 +133,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.UpdatedAt,
 		&i.LastLogin,
 		&i.IsSuspended,
+		&i.IsVerified,
 		&i.IsDeleted,
 		&i.LoginAttempts,
 		&i.LockoutDuration,
@@ -134,7 +144,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, name, email, username, password_hash, created_at, updated_at, last_login, is_suspended, is_deleted, login_attempts, lockout_duration, lockout_until, password_changed_at FROM users WHERE username = $1
+SELECT id, name, email, username, password_hash, created_at, updated_at, last_login, is_suspended, is_verified, is_deleted, login_attempts, lockout_duration, lockout_until, password_changed_at FROM users WHERE username = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username sql.NullString) (User, error) {
@@ -150,6 +160,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username sql.NullString
 		&i.UpdatedAt,
 		&i.LastLogin,
 		&i.IsSuspended,
+		&i.IsVerified,
 		&i.IsDeleted,
 		&i.LoginAttempts,
 		&i.LockoutDuration,
@@ -163,7 +174,7 @@ const updateUser = `-- name: UpdateUser :one
 UPDATE users
 SET name = $2, email = $3, username = $4, password_hash = $5, updated_at = $6, last_login = $7, is_suspended = $8, is_deleted = $9, login_attempts = $10, lockout_duration = $11, lockout_until = $12
 WHERE id = $1
-RETURNING id, name, email, username, password_hash, created_at, updated_at, last_login, is_suspended, is_deleted, login_attempts, lockout_duration, lockout_until, password_changed_at
+RETURNING id, name, email, username, password_hash, created_at, updated_at, last_login, is_suspended, is_verified, is_deleted, login_attempts, lockout_duration, lockout_until, password_changed_at
 `
 
 type UpdateUserParams struct {
@@ -207,6 +218,7 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		&i.UpdatedAt,
 		&i.LastLogin,
 		&i.IsSuspended,
+		&i.IsVerified,
 		&i.IsDeleted,
 		&i.LoginAttempts,
 		&i.LockoutDuration,

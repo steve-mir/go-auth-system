@@ -6,9 +6,47 @@ package sqlc
 
 import (
 	"database/sql"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/sqlc-dev/pqtype"
 )
+
+type BannedUser struct {
+	ID       int32          `json:"id"`
+	UserID   uuid.UUID      `json:"user_id"`
+	BannedAt sql.NullTime   `json:"banned_at"`
+	Reason   sql.NullString `json:"reason"`
+}
+
+type LoginFailure struct {
+	ID        int32          `json:"id"`
+	Email     string         `json:"email"`
+	Timestamp sql.NullTime   `json:"timestamp"`
+	UserAgent sql.NullString `json:"user_agent"`
+	IpAddress pqtype.Inet    `json:"ip_address"`
+}
+
+type SecurityQuestion struct {
+	ID        int32          `json:"id"`
+	UserID    uuid.UUID      `json:"user_id"`
+	Question  sql.NullString `json:"question"`
+	Answer    sql.NullString `json:"answer"`
+	ExpiredAt sql.NullTime   `json:"expired_at"`
+}
+
+type Session struct {
+	ID           uuid.UUID      `json:"id"`
+	UserID       uuid.UUID      `json:"user_id"`
+	Email        sql.NullString `json:"email"`
+	RefreshToken string         `json:"refresh_token"`
+	UserAgent    string         `json:"user_agent"`
+	IpAddress    pqtype.Inet    `json:"ip_address"`
+	IsBlocked    bool           `json:"is_blocked"`
+	ExpiresAt    time.Time      `json:"expires_at"`
+	CreatedAt    sql.NullTime   `json:"created_at"`
+	LastActiveAt sql.NullTime   `json:"last_active_at"`
+}
 
 type User struct {
 	ID                uuid.UUID      `json:"id"`
@@ -20,9 +58,18 @@ type User struct {
 	UpdatedAt         sql.NullTime   `json:"updated_at"`
 	LastLogin         sql.NullTime   `json:"last_login"`
 	IsSuspended       sql.NullBool   `json:"is_suspended"`
+	IsVerified        sql.NullBool   `json:"is_verified"`
 	IsDeleted         sql.NullBool   `json:"is_deleted"`
 	LoginAttempts     sql.NullInt32  `json:"login_attempts"`
 	LockoutDuration   sql.NullInt32  `json:"lockout_duration"`
 	LockoutUntil      sql.NullTime   `json:"lockout_until"`
 	PasswordChangedAt sql.NullTime   `json:"password_changed_at"`
+}
+
+type UserLogin struct {
+	ID        int32          `json:"id"`
+	UserID    uuid.UUID      `json:"user_id"`
+	LoginAt   sql.NullTime   `json:"login_at"`
+	IpAddress pqtype.Inet    `json:"ip_address"`
+	UserAgent sql.NullString `json:"user_agent"`
 }

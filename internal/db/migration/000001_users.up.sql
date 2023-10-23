@@ -10,6 +10,7 @@ CREATE TABLE "users" (
   "updated_at" timestamptz,
   "last_login" timestamptz,
   "is_suspended" boolean,
+  "is_verified" BOOLEAN DEFAULT FALSE,
   "is_deleted" boolean,
   "login_attempts" int DEFAULT 0,
   "lockout_duration" int DEFAULT 60,

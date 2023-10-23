@@ -10,8 +10,14 @@ air_run:
 start_ps:
 	docker start postgres16
 
+start_redis:
+	docker start redis
+
 postgres:
 	docker run --name postgres16 -p 5434:5432 -e POSTGRES_USER=root -e POSTGRES_PASSWORD=toor -d postgres:16.0-alpine3.18
+
+redis:
+	docker run --name redis -p 6379:6379 -d redis:7.0-alpine
 
 createdb:
 	docker exec -it postgres16 createdb --username=root --owner=root go_auth_system
@@ -46,7 +52,7 @@ test:
 run:
 	go run main.go
 
-.PHONY: postgres createdb dropdb migrateup migrateup1 migratedown migratedown1 sqlc test run environ air_init air_run
+.PHONY: postgres createdb dropdb migrateup migrateup1 migratedown migratedown1 sqlc test run environ air_init air_run start_redis redis start_ps
 
 # migrate create -ext sql -dir db/migration -seq add_user_session
 

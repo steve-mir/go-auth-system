@@ -13,6 +13,11 @@ import (
 	"go.uber.org/ratelimit"
 )
 
+// TODO: Research mor on rateLimiting
+// https://pkg.go.dev/github.com/gin-gonic/examples/ratelimiter#section-readme
+// https://github.com/gin-gonic/examples/blob/fdef5bbd945a/ratelimiter/rate.go
+// https://pkg.go.dev/go.uber.org/ratelimit#section-readme
+
 const (
 	defaultPath = "/auth"
 )
@@ -43,27 +48,24 @@ func Auth(config utils.Config, r *gin.Engine) {
 
 	// Register a new user
 	r.POST(defaultPath+"/register", controllers.Register(config))
+	r.POST(defaultPath+"/login", controllers.Login(config))     // Authenticate a user based on email/username and password.
+	r.POST(defaultPath+"/logout", controllers.Register(config)) // Log the user out.
 
 	log.Printf("Current Rate Limit: %v requests/s", rps)
 
-	// r.GET(defaultPath+"/login", controllers.Register(config))
-
-	/*// Authenticate a user based on email/username and password.
-	r.POST("user/login", controllers.Register(config))
-	// Log the user out.
-	r.POST("user/logout", controllers.Register(config))
-	// Initiate a password reset by providing an email or username.
-	r.POST("user/reset-password/request", controllers.Register(config))
-	// Confirm a password reset with a reset token.
-	r.POST("user/reset-password/confirm", controllers.Register(config))
-	// Set up Two-Factor Authentication (2FA).
-	r.POST("user/2fa/setup", controllers.Register(config))
-	// Verify the 2FA code during login.
-	r.POST("user/2fa/verify", controllers.Register(config))
-	// Update the user's profile.
-	r.PUT("user/profile", controllers.Register(config))
-	// Retrieve the user's profile.
-	r.GET("user/profile", controllers.Register(config))*/
+	/*
+		// Initiate a password reset by providing an email or username.
+		r.POST("user/reset-password/request", controllers.Register(config))
+		// Confirm a password reset with a reset token.
+		r.POST("user/reset-password/confirm", controllers.Register(config))
+		// Set up Two-Factor Authentication (2FA).
+		r.POST("user/2fa/setup", controllers.Register(config))
+		// Verify the 2FA code during login.
+		r.POST("user/2fa/verify", controllers.Register(config))
+		// Update the user's profile.
+		r.PUT("user/profile", controllers.Register(config))
+		// Retrieve the user's profile.
+		r.GET("user/profile", controllers.Register(config))*/
 
 }
 
