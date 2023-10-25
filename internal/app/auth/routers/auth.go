@@ -1,6 +1,7 @@
 package routers
 
 import (
+	"database/sql"
 	"flag"
 	"log"
 	"time"
@@ -9,8 +10,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/steve-mir/go-auth-system/internal/app/auth/controllers"
+	"github.com/steve-mir/go-auth-system/internal/app/auth/middlewares"
 	"github.com/steve-mir/go-auth-system/internal/utils"
 	"go.uber.org/ratelimit"
+	"go.uber.org/zap"
 )
 
 // TODO: Research mor on rateLimiting
@@ -40,18 +43,25 @@ func leakBucket() gin.HandlerFunc {
 
 // ab -n 20 -c 5 -r -s 1 -p post-data.txt http://localhost:9100/register
 
-func Auth(config utils.Config, r *gin.Engine) {
+func Auth(config utils.Config, db *sql.DB, l *zap.Logger, r *gin.Engine) {
 
 	limit = ratelimit.New(100)
 
 	r.Use(leakBucket())
-
-	// Register a new user
-	r.POST(defaultPath+"/register", controllers.Register(config))
-	r.POST(defaultPath+"/login", controllers.Login(config))     // Authenticate a user based on email/username and password.
-	r.POST(defaultPath+"/logout", controllers.Register(config)) // Log the user out.
-
 	log.Printf("Current Rate Limit: %v requests/s", rps)
+
+	// Public routes
+	// Requires throttling (rate limiting). No auth header required
+	public := r.Group(defaultPath)
+	public.POST("/register", controllers.Register(config, db, l)) // Register a new user
+	public.POST("/login", controllers.Login(config, db, l))       // Authenticate a user based on email/username and password.
+
+	// Private routes
+	// Protected routes with auth header required
+	private := r.Group(defaultPath)
+	private.Use(middlewares.AuthMiddlerWare(config, l))
+	private.Use(middlewares.Verify(config, db, l))
+	private.GET("/logout", controllers.Logout(config, db, l)) // Log the user out.
 
 	/*
 		// Initiate a password reset by providing an email or username.

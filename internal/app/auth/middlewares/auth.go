@@ -8,12 +8,17 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/steve-mir/go-auth-system/internal/token"
+	"github.com/steve-mir/go-auth-system/internal/utils"
+	"go.uber.org/zap"
 )
 
 const (
 	authorizationHeaderKey  = "authorization"
 	authorizationTypeBearer = "bearer"
-	authorizationPayloadKey = "authorization_payload"
+)
+
+var (
+	AuthorizationPayloadKey = "authorization_payload"
 )
 
 /*
@@ -38,13 +43,16 @@ const (
 	user_logins for successful login audit trail
 	login_failures for failed logins and security monitoring
 */
-func AuthMiddlerWare(tokenMaker token.Maker) gin.HandlerFunc {
+
+// ! Refresh token should be used only once. If reuse is detected end the session
+// ! Create table to track access token that have been refreshed.
+func AuthMiddlerWare(config utils.Config, l *zap.Logger) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		authorizationHeader := ctx.GetHeader(authorizationHeaderKey)
 		if len(authorizationHeader) == 0 {
 			fmt.Println("authorization header is not provided")
 			err := errors.New("authorization header is not provided")
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, err) // errorResponse(err)
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -52,7 +60,7 @@ func AuthMiddlerWare(tokenMaker token.Maker) gin.HandlerFunc {
 		if len(fields) < 2 {
 			fmt.Println("invalid authorization header format")
 			err := errors.New("invalid authorization header format")
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, err)
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -60,22 +68,43 @@ func AuthMiddlerWare(tokenMaker token.Maker) gin.HandlerFunc {
 		if authorizationType != authorizationTypeBearer {
 			fmt.Printf("unsupported authorization type %s", authorizationType)
 			err := fmt.Errorf("unsupported authorization type %s", authorizationType)
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, err)
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			return
 		}
 
 		accessToken := fields[1]
-		payload, err := tokenMaker.VerifyToken(accessToken)
+
+		tokenMaker, err := token.NewPasetoMaker(utils.GetKeyForToken(config, false))
 		if err != nil {
-			// Check if token is expired then refresh
-			fmt.Println("Error: ", err)
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, err.Error())
+			fmt.Printf("Could not init tokenMaker. Error: %s.", err)
+			err := fmt.Errorf("could not init tokenMaker %s", err)
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			return
 		}
 
-		// Check if email is verified
+		payload, err := tokenMaker.VerifyToken(accessToken) // Decrypts the access token and returns the data stored in it
+		if err != nil {
+			fmt.Println(payload)
+			fmt.Println("Access Token Error: ", err)
+			if err == token.ErrExpiredToken {
+				fmt.Println("Token expired going to verify")
+				ctx.Set(AuthorizationPayloadKey, payload)
+				return
+			}
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			return
+		}
 
-		ctx.Set(authorizationPayloadKey, payload)
+		// Verify the session is active
+
+		// Check if email is verified (remove if it is optional to verify email)
+		if !payload.IsUserVerified {
+			fmt.Println("Error: Please verify your account")
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "account not verified"})
+			return
+		}
+
+		ctx.Set(AuthorizationPayloadKey, payload) // TODO: Limit this to just the user's email and uid
 		ctx.Next()
 	}
 }

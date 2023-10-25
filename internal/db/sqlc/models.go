@@ -43,6 +43,7 @@ type Session struct {
 	UserAgent    string         `json:"user_agent"`
 	IpAddress    pqtype.Inet    `json:"ip_address"`
 	IsBlocked    bool           `json:"is_blocked"`
+	IsBreached   bool           `json:"is_breached"`
 	ExpiresAt    time.Time      `json:"expires_at"`
 	CreatedAt    sql.NullTime   `json:"created_at"`
 	LastActiveAt sql.NullTime   `json:"last_active_at"`
@@ -51,19 +52,21 @@ type Session struct {
 type User struct {
 	ID                uuid.UUID      `json:"id"`
 	Name              sql.NullString `json:"name"`
-	Email             sql.NullString `json:"email"`
+	Email             string         `json:"email"`
 	Username          sql.NullString `json:"username"`
 	PasswordHash      string         `json:"password_hash"`
 	CreatedAt         sql.NullTime   `json:"created_at"`
 	UpdatedAt         sql.NullTime   `json:"updated_at"`
-	LastLogin         sql.NullTime   `json:"last_login"`
-	IsSuspended       sql.NullBool   `json:"is_suspended"`
-	IsVerified        sql.NullBool   `json:"is_verified"`
-	IsDeleted         sql.NullBool   `json:"is_deleted"`
+	IsSuspended       bool           `json:"is_suspended"`
+	IsVerified        bool           `json:"is_verified"`
+	IsDeleted         bool           `json:"is_deleted"`
 	LoginAttempts     sql.NullInt32  `json:"login_attempts"`
 	LockoutDuration   sql.NullInt32  `json:"lockout_duration"`
 	LockoutUntil      sql.NullTime   `json:"lockout_until"`
 	PasswordChangedAt sql.NullTime   `json:"password_changed_at"`
+	DeletedAt         sql.NullTime   `json:"deleted_at"`
+	SuspendedAt       sql.NullTime   `json:"suspended_at"`
+	VerifiedAt        sql.NullTime   `json:"verified_at"`
 }
 
 type UserLogin struct {

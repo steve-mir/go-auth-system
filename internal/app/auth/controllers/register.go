@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"database/sql"
-	"log"
 	"net/http"
 	"regexp"
 
@@ -19,7 +18,7 @@ type userRequest struct {
 	Password string `json:"password" validate:"required,min=8,max=64,strong_password"`
 }
 
-func Register(config utils.Config) gin.HandlerFunc {
+func Register(config utils.Config, db *sql.DB, l *zap.Logger) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		l, _ := zap.NewProduction()
 		var req userRequest
@@ -39,12 +38,12 @@ func Register(config utils.Config) gin.HandlerFunc {
 		}
 
 		// Open a database connection
-		db, err := sql.Open(config.DBDriver, config.DBSource)
-		if err != nil {
-			l.Error("DB connection error", zap.Error(err))
-			log.Fatal("Cannot connect to db:", err)
-		}
-		defer db.Close()
+		// db, err := sql.Open(config.DBDriver, config.DBSource)
+		// if err != nil {
+		// 	l.Error("DB connection error", zap.Error(err))
+		// 	log.Fatal("Cannot connect to db:", err)
+		// }
+		// defer db.Close()
 
 		store := sqlc.NewStore(db)
 

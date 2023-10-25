@@ -72,3 +72,14 @@ func IsStrongPasswordValidation(password string) bool {
 
 	return true
 }
+
+func GetKeyForToken(config Config, isRefresh bool) string {
+	var key string
+	if isRefresh {
+		key = config.RefreshTokenSymmetricKey
+	} else {
+		key = config.AccessTokenSymmetricKey
+	}
+
+	return key
+}

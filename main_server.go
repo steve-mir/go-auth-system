@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 	"os"
 	"os/signal"
@@ -10,6 +11,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/steve-mir/go-auth-system/internal/app/auth/routers"
+	"github.com/steve-mir/go-auth-system/internal/db/sqlc"
 	"github.com/steve-mir/go-auth-system/internal/utils"
 	"go.uber.org/zap"
 )
@@ -29,7 +31,12 @@ func main() {
 	router := gin.New()
 
 	// Create the routes
-	setupRouter(config, router, l)
+	db, err := sqlc.CreateDbPool(config)
+	if err != nil {
+		l.Error("cannot create db pool", zap.Error(err))
+		return
+	}
+	setupRouter(db, config, router, l)
 
 	// Serve your Swagger documentation if needed
 	// r.StaticFile("/swagger.yaml", "./swagger.yaml")
@@ -54,6 +61,7 @@ func main() {
 	// signal.Notify(sigChan, os.Kill)
 	sig := <-sigChan
 	l.Info("Received terminate, graceful shutdown", zap.String("signal", sig.String()))
+	defer db.Close() // close db connection
 
 	// Graceful shutdown with error handling
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -64,7 +72,7 @@ func main() {
 
 }
 
-func setupRouter(config utils.Config, route *gin.Engine, l *zap.Logger) {
+func setupRouter(db *sql.DB, config utils.Config, route *gin.Engine, l *zap.Logger) {
 	// Create cors
 	corsConfig := cors.DefaultConfig()
 	corsConfig.AllowOrigins = []string{"https://localhost:3000"}
@@ -72,16 +80,5 @@ func setupRouter(config utils.Config, route *gin.Engine, l *zap.Logger) {
 
 	// Use structured logger middleware
 	route.Use(gin.Logger())
-
-	routers.Auth(config, route)
-
-	// Add auth middleware to protected routes
-	// maker, err := token.NewPasetoMaker(config.TokenSymmetricKey)
-	// if err != nil {
-	// 	l.Fatal("cannot create token maker", zap.Error(err))
-	// 	return
-	// }
-	// authRoutes := route.Group("/").Use(middlewares.AuthMiddlerWare(maker))
-
-	// route.Profile(config, authRoutes)
+	routers.Auth(config, db, l, route)
 }

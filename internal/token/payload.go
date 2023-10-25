@@ -26,11 +26,12 @@ var (
 
 type PayloadData struct {
 	// Role     string    `json:"role"`
+	RefreshID      string      `json:"refresh_token"`
 	UserId         uuid.UUID   `json:"user_id"`
+	IsRefresh      bool        `json:"is_refresh"`
 	Username       string      `json:"username"`
 	IsUserVerified bool        `json:"is_user_verified"` // End of user part
 	SessionID      uuid.UUID   `json:"session_id"`
-	Type           string      `json:"type"`
 	Issuer         string      `json:"issuer"`
 	Audience       string      `json:"audience"`
 	IP             pqtype.Inet `json:"ip"`
@@ -87,7 +88,7 @@ func NewPayload(payload PayloadData, duration time.Duration) (*Payload, error) {
 // 	return nil
 // }
 
-func (payload *Payload) Valid() error {
+func (payload *Payload) ValidateExpiry() error {
 	currentTime := time.Now()
 	if currentTime.After(payload.Expires) {
 		return ErrExpiredToken

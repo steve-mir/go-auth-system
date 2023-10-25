@@ -57,7 +57,7 @@ func LoginUser(config utils.Config, store *sqlc.Store, ctx *gin.Context, email s
 
 	//* Check login_failures for recent failures for this user from the current IP address. If too many, block login.
 
-	user, err := store.GetUserByEmail(context.Background(), sql.NullString{String: email, Valid: true})
+	user, err := store.GetUserByEmail(context.Background(), email)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			// err2 := recordFailedLogin(store, user.ID, ctx.Request.UserAgent(), clientIP)
@@ -79,19 +79,15 @@ func LoginUser(config utils.Config, store *sqlc.Store, ctx *gin.Context, email s
 		return AuthUserResponse{User: User{}, Error: errors.New("email or password incorrect")}
 	}
 
-	// Access token
-	accessToken, accessPayload, err := createUserToken(
-		config, tokenID, "accessToken", user.Email.String, user.ID, user.IsVerified.Bool,
-		clientIP, ctx.Request.UserAgent(), config.AccessTokenDuration,
-	)
+	// Check if user should gain access
+	err = checkAccountStat(user.IsSuspended, user.IsDeleted)
 	if err != nil {
-		log.Println("Error creating Access token for ", email, "Error: ", err)
-		return AuthUserResponse{User: User{}, Error: errors.New("an unknown error occurred")}
+		return AuthUserResponse{User: User{}, Error: err}
 	}
 
 	// Refresh token
-	refreshToken, refreshPayload, err := createUserToken(
-		config, tokenID, "refreshToken", user.Email.String, user.ID, user.IsVerified.Bool,
+	refreshToken, refreshPayload, err := CreateUserToken(
+		true, "", config, tokenID, true, user.Email, user.ID, user.IsVerified,
 		clientIP, ctx.Request.UserAgent(), config.RefreshTokenDuration,
 	)
 
@@ -100,15 +96,26 @@ func LoginUser(config utils.Config, store *sqlc.Store, ctx *gin.Context, email s
 		return AuthUserResponse{User: User{}, Error: errors.New("an unknown error occurred")}
 	}
 
+	// Access token
+	accessToken, accessPayload, err := CreateUserToken(
+		false, refreshToken, config, tokenID, false, user.Email, user.ID, user.IsVerified,
+		clientIP, ctx.Request.UserAgent(), config.AccessTokenDuration,
+	)
+	if err != nil {
+		log.Println("Error creating Access token for ", email, "Error: ", err)
+		return AuthUserResponse{User: User{}, Error: errors.New("an unknown error occurred")}
+	}
+
 	_, err = store.CreateSession(context.Background(), sqlc.CreateSessionParams{
 
 		ID:           tokenID, //refreshPayload.ID,
 		UserID:       user.ID,
-		Email:        user.Email,
+		Email:        sql.NullString{String: user.Email, Valid: true},
 		RefreshToken: refreshToken,
 		UserAgent:    ctx.Request.UserAgent(),
 		IpAddress:    clientIP,
 		IsBlocked:    false,
+		IsBreached:   false,
 		ExpiresAt:    refreshPayload.Expires,
 		CreatedAt: sql.NullTime{
 			Time:  refreshPayload.IssuedAt,
@@ -124,9 +131,8 @@ func LoginUser(config utils.Config, store *sqlc.Store, ctx *gin.Context, email s
 	resp := AuthUserResponse{
 		User: User{
 			ID:                    user.ID,
-			Email:                 user.Email.String,
-			IsEmailVerified:       user.IsVerified.Bool,
-			LastLogin:             user.LastLogin.Time,
+			Email:                 user.Email,
+			IsEmailVerified:       user.IsVerified,
 			CreatedAt:             user.CreatedAt.Time,
 			AccessToken:           accessToken,
 			AccessTokenExpiresAt:  accessPayload.Expires,
@@ -137,23 +143,8 @@ func LoginUser(config utils.Config, store *sqlc.Store, ctx *gin.Context, email s
 		Error: nil,
 	}
 
-	maker, _ := token.NewPasetoMaker(config.TokenSymmetricKey)
+	fmt.Println("ACESS TOKEN")
 	fmt.Println(accessToken)
-	cPayload, err := maker.VerifyToken(accessToken)
-	if err != nil {
-		return AuthUserResponse{User: User{}, Error: errors.New("paseto token verification failed")}
-	}
-
-	// TODO: Use to test verify. Remove after
-	rPayload, err := maker.VerifyToken(refreshToken)
-	if err != nil {
-		return AuthUserResponse{User: User{}, Error: errors.New("paseto token verification failed")}
-	}
-
-	log.Println("Printing user from Access token")
-	fmt.Printf("%+v\n", cPayload)
-	log.Println("Printing user from Refresh token")
-	fmt.Printf("%+v\n", rPayload)
 
 	//! 3 User logged in successfully. Record it
 	err = recordLoginSuccess(store, user.ID, ctx.Request.UserAgent(), clientIP)
@@ -165,12 +156,27 @@ func LoginUser(config utils.Config, store *sqlc.Store, ctx *gin.Context, email s
 	return resp
 }
 
-func createUserToken(config utils.Config, tokenID uuid.UUID, tokenType string,
-	email string, uid uuid.UUID, IsUserVerified bool, ip pqtype.Inet,
-	agent string, duration time.Duration,
+func checkAccountStat(isSuspended bool, isDeleted bool) error {
+	fmt.Printf("Is Suspended %v is deleted %v", isSuspended, isDeleted)
+	if isSuspended {
+		fmt.Println("Account deleted: ", isSuspended)
+		return errors.New("account suspended")
+	}
+
+	// Check if user should gain access
+	if isDeleted {
+		fmt.Println("Account deleted: ", isDeleted)
+		return errors.New("account suspended")
+	}
+	return nil
+}
+
+func CreateUserToken(isRefreshToken bool, refreshToken string, config utils.Config, tokenID uuid.UUID,
+	isRefresh bool, email string, uid uuid.UUID, IsUserVerified bool,
+	ip pqtype.Inet, agent string, duration time.Duration,
 ) (string, *token.Payload, error) {
 
-	maker, err := token.NewPasetoMaker(config.TokenSymmetricKey)
+	maker, err := token.NewPasetoMaker(utils.GetKeyForToken(config, isRefreshToken))
 	if err != nil {
 		log.Println("Error creating new paseto maker for ", email, "Error: ", err)
 		return "", &token.Payload{}, err
@@ -178,16 +184,17 @@ func createUserToken(config utils.Config, tokenID uuid.UUID, tokenType string,
 
 	return maker.CreateToken(
 		token.PayloadData{
+			// Role: "user",
+			RefreshID:      refreshToken,
+			IsRefresh:      isRefresh,
 			SessionID:      tokenID,
-			Type:           tokenType,
 			UserId:         uid,
 			Username:       email,
 			IsUserVerified: IsUserVerified,
-			// Role: "user",
-			Issuer:    "Settle in",
-			Audience:  "website users",
-			IP:        ip,
-			UserAgent: agent,
+			Issuer:         "Settle in",
+			Audience:       "website users",
+			IP:             ip,
+			UserAgent:      agent,
 		}, duration)
 }
 

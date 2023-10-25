@@ -54,18 +54,6 @@ func (maker *PasetoMaker) CreateToken(payloadData PayloadData, duration time.Dur
 	return accessToken, payload, err
 }
 
-// CreateCustomToken implements Maker.
-/*
-func (maker *PasetoMaker) CreateCustomToken(user sqlc.User, duration time.Duration) (string, *Payload, error) {
-	payload, err := CustomNewPayload(user, duration)
-	if err != nil {
-		return "", payload, err
-	}
-	pToken, err := maker.paseto.Encrypt(maker.symmetricKey, payload, nil)
-	// payload.Username = "pToken"
-	return pToken, payload, err
-}*/
-
 // VerifyToken implements Maker.
 func (maker *PasetoMaker) VerifyToken(token string) (*Payload, error) {
 	// Check cache first
@@ -80,35 +68,22 @@ func (maker *PasetoMaker) VerifyToken(token string) (*Payload, error) {
 		return nil, ErrInvalidToken
 	}
 
-	err = payload.Valid()
-	if err != nil {
-		return nil, err
+	// Check for expiry if is refresh token
+	// if payload.RefreshID == "" {
+	err = payload.ValidateExpiry()
+	if err != nil { //&& err.Error() != ErrExpiredToken.Error() {
+		return payload, err
 	}
+	// }
 
 	// Cache validated token
 	maker.validTokens[token] = struct{}{}
 
-	return payload, nil
+	return payload, nil //err //nil
 }
 
-// VerifyToken implements Maker.
-// func (maker *PasetoMaker) VerifyCustomToken(token string) (*Payload, error) {
-// 	payload := &CustomPayload{}
-
-// 	err := maker.paseto.Decrypt(token, maker.symmetricKey, payload, nil)
-// 	if err != nil {
-// 		return nil, ErrInvalidToken
-// 	}
-
-// 	err = payload.Valid()
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	return payload, nil
-// }
-
 // Add a revoke endpoint
+// todo: implement
 func (m *PasetoMaker) RevokeToken(token string) error {
 	// Used for logout
 	delete(m.validTokens, token)

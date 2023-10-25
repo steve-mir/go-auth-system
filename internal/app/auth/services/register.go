@@ -99,14 +99,8 @@ func CreateUser(config utils.Config, ctx *gin.Context, store *sqlc.Store, email 
 	uid := uuidGenerator
 
 	params := sqlc.CreateUserParams{
-		ID: uid,
-		Email: sql.NullString{
-			String: email,
-			Valid:  true,
-		}, IsVerified: sql.NullBool{
-			Bool:  false,
-			Valid: true,
-		},
+		ID:    uid,
+		Email: email, IsVerified: false,
 		PasswordHash: result.HashedPassword,
 		CreatedAt: sql.NullTime{
 			Time:  time.Now(),
@@ -121,12 +115,21 @@ func CreateUser(config utils.Config, ctx *gin.Context, store *sqlc.Store, email 
 	}
 	// latency := time.Since(start)
 
-	accessToken, accessPayload, err := createToken(sqlcUser.Email.String, sqlcUser.ID, clientIP, ctx.Request.UserAgent(), config)
+	// Refresh token
+	// refreshToken, refreshPayload, err := createToken(false, sqlcUser.Email, sqlcUser.ID, clientIP, ctx.Request.UserAgent(), config)
+	// if err != nil {
+	// 	return AuthUserResponse{User: User{}, Error: err}
+	// }
+
+	refreshToken := "new user"
+	accessToken, accessPayload, err := createToken(false, refreshToken, sqlcUser.Email, sqlcUser.ID, clientIP, ctx.Request.UserAgent(), config)
 	if err != nil {
 		return AuthUserResponse{User: User{}, Error: err}
 	}
 
-	checkToken(accessToken, config)
+	// TODO: Create session for user when they register
+
+	checkToken(false, accessToken, config)
 
 	// TODO: record metrics
 	// metrics.RegisterUser()
@@ -134,10 +137,9 @@ func CreateUser(config utils.Config, ctx *gin.Context, store *sqlc.Store, email 
 	newUser := AuthUserResponse{
 		User: User{
 			ID:                   sqlcUser.ID,
-			Email:                sqlcUser.Email.String,
-			IsEmailVerified:      sqlcUser.IsVerified.Bool,
+			Email:                sqlcUser.Email,
+			IsEmailVerified:      sqlcUser.IsVerified,
 			PasswordChangedAt:    sqlcUser.CreatedAt.Time,
-			LastLogin:            sqlcUser.LastLogin.Time,
 			CreatedAt:            sqlcUser.CreatedAt.Time,
 			AccessToken:          accessToken,
 			AccessTokenExpiresAt: accessPayload.Expires,
@@ -175,33 +177,32 @@ func HandleEmailPwdErrors(email string, pwd string) error {
 
 func checkEmailExistsError(store *sqlc.Store, email string) error {
 	// Check duplicate emails
-	userEmail, _ := store.GetUserByEmail(context.Background(), sql.NullString{
-		String: email,
-		Valid:  true,
-	})
+	userEmail, _ := store.GetUserByEmail(context.Background(), email)
 	if userEmail.ID != uuid.Nil {
 		return errors.New("user already exists")
 	}
 	return nil
 }
-func createToken(email string, userId uuid.UUID, ip pqtype.Inet, userAgent string, config utils.Config) (string, *token.Payload, error) {
+func createToken(isRefreshToken bool, refreshToken string, email string, userId uuid.UUID, ip pqtype.Inet, userAgent string, config utils.Config) (string, *token.Payload, error) {
 	// Create a Paseto token and include user data in the payload
-	// Exclude sensitive data like the password
-	maker, err := token.NewPasetoMaker(config.TokenSymmetricKey)
+	// todo: Exclude sensitive data like the password
+	maker, err := token.NewPasetoMaker(utils.GetKeyForToken(config, isRefreshToken))
 	if err != nil {
 		return "", &token.Payload{}, err
 	}
 
 	// Define the payload for the token (excluding the password)
 	payloadData := token.PayloadData{
-		UserId:   userId,
-		Username: email,
-		// Role: "user",
-		// SessionID uuid.UUID `json:"session_id"`
+		RefreshID: refreshToken,
+		IsRefresh: false,
+		UserId:    userId,
+		Username:  email,
 		Issuer:    "Settle in",
 		Audience:  "website users",
 		IP:        ip,
 		UserAgent: userAgent,
+		// Role: "user",
+		// SessionID uuid.UUID `json:"session_id"`
 	}
 
 	// Create the Paseto token
@@ -210,8 +211,8 @@ func createToken(email string, userId uuid.UUID, ip pqtype.Inet, userAgent strin
 }
 
 /** Debug functions*/
-func verifyToken(config utils.Config, pToken string) (*token.Payload, error) {
-	maker, err := token.NewPasetoMaker(config.TokenSymmetricKey)
+func verifyToken(isRefreshToken bool, config utils.Config, pToken string) (*token.Payload, error) {
+	maker, err := token.NewPasetoMaker(utils.GetKeyForToken(config, isRefreshToken))
 	if err != nil {
 		return &token.Payload{}, err
 	}
@@ -225,10 +226,10 @@ func verifyToken(config utils.Config, pToken string) (*token.Payload, error) {
 	return payload, nil
 }
 
-func checkToken(pToken string, config utils.Config) {
+func checkToken(isRefreshToken bool, pToken string, config utils.Config) {
 	log.Println("Token", pToken)
 
-	pUser, _ := verifyToken(config, pToken)
+	pUser, _ := verifyToken(isRefreshToken, config, pToken)
 	log.Println(pUser.UserId)
 	log.Println(pUser.Username)
 }
