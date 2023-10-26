@@ -80,14 +80,14 @@ func LoginUser(config utils.Config, store *sqlc.Store, ctx *gin.Context, email s
 	}
 
 	// Check if user should gain access
-	err = checkAccountStat(user.IsSuspended, user.IsDeleted)
+	err = checkAccountStat(user.IsSuspended.Bool, user.IsDeleted)
 	if err != nil {
 		return AuthUserResponse{User: User{}, Error: err}
 	}
 
 	// Refresh token
 	refreshToken, refreshPayload, err := CreateUserToken(
-		true, "", config, tokenID, true, user.Email, user.ID, user.IsVerified,
+		true, "", config, tokenID, true, user.Email, user.ID, user.IsEmailVerified.Bool,
 		clientIP, ctx.Request.UserAgent(), config.RefreshTokenDuration,
 	)
 
@@ -98,7 +98,7 @@ func LoginUser(config utils.Config, store *sqlc.Store, ctx *gin.Context, email s
 
 	// Access token
 	accessToken, accessPayload, err := CreateUserToken(
-		false, refreshToken, config, tokenID, false, user.Email, user.ID, user.IsVerified,
+		false, refreshToken, config, tokenID, false, user.Email, user.ID, user.IsEmailVerified.Bool,
 		clientIP, ctx.Request.UserAgent(), config.AccessTokenDuration,
 	)
 	if err != nil {
@@ -132,7 +132,7 @@ func LoginUser(config utils.Config, store *sqlc.Store, ctx *gin.Context, email s
 		User: User{
 			ID:                    user.ID,
 			Email:                 user.Email,
-			IsEmailVerified:       user.IsVerified,
+			IsEmailVerified:       user.IsEmailVerified.Bool,
 			CreatedAt:             user.CreatedAt.Time,
 			AccessToken:           accessToken,
 			AccessTokenExpiresAt:  accessPayload.Expires,
@@ -190,6 +190,7 @@ func CreateUserToken(isRefreshToken bool, refreshToken string, config utils.Conf
 			SessionID:      tokenID,
 			UserId:         uid,
 			Username:       email,
+			Email:          email,
 			IsUserVerified: IsUserVerified,
 			Issuer:         "Settle in",
 			Audience:       "website users",

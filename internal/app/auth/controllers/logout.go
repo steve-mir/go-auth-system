@@ -31,6 +31,8 @@ func Logout(config utils.Config, db *sql.DB, l *zap.Logger) gin.HandlerFunc {
 			return
 		}
 
-		ctx.JSON(http.StatusOK, gin.H{"msg": "User logout successfully lol."})
+		verifyCode, _ := utils.GenerateUniqueToken("bbd2518c-1d94-472c-8563-cb5ab7608bf0")
+
+		ctx.JSON(http.StatusOK, gin.H{"msg": "User logout successfully lol.", "link": verifyCode})
 	}
 }

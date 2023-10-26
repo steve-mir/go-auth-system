@@ -28,3 +28,8 @@ func RegisterUser(req RegisterUserRequest) RegisterUserResponse {
 func createToken(user User) string {
   // paseto token creation...
 }
+
+
+2-factor-auth
+pwd reset
+pwd change

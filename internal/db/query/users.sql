@@ -29,5 +29,11 @@ UPDATE users
 SET is_suspended = $3, suspended_at = $2
 WHERE id = $1;
 
+-- name: UpdateUserEmailVerified :exec
+UPDATE users
+SET is_email_verified = $3,
+verified_at = $2 --// TODO: Change to email_verified_at
+WHERE id = $1;
+
 -- name: DeleteUserByID :exec
 DELETE FROM users WHERE id = $1;

@@ -100,7 +100,7 @@ func CreateUser(config utils.Config, ctx *gin.Context, store *sqlc.Store, email 
 
 	params := sqlc.CreateUserParams{
 		ID:    uid,
-		Email: email, IsVerified: false,
+		Email: email, IsVerified: sql.NullBool{Bool: true, Valid: true},
 		PasswordHash: result.HashedPassword,
 		CreatedAt: sql.NullTime{
 			Time:  time.Now(),
@@ -138,7 +138,7 @@ func CreateUser(config utils.Config, ctx *gin.Context, store *sqlc.Store, email 
 		User: User{
 			ID:                   sqlcUser.ID,
 			Email:                sqlcUser.Email,
-			IsEmailVerified:      sqlcUser.IsVerified,
+			IsEmailVerified:      sqlcUser.IsEmailVerified.Bool,
 			PasswordChangedAt:    sqlcUser.CreatedAt.Time,
 			CreatedAt:            sqlcUser.CreatedAt.Time,
 			AccessToken:          accessToken,
@@ -197,6 +197,7 @@ func createToken(isRefreshToken bool, refreshToken string, email string, userId 
 		IsRefresh: false,
 		UserId:    userId,
 		Username:  email,
+		Email:     email,
 		Issuer:    "Settle in",
 		Audience:  "website users",
 		IP:        ip,

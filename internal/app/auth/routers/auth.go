@@ -53,15 +53,17 @@ func Auth(config utils.Config, db *sql.DB, l *zap.Logger, r *gin.Engine) {
 	// Public routes
 	// Requires throttling (rate limiting). No auth header required
 	public := r.Group(defaultPath)
-	public.POST("/register", controllers.Register(config, db, l)) // Register a new user
-	public.POST("/login", controllers.Login(config, db, l))       // Authenticate a user based on email/username and password.
+	public.POST("/register", controllers.Register(config, db, l))      // Register a new user
+	public.POST("/login", controllers.Login(config, db, l))            // Authenticate a user based on email/username and password.
+	public.GET("/verify/", controllers.VerifyUserEmail(config, db, l)) // Log the user out.
 
 	// Private routes
 	// Protected routes with auth header required
 	private := r.Group(defaultPath)
 	private.Use(middlewares.AuthMiddlerWare(config, l))
 	private.Use(middlewares.Verify(config, db, l))
-	private.GET("/logout", controllers.Logout(config, db, l)) // Log the user out.
+	private.GET("/logout", controllers.Logout(config, db, l))                      // Log the user out.
+	private.GET("/verify/link", controllers.VerifyUserEmailRequest(config, db, l)) // Send verification link to user
 
 	/*
 		// Initiate a password reset by providing an email or username.

@@ -1,8 +1,13 @@
 package utils
 
 import (
+	"crypto/rand"
+	"encoding/base64"
+	"fmt"
 	"net"
 	"regexp"
+	"strings"
+	"time"
 
 	"github.com/sqlc-dev/pqtype"
 )
@@ -82,4 +87,38 @@ func GetKeyForToken(config Config, isRefresh bool) string {
 	}
 
 	return key
+}
+
+// GenerateUniqueToken generates a unique verification token.
+func GenerateUniqueToken(userID string) (string, error) { // TODO: revisit to fix string length, format and content
+	// Generate a cryptographically secure random value
+	randomBytes := make([]byte, 32)
+	_, err := rand.Read(randomBytes)
+	if err != nil {
+		return "", err
+	}
+	fmt.Println(randomBytes)
+
+	// Create a unique token by combining user ID, timestamp, and random value
+	timestamp := time.Now().Unix()
+	token := fmt.Sprintf("%s-%d-%s", userID, timestamp, formatConsistentToken(timestamp, base64.URLEncoding.EncodeToString(randomBytes)))
+
+	return token, nil
+}
+
+func formatConsistentToken(timestamp int64, randomString string) string {
+	// Convert the timestamp to a time.Time
+	timestampTime := time.Unix(timestamp, 0)
+
+	// Format the timestamp as a string (e.g., "2023-03-06T08:46:47Z")
+	formattedTimestamp := timestampTime.Format("2006-01-02T15:04:05Z")
+
+	// Remove special characters and spaces from the random string
+	cleanedRandomString := strings.ReplaceAll(randomString, "-", "")
+	cleanedRandomString = strings.ReplaceAll(cleanedRandomString, "_", "")
+
+	// Combine the formatted timestamp and cleaned random string
+	consistentToken := fmt.Sprintf("%s-%s", formattedTimestamp, cleanedRandomString)
+
+	return consistentToken
 }

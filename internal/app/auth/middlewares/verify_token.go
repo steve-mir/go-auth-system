@@ -56,7 +56,7 @@ func Verify(config utils.Config, db *sql.DB, l *zap.Logger) gin.HandlerFunc {
 				}
 
 				// Check if user is suspended
-				if condition := user.IsSuspended; condition {
+				if condition := user.IsSuspended.Bool; condition {
 					fmt.Println("Error: User suspended")
 					ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "account suspended"})
 					ctx.Abort()
@@ -77,7 +77,7 @@ func Verify(config utils.Config, db *sql.DB, l *zap.Logger) gin.HandlerFunc {
 
 				// fmt.Println("SESSION", session)
 
-				if session.RefreshToken != data.RefreshID && !user.IsSuspended {
+				if session.RefreshToken != data.RefreshID && !user.IsSuspended.Bool {
 					// Block user here
 					fmt.Println("Illegal activity detected on " + session.ID.String())
 					if err := blockUser(store, session); err != nil {
@@ -157,7 +157,7 @@ func blockUser(store *sqlc.Store, session sqlc.Session) error {
 	//* update the user to isSuspended
 	err = store.UpdateUserSuspension(context.Background(), sqlc.UpdateUserSuspensionParams{ // ! 2c
 		ID:          session.UserID,
-		IsSuspended: true,
+		IsSuspended: sql.NullBool{Bool: true, Valid: true},
 		SuspendedAt: sql.NullTime{Time: time.Now(), Valid: true},
 	})
 	if err != nil {
@@ -185,7 +185,7 @@ func generateNewAccessToken(config utils.Config, store *sqlc.Store, ctx *gin.Con
 
 	// Refresh token
 	refreshToken, refreshPayload, err := services.CreateUserToken(
-		true, "", config, tokenID, true, user.Email, user.ID, user.IsVerified,
+		true, "", config, tokenID, true, user.Email, user.ID, user.IsEmailVerified.Bool,
 		clientIP, ctx.Request.UserAgent(), config.RefreshTokenDuration,
 	)
 
@@ -196,7 +196,7 @@ func generateNewAccessToken(config utils.Config, store *sqlc.Store, ctx *gin.Con
 
 	// Access token
 	accessToken, _, err := services.CreateUserToken(
-		false, refreshToken, config, tokenID, false, user.Email, user.ID, user.IsVerified,
+		false, refreshToken, config, tokenID, false, user.Email, user.ID, user.IsEmailVerified.Bool,
 		clientIP, ctx.Request.UserAgent(), config.AccessTokenDuration,
 	)
 	if err != nil {

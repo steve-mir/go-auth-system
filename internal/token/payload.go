@@ -30,6 +30,7 @@ type PayloadData struct {
 	UserId         uuid.UUID   `json:"user_id"`
 	IsRefresh      bool        `json:"is_refresh"`
 	Username       string      `json:"username"`
+	Email          string      `json:"email"`
 	IsUserVerified bool        `json:"is_user_verified"` // End of user part
 	SessionID      uuid.UUID   `json:"session_id"`
 	Issuer         string      `json:"issuer"`
@@ -67,26 +68,6 @@ func NewPayload(payload PayloadData, duration time.Duration) (*Payload, error) {
 	}, nil
 
 }
-
-// func CustomNewPayload(user Payload, duration time.Duration) (*Payload, error) {
-// 	payload, err := NewPayload(user, duration)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	customPayload := &Payload{
-// 		// Payload: user,
-// 	}
-
-// 	return customPayload, nil
-// }
-
-// func (payload *Payload) Valid() error {
-// 	if time.Now().After(payload.Expires) {
-// 		return ErrExpiredToken
-// 	}
-// 	return nil
-// }
 
 func (payload *Payload) ValidateExpiry() error {
 	currentTime := time.Now()

@@ -98,82 +98,14 @@ func AuthMiddlerWare(config utils.Config, l *zap.Logger) gin.HandlerFunc {
 		// Verify the session is active
 
 		// Check if email is verified (remove if it is optional to verify email)
-		if !payload.IsUserVerified {
-			fmt.Println("Error: Please verify your account")
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "account not verified"})
-			return
-		}
+		// TODO: fix for 1 login or unverified emails
+		// if !payload.IsUserVerified {
+		// 	fmt.Println("Error: Please verify your account")
+		// 	ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "account not verified"})
+		// 	return
+		// }
 
 		ctx.Set(AuthorizationPayloadKey, payload) // TODO: Limit this to just the user's email and uid
 		ctx.Next()
 	}
 }
-
-/**
-// If accessToken is deleted
-func refreshAccessToken(refreshToken string) {
-
-  // Verify refresh token
-  claims, err := parseToken(refreshToken)
-  //... error handling
-
-  // Lookup user
-  user := db.FindUser(claims.UserId)
-
-  // Create new access token
-  accessToken := createAccessToken(user)
-
-  // Create new refresh token
-  newRefreshToken := createRefreshToken(user)
-
-  // Replace old refresh token with new one
-  db.UpdateUserRefreshToken(user.Id, newRefreshToken)
-
-  // Return access and refresh tokens
-}
-*/
-
-/**
-func AuthMiddleware(tokenMaker token.Maker, store Store) gin.HandlerFunc {
-
-  return func(ctx *gin.Context) {
-
-    accessToken := ctx.GetHeader("Authorization")
-
-    // 1. Validate access token
-    claims, err := tokenMaker.VerifyToken(accessToken)
-    if err != nil {
-      return unauthorizedError(ctx)
-    }
-
-    // 2. Lookup session
-    session := store.GetSession(claims.SessionID)
-    if session == nil || session.IsExpired() {
-      return unauthorizedError(ctx)
-    }
-
-    // 3. Lookup user
-    user, err := store.GetUser(session.UserID)
-    if err != nil {
-      return unauthorizedError(ctx)
-    }
-
-    // 4. Attach user to context
-    ctx.Set("user", user)
-
-    // 5. Refresh token if needed
-    if session.ShouldRefresh() {
-      accessToken, refreshToken := refreshTokens(session, user)
-      ctx.SetCookie("refreshToken", refreshToken, maxAge, path, domain, secure, httponly)
-    }
-
-    ctx.Next()
-  }
-
-}
-
-func refreshTokens(session sqlc.Session, user sqlc.User) {
-  // issue new access & refresh tokens
-  return accessToken, refreshToken
-}
-**/
