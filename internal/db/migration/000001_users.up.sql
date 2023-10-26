@@ -19,7 +19,7 @@ CREATE TABLE "users" (
   "password_changed_at" timestamptz,
   "deleted_at" timestamptz,
   "suspended_at" timestamptz,
-  "verified_at" timestamptz
+  "email_verified_at" timestamptz
 );
 
 CREATE INDEX ON "users" ("email", "username", "created_at", "updated_at");

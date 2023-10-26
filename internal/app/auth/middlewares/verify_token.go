@@ -3,6 +3,7 @@ package middlewares
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -23,7 +24,8 @@ func Verify(config utils.Config, db *sql.DB, l *zap.Logger) gin.HandlerFunc {
 		if payload, exists := ctx.Get(AuthorizationPayloadKey); exists {
 			if data, ok := payload.(*token.Payload); ok {
 				if data.RefreshID == "" {
-					fmt.Println("USING REFRESH TOKEN", data.RefreshID)
+					// Add data to error
+					l.Error("wrong token error", zap.Error(errors.New("use of refresh token detected")))
 					ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "no refresh token on payload"})
 					return
 					// ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
@@ -41,6 +43,7 @@ func Verify(config utils.Config, db *sql.DB, l *zap.Logger) gin.HandlerFunc {
 				// Get the user from db
 				user, err := store.GetUserByID(context.Background(), data.UserId) // ! 1
 				if err != nil {
+					l.Error("error fetching user by uid", zap.Error(err))
 					ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "user not found"})
 					ctx.Abort()
 					return
@@ -48,7 +51,7 @@ func Verify(config utils.Config, db *sql.DB, l *zap.Logger) gin.HandlerFunc {
 
 				// Check if user is deleted
 				if user.IsDeleted {
-					fmt.Println("Error: User suspended")
+					l.Error("error fetching user", zap.Error(errors.New("account deleted")))
 					ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "account does not exists"})
 					ctx.Abort()
 					return
@@ -57,7 +60,7 @@ func Verify(config utils.Config, db *sql.DB, l *zap.Logger) gin.HandlerFunc {
 
 				// Check if user is suspended
 				if condition := user.IsSuspended.Bool; condition {
-					fmt.Println("Error: User suspended")
+					l.Error("Error", zap.Error(errors.New("account suspended: "+user.Email)))
 					ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "account suspended"})
 					ctx.Abort()
 					return
@@ -69,7 +72,7 @@ func Verify(config utils.Config, db *sql.DB, l *zap.Logger) gin.HandlerFunc {
 				// Get the session from the db
 				session, err := store.GetSessionsByID(context.Background(), data.SessionID) // ! 2
 				if err != nil {
-					fmt.Println("Fetching Session Error: " + err.Error())
+					l.Error("error fetching session by id", zap.Error(err))
 					ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "suspicious activity detected"})
 					ctx.Abort()
 					return
@@ -81,7 +84,7 @@ func Verify(config utils.Config, db *sql.DB, l *zap.Logger) gin.HandlerFunc {
 					// Block user here
 					fmt.Println("Illegal activity detected on " + session.ID.String())
 					if err := blockUser(store, session); err != nil {
-						fmt.Println("Error blocking user:", err)
+						l.Error("error blocking user", zap.Error(err))
 						ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unknown error occurred. please contact support"})
 						return
 					}
@@ -105,9 +108,6 @@ func Verify(config utils.Config, db *sql.DB, l *zap.Logger) gin.HandlerFunc {
 					return
 				}
 
-				fmt.Println("Printing session")
-				fmt.Println(session)
-
 				// Rotate the Refresh token
 				if time.Now().After(data.Expires) {
 					fmt.Println("Access token expired")
@@ -124,11 +124,13 @@ func Verify(config utils.Config, db *sql.DB, l *zap.Logger) gin.HandlerFunc {
 				ctx.Next()
 
 			} else {
+				l.Error("ctx data conversion error", zap.Error(errors.New("error converting ctx data to payload type")))
 				ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "payload data conversion error"})
 				ctx.Abort()
 				return
 			}
 		} else {
+			l.Error("error getting ctx", zap.Error(errors.New("error getting auth token from ctx")))
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "error getting payload from ctx"})
 			ctx.Abort()
 			return

@@ -23,7 +23,7 @@ func Logout(config utils.Config, db *sql.DB, l *zap.Logger) gin.HandlerFunc {
 		// }
 		// defer db.Close()
 
-		store := sqlc.NewStore(db)
+		store := sqlc.NewStore(db) // TODO: Add store as dependency injector
 
 		err := services.LogoutUser(config, store, ctx)
 		if err != nil {

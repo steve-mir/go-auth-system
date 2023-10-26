@@ -20,7 +20,6 @@ type userRequest struct {
 
 func Register(config utils.Config, db *sql.DB, l *zap.Logger) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		l, _ := zap.NewProduction()
 		var req userRequest
 		if err := ctx.ShouldBindJSON(&req); err != nil {
 			l.Error("Invalid fields error", zap.Error(err))
@@ -37,17 +36,9 @@ func Register(config utils.Config, db *sql.DB, l *zap.Logger) gin.HandlerFunc {
 			return
 		}
 
-		// Open a database connection
-		// db, err := sql.Open(config.DBDriver, config.DBSource)
-		// if err != nil {
-		// 	l.Error("DB connection error", zap.Error(err))
-		// 	log.Fatal("Cannot connect to db:", err)
-		// }
-		// defer db.Close()
-
 		store := sqlc.NewStore(db)
 
-		newUserResp := services.CreateUser(config, ctx, store, req.Email, req.Password)
+		newUserResp := services.CreateUser(config, ctx, store, l, req.Email, req.Password)
 		if newUserResp.Error != nil {
 			l.Error("Create User error", zap.Error(newUserResp.Error))
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": newUserResp.Error.Error()})

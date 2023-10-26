@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -56,12 +57,14 @@ func SendVerificationEmail(config utils.Config, store *sqlc.Store, ctx *gin.Cont
 			return link, nil
 
 		} else {
+			l.Error("ctx data conversion error", zap.Error(errors.New("error converting ctx data to payload type")))
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "error getting payload from ctx"})
 			ctx.Abort()
 			return "", nil
 		}
 
 	} else {
+		l.Error("error getting ctx", zap.Error(errors.New("error getting auth token from ctx")))
 		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "error getting payload from ctx"})
 		ctx.Abort()
 		return "", nil
@@ -73,6 +76,7 @@ func VerifyEmail(config utils.Config, store *sqlc.Store, link string, l *zap.Log
 
 	linkData, err := store.GetEmailVerificationRequestByToken(context.Background(), link)
 	if err != nil {
+		l.Error("error getting email link from db", zap.Error(err))
 		return err
 	}
 
@@ -89,15 +93,17 @@ func VerifyEmail(config utils.Config, store *sqlc.Store, link string, l *zap.Log
 		IsVerified: sql.NullBool{Bool: true, Valid: true},
 	})
 	if err != nil {
+		l.Error("error updating token status", zap.Error(err))
 		return err
 	}
 
 	err = store.UpdateUserEmailVerified(context.Background(), sqlc.UpdateUserEmailVerifiedParams{
 		ID:              linkData.UserID,
 		IsEmailVerified: sql.NullBool{Bool: true, Valid: true},
-		VerifiedAt:      sql.NullTime{Time: time.Now(), Valid: true},
+		EmailVerifiedAt: sql.NullTime{Time: time.Now(), Valid: true},
 	})
 	if err != nil {
+		l.Error("error updating user status", zap.Error(err))
 		return err
 	}
 

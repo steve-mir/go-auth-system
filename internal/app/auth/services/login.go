@@ -14,6 +14,7 @@ import (
 	"github.com/steve-mir/go-auth-system/internal/db/sqlc"
 	"github.com/steve-mir/go-auth-system/internal/token"
 	"github.com/steve-mir/go-auth-system/internal/utils"
+	"go.uber.org/zap"
 )
 
 type LoginUserResponse struct {
@@ -31,29 +32,27 @@ type LoginUserRequest struct {
 }
 
 /**
-// TODO: Implement throttling to prevent brute force attacks
-*/
-
-/**
 Record failed logins and track patterns
 Extract auth logic into service layer
 Add OpenAPI docs for the login API
 */
 
-func LoginUser(config utils.Config, store *sqlc.Store, ctx *gin.Context, email string, pwd string) AuthUserResponse {
+func LoginUser(config utils.Config, store *sqlc.Store,
+	ctx *gin.Context, l *zap.Logger, email string, pwd string,
+) AuthUserResponse {
 	clientIP := utils.GetIpAddr(ctx.ClientIP())
 
 	err := HandleEmailPwdErrors(email, pwd)
 	if err != nil {
+		l.Error("Email password error:", zap.Error(err))
 		return AuthUserResponse{User: User{}, Error: err}
 	}
 
 	tokenID, err := uuid.NewRandom()
 	if err != nil {
-		// log error
+		l.Error("UUID error", zap.Error(err))
 		return AuthUserResponse{User: User{}, Error: errors.New("an unexpected error occurred")}
 	}
-	// l, _ := zap.NewProduction()
 
 	//* Check login_failures for recent failures for this user from the current IP address. If too many, block login.
 
@@ -61,27 +60,25 @@ func LoginUser(config utils.Config, store *sqlc.Store, ctx *gin.Context, email s
 	if err != nil {
 		if err == sql.ErrNoRows {
 			// err2 := recordFailedLogin(store, user.ID, ctx.Request.UserAgent(), clientIP)
-			fmt.Println("User not found: ", email, err)
-			// l.Error("User not found", zap.String("email", email))
+			l.Error("Error getting email "+email, zap.Error(err))
 			return AuthUserResponse{User: User{}, Error: errors.New("email or password incorrect")}
 		}
 		// _ = recordFailedLogin(store, user.ID, ctx.Request.UserAgent(), clientIP)
-		fmt.Println("DB error: ", err)
-		// l.Error("DB error", zap.Error(err))
+		l.Error("DB error", zap.Error(err))
 		return AuthUserResponse{User: User{}, Error: errors.New("email or password incorrect")}
 	}
 
 	err = utils.CheckPassword(pwd, user.PasswordHash)
 	if err != nil {
 		// _ = recordFailedLogin(store, user.ID, ctx.Request.UserAgent(), clientIP)
-		fmt.Println("Hashing error: ", err)
-		// l.Error("wrong email or password", zap.Error(err))
+		l.Error("wrong password", zap.Error(err))
 		return AuthUserResponse{User: User{}, Error: errors.New("email or password incorrect")}
 	}
 
 	// Check if user should gain access
 	err = checkAccountStat(user.IsSuspended.Bool, user.IsDeleted)
 	if err != nil {
+		l.Error("Checking account stat error", zap.Error(err))
 		return AuthUserResponse{User: User{}, Error: err}
 	}
 
@@ -92,7 +89,7 @@ func LoginUser(config utils.Config, store *sqlc.Store, ctx *gin.Context, email s
 	)
 
 	if err != nil {
-		log.Println("Error creating Refresh token for ", email, "Error: ", err)
+		l.Error("Error creating Refresh token for "+email, zap.Error(err))
 		return AuthUserResponse{User: User{}, Error: errors.New("an unknown error occurred")}
 	}
 
@@ -102,7 +99,7 @@ func LoginUser(config utils.Config, store *sqlc.Store, ctx *gin.Context, email s
 		clientIP, ctx.Request.UserAgent(), config.AccessTokenDuration,
 	)
 	if err != nil {
-		log.Println("Error creating Access token for ", email, "Error: ", err)
+		l.Error("Error creating Access token for "+email, zap.Error(err))
 		return AuthUserResponse{User: User{}, Error: errors.New("an unknown error occurred")}
 	}
 
@@ -124,7 +121,7 @@ func LoginUser(config utils.Config, store *sqlc.Store, ctx *gin.Context, email s
 	})
 
 	if err != nil {
-		log.Println("Error creating Session for ", email, "Error: ", err)
+		l.Error("Error creating Session for "+email, zap.Error(err))
 		return AuthUserResponse{User: User{}, Error: errors.New("an unknown error occurred")}
 	}
 
@@ -143,13 +140,13 @@ func LoginUser(config utils.Config, store *sqlc.Store, ctx *gin.Context, email s
 		Error: nil,
 	}
 
-	fmt.Println("ACESS TOKEN")
+	fmt.Println("ACCESS TOKEN")
 	fmt.Println(accessToken)
 
 	//! 3 User logged in successfully. Record it
 	err = recordLoginSuccess(store, user.ID, ctx.Request.UserAgent(), clientIP)
 	if err != nil {
-		log.Println("Error creating login record for ", email, "Error: ", err)
+		l.Error("Error creating login record for "+email, zap.Error(err))
 		return AuthUserResponse{User: User{}, Error: errors.New("an unknown error occurred")}
 	}
 
@@ -159,13 +156,13 @@ func LoginUser(config utils.Config, store *sqlc.Store, ctx *gin.Context, email s
 func checkAccountStat(isSuspended bool, isDeleted bool) error {
 	fmt.Printf("Is Suspended %v is deleted %v", isSuspended, isDeleted)
 	if isSuspended {
-		fmt.Println("Account deleted: ", isSuspended)
+		log.Println("Account deleted: ", isSuspended)
 		return errors.New("account suspended")
 	}
 
 	// Check if user should gain access
 	if isDeleted {
-		fmt.Println("Account deleted: ", isDeleted)
+		log.Println("Account deleted: ", isDeleted)
 		return errors.New("account suspended")
 	}
 	return nil
@@ -185,17 +182,17 @@ func CreateUserToken(isRefreshToken bool, refreshToken string, config utils.Conf
 	return maker.CreateToken(
 		token.PayloadData{
 			// Role: "user",
-			RefreshID:      refreshToken,
-			IsRefresh:      isRefresh,
-			SessionID:      tokenID,
-			UserId:         uid,
-			Username:       email,
-			Email:          email,
-			IsUserVerified: IsUserVerified,
-			Issuer:         "Settle in",
-			Audience:       "website users",
-			IP:             ip,
-			UserAgent:      agent,
+			RefreshID:       refreshToken,
+			IsRefresh:       isRefresh,
+			SessionID:       tokenID,
+			UserId:          uid,
+			Username:        email,
+			Email:           email,
+			IsEmailVerified: IsUserVerified,
+			Issuer:          "Settle in",
+			Audience:        "website users",
+			IP:              ip,
+			UserAgent:       agent,
 		}, duration)
 }
 

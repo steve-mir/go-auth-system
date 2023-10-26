@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"log"
 	"regexp"
 	"time"
 
@@ -51,21 +50,21 @@ type HashResult struct {
 	Err            error
 }
 
-// *671#
-
-// TODO: zap for logging
-func CreateUser(config utils.Config, ctx *gin.Context, store *sqlc.Store, email string, pwd string) AuthUserResponse {
+func CreateUser(config utils.Config, ctx *gin.Context,
+	store *sqlc.Store, l *zap.Logger, email string, pwd string,
+) AuthUserResponse {
 	clientIP := utils.GetIpAddr(ctx.ClientIP())
-	l, _ := zap.NewProduction()
-	l.Info("Registeration request received for email", zap.String("email", email))
+	l.Info("Registration request received for email", zap.String("email", email))
 
 	err := HandleEmailPwdErrors(email, pwd)
 	if err != nil {
+		l.Error("Email password error", zap.Error(err))
 		return AuthUserResponse{User: User{}, Error: err}
 	}
 
 	err = checkEmailExistsError(store, email)
 	if err != nil {
+		l.Error("Error while fetching email from db", zap.Error(err))
 		return AuthUserResponse{User: User{}, Error: err}
 	}
 
@@ -92,6 +91,7 @@ func CreateUser(config utils.Config, ctx *gin.Context, store *sqlc.Store, email 
 	result := <-hashedPwdChan
 
 	if result.Err != nil {
+		l.Error("Error while hashing password", zap.Error(result.Err))
 		return AuthUserResponse{User: User{}, Error: result.Err}
 	}
 
@@ -111,25 +111,20 @@ func CreateUser(config utils.Config, ctx *gin.Context, store *sqlc.Store, email 
 	// start := time.Now()
 	sqlcUser, err := store.CreateUser(context.Background(), params)
 	if err != nil {
+		l.Error("Error while creating user with email and password", zap.Error(err))
 		return AuthUserResponse{User: User{}, Error: err}
 	}
 	// latency := time.Since(start)
 
-	// Refresh token
-	// refreshToken, refreshPayload, err := createToken(false, sqlcUser.Email, sqlcUser.ID, clientIP, ctx.Request.UserAgent(), config)
-	// if err != nil {
-	// 	return AuthUserResponse{User: User{}, Error: err}
-	// }
-
-	refreshToken := "new user"
-	accessToken, accessPayload, err := createToken(false, refreshToken, sqlcUser.Email, sqlcUser.ID, clientIP, ctx.Request.UserAgent(), config)
+	accessToken, accessPayload, err := createToken(false, "register access token", sqlcUser.Email,
+		false, // sqlcUser.IsEmailVerified.Bool,
+		sqlcUser.ID, clientIP, ctx.Request.UserAgent(), config)
 	if err != nil {
+		l.Error("Error creating access token", zap.Error(err))
 		return AuthUserResponse{User: User{}, Error: err}
 	}
 
-	// TODO: Create session for user when they register
-
-	checkToken(false, accessToken, config)
+	// Optional Create session for user when they register
 
 	// TODO: record metrics
 	// metrics.RegisterUser()
@@ -159,7 +154,6 @@ func CreateUser(config utils.Config, ctx *gin.Context, store *sqlc.Store, email 
 }
 
 func HandleEmailPwdErrors(email string, pwd string) error {
-	// var emailRegex = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
 	var emailRegex = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
 
 	// Validate email
@@ -183,9 +177,11 @@ func checkEmailExistsError(store *sqlc.Store, email string) error {
 	}
 	return nil
 }
-func createToken(isRefreshToken bool, refreshToken string, email string, userId uuid.UUID, ip pqtype.Inet, userAgent string, config utils.Config) (string, *token.Payload, error) {
+func createToken(isRefreshToken bool, refreshToken string, email string, isEmailVerified bool,
+	userId uuid.UUID, ip pqtype.Inet, userAgent string, config utils.Config,
+) (string, *token.Payload, error) {
+
 	// Create a Paseto token and include user data in the payload
-	// todo: Exclude sensitive data like the password
 	maker, err := token.NewPasetoMaker(utils.GetKeyForToken(config, isRefreshToken))
 	if err != nil {
 		return "", &token.Payload{}, err
@@ -193,15 +189,16 @@ func createToken(isRefreshToken bool, refreshToken string, email string, userId 
 
 	// Define the payload for the token (excluding the password)
 	payloadData := token.PayloadData{
-		RefreshID: refreshToken,
-		IsRefresh: false,
-		UserId:    userId,
-		Username:  email,
-		Email:     email,
-		Issuer:    "Settle in",
-		Audience:  "website users",
-		IP:        ip,
-		UserAgent: userAgent,
+		RefreshID:       refreshToken,
+		IsRefresh:       false,
+		UserId:          userId,
+		Username:        email,
+		Email:           email,
+		IsEmailVerified: isEmailVerified,
+		Issuer:          "Settle in",
+		Audience:        "website users",
+		IP:              ip,
+		UserAgent:       userAgent,
 		// Role: "user",
 		// SessionID uuid.UUID `json:"session_id"`
 	}
@@ -209,28 +206,4 @@ func createToken(isRefreshToken bool, refreshToken string, email string, userId 
 	// Create the Paseto token
 	pToken, payload, err := maker.CreateToken(payloadData, config.AccessTokenDuration) // Set the token expiration as needed
 	return pToken, payload, err
-}
-
-/** Debug functions*/
-func verifyToken(isRefreshToken bool, config utils.Config, pToken string) (*token.Payload, error) {
-	maker, err := token.NewPasetoMaker(utils.GetKeyForToken(config, isRefreshToken))
-	if err != nil {
-		return &token.Payload{}, err
-	}
-
-	payload, err2 := maker.VerifyToken(pToken)
-
-	if err2 != nil {
-		return &token.Payload{}, err
-	}
-
-	return payload, nil
-}
-
-func checkToken(isRefreshToken bool, pToken string, config utils.Config) {
-	log.Println("Token", pToken)
-
-	pUser, _ := verifyToken(isRefreshToken, config, pToken)
-	log.Println(pUser.UserId)
-	log.Println(pUser.Username)
 }

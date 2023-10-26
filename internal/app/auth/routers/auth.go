@@ -16,7 +16,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// TODO: Research mor on rateLimiting
+// TODO: Research more on rateLimiting
 // https://pkg.go.dev/github.com/gin-gonic/examples/ratelimiter#section-readme
 // https://github.com/gin-gonic/examples/blob/fdef5bbd945a/ratelimiter/rate.go
 // https://pkg.go.dev/go.uber.org/ratelimit#section-readme
@@ -52,6 +52,7 @@ func Auth(config utils.Config, db *sql.DB, l *zap.Logger, r *gin.Engine) {
 
 	// Public routes
 	// Requires throttling (rate limiting). No auth header required
+	// TODO: Implement throttling to prevent brute force attacks (rate limiting)
 	public := r.Group(defaultPath)
 	public.POST("/register", controllers.Register(config, db, l))      // Register a new user
 	public.POST("/login", controllers.Login(config, db, l))            // Authenticate a user based on email/username and password.

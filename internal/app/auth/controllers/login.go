@@ -21,7 +21,7 @@ func Login(config utils.Config, db *sql.DB, l *zap.Logger) gin.HandlerFunc {
 
 		store := sqlc.NewStore(db)
 
-		loginResp := services.LoginUser(config, store, ctx, req.Email, req.Password)
+		loginResp := services.LoginUser(config, store, ctx, l, req.Email, req.Password)
 		if loginResp.Error != nil {
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": loginResp.Error.Error()})
 			return

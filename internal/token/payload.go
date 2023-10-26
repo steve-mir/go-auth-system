@@ -26,17 +26,17 @@ var (
 
 type PayloadData struct {
 	// Role     string    `json:"role"`
-	RefreshID      string      `json:"refresh_token"`
-	UserId         uuid.UUID   `json:"user_id"`
-	IsRefresh      bool        `json:"is_refresh"`
-	Username       string      `json:"username"`
-	Email          string      `json:"email"`
-	IsUserVerified bool        `json:"is_user_verified"` // End of user part
-	SessionID      uuid.UUID   `json:"session_id"`
-	Issuer         string      `json:"issuer"`
-	Audience       string      `json:"audience"`
-	IP             pqtype.Inet `json:"ip"`
-	UserAgent      string      `json:"user_agent"`
+	RefreshID       string      `json:"refresh_token"`
+	UserId          uuid.UUID   `json:"user_id"`
+	IsRefresh       bool        `json:"is_refresh"`
+	Username        string      `json:"username"`
+	Email           string      `json:"email"`
+	IsEmailVerified bool        `json:"is_email_verified"`
+	SessionID       uuid.UUID   `json:"session_id"`
+	Issuer          string      `json:"issuer"`
+	Audience        string      `json:"audience"`
+	IP              pqtype.Inet `json:"ip"`
+	UserAgent       string      `json:"user_agent"`
 }
 
 type Payload struct {
@@ -48,23 +48,12 @@ type Payload struct {
 	IssuedAt     time.Time `json:"issued_at"`
 }
 
-// type CustomPayload struct {
-// 	Payload
-// 	User sqlc.User
-// }
-
 func NewPayload(payload PayloadData, duration time.Duration) (*Payload, error) {
-	// tokenID, err := uuid.NewRandom()
-	// if err != nil {
-	// 	return nil, err
-	// }
-
 	return &Payload{
-		PayloadData: payload,
 		// ID:           tokenID,
-		Expires:      time.Now().Add(duration),
-		RefreshAfter: time.Now().Add(duration), // TODO: Fix refresh after
-		IssuedAt:     time.Now(),
+		PayloadData: payload,
+		Expires:     time.Now().Add(duration),
+		IssuedAt:    time.Now(),
 	}, nil
 
 }

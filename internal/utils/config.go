@@ -21,7 +21,9 @@ type Config struct {
 	DBMaxLifeTime            int           `mapstructure:"DB_MAX_LIFE_TIME"`
 }
 
-// LoadConfig reads configuration from file or environment variables.
+// LoadConfig reads configuration from a file or environment variables.
+// It takes the path to the configuration file as input.
+// It returns the loaded configuration and any error encountered during the process.
 func LoadConfig(path string) (config Config, err error) {
 	viper.AddConfigPath(path)
 	viper.SetConfigName("app")

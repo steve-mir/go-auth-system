@@ -19,9 +19,10 @@ import (
 func GetIpAddr(clientIP string) pqtype.Inet {
 	ip := net.ParseIP(clientIP)
 
-	// if ip == nil {
-	// 	 TODO: Handle the case where ctx.ClientIP() doesn't return a valid IP address
-	// }
+	if ip == nil {
+		// Handle the case where ctx.ClientIP() doesn't return a valid IP address
+		return pqtype.Inet{}
+	}
 
 	inet := pqtype.Inet{
 		IPNet: net.IPNet{
@@ -90,7 +91,7 @@ func GetKeyForToken(config Config, isRefresh bool) string {
 }
 
 // GenerateUniqueToken generates a unique verification token.
-func GenerateUniqueToken(userID string) (string, error) { // TODO: revisit to fix string length, format and content
+func GenerateUniqueToken(userID string) (string, error) {
 	// Generate a cryptographically secure random value
 	randomBytes := make([]byte, 32)
 	_, err := rand.Read(randomBytes)

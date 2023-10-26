@@ -50,24 +50,24 @@ func AuthMiddlerWare(config utils.Config, l *zap.Logger) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		authorizationHeader := ctx.GetHeader(authorizationHeaderKey)
 		if len(authorizationHeader) == 0 {
-			fmt.Println("authorization header is not provided")
 			err := errors.New("authorization header is not provided")
+			l.Error("auth err", zap.Error(err))
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			return
 		}
 
 		fields := strings.Fields(authorizationHeader)
 		if len(fields) < 2 {
-			fmt.Println("invalid authorization header format")
 			err := errors.New("invalid authorization header format")
+			l.Error("auth err", zap.Error(err))
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			return
 		}
 
 		authorizationType := strings.ToLower(fields[0])
 		if authorizationType != authorizationTypeBearer {
-			fmt.Printf("unsupported authorization type %s", authorizationType)
 			err := fmt.Errorf("unsupported authorization type %s", authorizationType)
+			l.Error("auth err", zap.Error(err))
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			return
 		}
@@ -76,8 +76,8 @@ func AuthMiddlerWare(config utils.Config, l *zap.Logger) gin.HandlerFunc {
 
 		tokenMaker, err := token.NewPasetoMaker(utils.GetKeyForToken(config, false))
 		if err != nil {
-			fmt.Printf("Could not init tokenMaker. Error: %s.", err)
 			err := fmt.Errorf("could not init tokenMaker %s", err)
+			l.Error("paseto maker err", zap.Error(err))
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			return
 		}
@@ -87,15 +87,14 @@ func AuthMiddlerWare(config utils.Config, l *zap.Logger) gin.HandlerFunc {
 			fmt.Println(payload)
 			fmt.Println("Access Token Error: ", err)
 			if err == token.ErrExpiredToken {
-				fmt.Println("Token expired going to verify")
+				fmt.Println("Token expired going to verify......")
 				ctx.Set(AuthorizationPayloadKey, payload)
 				return
+				// ctx.Next()
 			}
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			return
 		}
-
-		// Verify the session is active
 
 		// Check if email is verified (remove if it is optional to verify email)
 		// TODO: fix for 1 login or unverified emails
@@ -105,7 +104,7 @@ func AuthMiddlerWare(config utils.Config, l *zap.Logger) gin.HandlerFunc {
 		// 	return
 		// }
 
-		ctx.Set(AuthorizationPayloadKey, payload) // TODO: Limit this to just the user's email and uid
+		ctx.Set(AuthorizationPayloadKey, payload)
 		ctx.Next()
 	}
 }

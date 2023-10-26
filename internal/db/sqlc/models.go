@@ -82,7 +82,7 @@ type User struct {
 	PasswordChangedAt sql.NullTime   `json:"password_changed_at"`
 	DeletedAt         sql.NullTime   `json:"deleted_at"`
 	SuspendedAt       sql.NullTime   `json:"suspended_at"`
-	VerifiedAt        sql.NullTime   `json:"verified_at"`
+	EmailVerifiedAt   sql.NullTime   `json:"email_verified_at"`
 }
 
 type UserLogin struct {

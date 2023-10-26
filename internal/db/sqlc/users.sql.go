@@ -20,7 +20,7 @@ INSERT INTO users (
     password_changed_at, is_verified
     )
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-RETURNING id, name, email, username, password_hash, created_at, updated_at, is_suspended, is_verified, is_email_verified, is_deleted, login_attempts, lockout_duration, lockout_until, password_changed_at, deleted_at, suspended_at, verified_at
+RETURNING id, name, email, username, password_hash, created_at, updated_at, is_suspended, is_verified, is_email_verified, is_deleted, login_attempts, lockout_duration, lockout_until, password_changed_at, deleted_at, suspended_at, email_verified_at
 `
 
 type CreateUserParams struct {
@@ -76,7 +76,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.PasswordChangedAt,
 		&i.DeletedAt,
 		&i.SuspendedAt,
-		&i.VerifiedAt,
+		&i.EmailVerifiedAt,
 	)
 	return i, err
 }
@@ -91,7 +91,7 @@ func (q *Queries) DeleteUserByID(ctx context.Context, id uuid.UUID) error {
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, name, email, username, password_hash, created_at, updated_at, is_suspended, is_verified, is_email_verified, is_deleted, login_attempts, lockout_duration, lockout_until, password_changed_at, deleted_at, suspended_at, verified_at FROM users WHERE email = $1 LIMIT 1
+SELECT id, name, email, username, password_hash, created_at, updated_at, is_suspended, is_verified, is_email_verified, is_deleted, login_attempts, lockout_duration, lockout_until, password_changed_at, deleted_at, suspended_at, email_verified_at FROM users WHERE email = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -115,13 +115,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.PasswordChangedAt,
 		&i.DeletedAt,
 		&i.SuspendedAt,
-		&i.VerifiedAt,
+		&i.EmailVerifiedAt,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, name, email, username, password_hash, created_at, updated_at, is_suspended, is_verified, is_email_verified, is_deleted, login_attempts, lockout_duration, lockout_until, password_changed_at, deleted_at, suspended_at, verified_at FROM users WHERE id = $1 LIMIT 1
+SELECT id, name, email, username, password_hash, created_at, updated_at, is_suspended, is_verified, is_email_verified, is_deleted, login_attempts, lockout_duration, lockout_until, password_changed_at, deleted_at, suspended_at, email_verified_at FROM users WHERE id = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
@@ -145,13 +145,13 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.PasswordChangedAt,
 		&i.DeletedAt,
 		&i.SuspendedAt,
-		&i.VerifiedAt,
+		&i.EmailVerifiedAt,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, name, email, username, password_hash, created_at, updated_at, is_suspended, is_verified, is_email_verified, is_deleted, login_attempts, lockout_duration, lockout_until, password_changed_at, deleted_at, suspended_at, verified_at FROM users WHERE username = $1 LIMIT 1
+SELECT id, name, email, username, password_hash, created_at, updated_at, is_suspended, is_verified, is_email_verified, is_deleted, login_attempts, lockout_duration, lockout_until, password_changed_at, deleted_at, suspended_at, email_verified_at FROM users WHERE username = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username sql.NullString) (User, error) {
@@ -175,7 +175,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username sql.NullString
 		&i.PasswordChangedAt,
 		&i.DeletedAt,
 		&i.SuspendedAt,
-		&i.VerifiedAt,
+		&i.EmailVerifiedAt,
 	)
 	return i, err
 }
@@ -220,18 +220,18 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) error {
 const updateUserEmailVerified = `-- name: UpdateUserEmailVerified :exec
 UPDATE users
 SET is_email_verified = $3,
-verified_at = $2 --// TODO: Change to email_verified_at
+email_verified_at = $2
 WHERE id = $1
 `
 
 type UpdateUserEmailVerifiedParams struct {
 	ID              uuid.UUID    `json:"id"`
-	VerifiedAt      sql.NullTime `json:"verified_at"`
+	EmailVerifiedAt sql.NullTime `json:"email_verified_at"`
 	IsEmailVerified sql.NullBool `json:"is_email_verified"`
 }
 
 func (q *Queries) UpdateUserEmailVerified(ctx context.Context, arg UpdateUserEmailVerifiedParams) error {
-	_, err := q.db.ExecContext(ctx, updateUserEmailVerified, arg.ID, arg.VerifiedAt, arg.IsEmailVerified)
+	_, err := q.db.ExecContext(ctx, updateUserEmailVerified, arg.ID, arg.EmailVerifiedAt, arg.IsEmailVerified)
 	return err
 }
 

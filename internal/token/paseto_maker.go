@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/o1egl/paseto"
-	// "github.com/steve-mir/go-auth-system/internal/db/sqlc"
 	"golang.org/x/crypto/pbkdf2"
 )
 
@@ -16,7 +15,7 @@ type PasetoMaker struct {
 	paseto       *paseto.V2
 	symmetricKey []byte
 
-	// ? TODO Caching
+	// ? Caching
 	validTokens map[string]struct{} // TODO: Cache with Redis or DynamoDB distributed cache
 }
 
@@ -47,8 +46,6 @@ func (maker *PasetoMaker) CreateToken(payloadData PayloadData, duration time.Dur
 	if err != nil {
 		return "", &Payload{}, err
 	}
-	// Allow custom expiry
-	// payload.Expires = time.Now().Add(expiry)
 
 	accessToken, err := maker.paseto.Encrypt(maker.symmetricKey, payload, nil)
 	return accessToken, payload, err
@@ -69,17 +66,15 @@ func (maker *PasetoMaker) VerifyToken(token string) (*Payload, error) {
 	}
 
 	// Check for expiry if is refresh token
-	// if payload.RefreshID == "" {
 	err = payload.ValidateExpiry()
-	if err != nil { //&& err.Error() != ErrExpiredToken.Error() {
+	if err != nil {
 		return payload, err
 	}
-	// }
 
 	// Cache validated token
 	maker.validTokens[token] = struct{}{}
 
-	return payload, nil //err //nil
+	return payload, nil
 }
 
 // Add a revoke endpoint
