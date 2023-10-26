@@ -4,15 +4,12 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/gin-gonic/gin"
 	"github.com/steve-mir/go-auth-system/internal/app/auth"
 	"github.com/steve-mir/go-auth-system/internal/db/sqlc"
-	"github.com/steve-mir/go-auth-system/internal/utils"
-	"go.uber.org/zap"
 )
 
-func CreateUserProfile(config utils.Config, store *sqlc.Store,
-	ctx *gin.Context, l *zap.Logger, profileData auth.UserAuth,
+func CreateUserProfile(store *sqlc.Store,
+	profileData auth.UserAuth,
 ) error {
 	// Validate profileData
 

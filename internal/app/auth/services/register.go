@@ -151,13 +151,14 @@ func CreateUser(config utils.Config, ctx *gin.Context,
 	// metrics.RegistrationsCount.Inc()
 	// metrics.RegistrationLatency.Observe(latency.Seconds())
 
-	// TODO: Create user profile
-	err = profiles.CreateUserProfile(config, store, ctx, l, auth.UserAuth{
+	// Create user profile
+	err = profiles.CreateUserProfile(store, auth.UserAuth{
 		UserId:    sqlcUser.ID,
 		FirstName: req.FirstName,
 		LastName:  req.LastName,
 	})
 	if err != nil {
+		l.Error("Error creating User profile", zap.Error(err))
 		return AuthUserResponse{User: User{}, Error: err}
 	}
 
