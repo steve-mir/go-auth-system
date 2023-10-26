@@ -9,7 +9,7 @@ CREATE TABLE "users" (
   "created_at" TIMESTAMPTZ DEFAULT (now()),
   "updated_at" timestamptz,
   -- "last_login" timestamptz,
-  "is_suspended" boolean DEFAULT false,
+  "is_suspended" boolean NOT NULL,
   "is_verified" BOOLEAN DEFAULT false,
   "is_email_verified" boolean DEFAULT false,
   "is_deleted" boolean NOT NULL,

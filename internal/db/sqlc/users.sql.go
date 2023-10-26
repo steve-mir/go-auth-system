@@ -31,7 +31,7 @@ type CreateUserParams struct {
 	PasswordHash      string         `json:"password_hash"`
 	CreatedAt         sql.NullTime   `json:"created_at"`
 	UpdatedAt         sql.NullTime   `json:"updated_at"`
-	IsSuspended       sql.NullBool   `json:"is_suspended"`
+	IsSuspended       bool           `json:"is_suspended"`
 	IsDeleted         bool           `json:"is_deleted"`
 	LoginAttempts     sql.NullInt32  `json:"login_attempts"`
 	LockoutDuration   sql.NullInt32  `json:"lockout_duration"`
@@ -193,7 +193,7 @@ type UpdateUserParams struct {
 	Username        sql.NullString `json:"username"`
 	PasswordHash    string         `json:"password_hash"`
 	UpdatedAt       sql.NullTime   `json:"updated_at"`
-	IsSuspended     sql.NullBool   `json:"is_suspended"`
+	IsSuspended     bool           `json:"is_suspended"`
 	IsDeleted       bool           `json:"is_deleted"`
 	LoginAttempts   sql.NullInt32  `json:"login_attempts"`
 	LockoutDuration sql.NullInt32  `json:"lockout_duration"`
@@ -244,7 +244,7 @@ WHERE id = $1
 type UpdateUserSuspensionParams struct {
 	ID          uuid.UUID    `json:"id"`
 	SuspendedAt sql.NullTime `json:"suspended_at"`
-	IsSuspended sql.NullBool `json:"is_suspended"`
+	IsSuspended bool         `json:"is_suspended"`
 }
 
 func (q *Queries) UpdateUserSuspension(ctx context.Context, arg UpdateUserSuspensionParams) error {

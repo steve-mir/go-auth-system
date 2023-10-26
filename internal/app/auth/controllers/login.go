@@ -11,9 +11,14 @@ import (
 	"go.uber.org/zap"
 )
 
+type UserRequest struct {
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required,min=8,max=64,strong_password"`
+}
+
 func Login(config utils.Config, db *sql.DB, l *zap.Logger) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		var req userRequest
+		var req UserRequest
 		if err := ctx.ShouldBindJSON(&req); err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return

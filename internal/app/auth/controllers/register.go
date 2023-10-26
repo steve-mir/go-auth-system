@@ -7,20 +7,16 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
+	"github.com/steve-mir/go-auth-system/internal/app/auth"
 	"github.com/steve-mir/go-auth-system/internal/app/auth/services"
 	"github.com/steve-mir/go-auth-system/internal/db/sqlc"
 	"github.com/steve-mir/go-auth-system/internal/utils"
 	"go.uber.org/zap"
 )
 
-type userRequest struct {
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required,min=8,max=64,strong_password"`
-}
-
 func Register(config utils.Config, db *sql.DB, l *zap.Logger) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		var req userRequest
+		var req auth.UserAuth
 		if err := ctx.ShouldBindJSON(&req); err != nil {
 			l.Error("Invalid fields error", zap.Error(err))
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "email and password fields required", "status": err.Error()})
@@ -38,7 +34,7 @@ func Register(config utils.Config, db *sql.DB, l *zap.Logger) gin.HandlerFunc {
 
 		store := sqlc.NewStore(db)
 
-		newUserResp := services.CreateUser(config, ctx, store, l, req.Email, req.Password)
+		newUserResp := services.CreateUser(config, ctx, store, l, req)
 		if newUserResp.Error != nil {
 			l.Error("Create User error", zap.Error(newUserResp.Error))
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": newUserResp.Error.Error()})

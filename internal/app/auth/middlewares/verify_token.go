@@ -59,7 +59,7 @@ func Verify(config utils.Config, db *sql.DB, l *zap.Logger) gin.HandlerFunc {
 				}
 
 				// Check if user is suspended
-				if condition := user.IsSuspended.Bool; condition {
+				if condition := user.IsSuspended; condition {
 					l.Error("Error", zap.Error(errors.New("account suspended: "+user.Email)))
 					ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "account suspended"})
 					ctx.Abort()
@@ -80,7 +80,7 @@ func Verify(config utils.Config, db *sql.DB, l *zap.Logger) gin.HandlerFunc {
 
 				// fmt.Println("SESSION", session)
 
-				if session.RefreshToken != data.RefreshID && !user.IsSuspended.Bool {
+				if session.RefreshToken != data.RefreshID && !user.IsSuspended {
 					// Block user here
 					fmt.Println("Illegal activity detected on " + session.ID.String())
 					if err := blockUser(store, session); err != nil {
@@ -159,7 +159,7 @@ func blockUser(store *sqlc.Store, session sqlc.Session) error {
 	//* update the user to isSuspended
 	err = store.UpdateUserSuspension(context.Background(), sqlc.UpdateUserSuspensionParams{ // ! 2c
 		ID:          session.UserID,
-		IsSuspended: sql.NullBool{Bool: true, Valid: true},
+		IsSuspended: true,
 		SuspendedAt: sql.NullTime{Time: time.Now(), Valid: true},
 	})
 	if err != nil {

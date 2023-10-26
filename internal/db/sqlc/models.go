@@ -72,7 +72,7 @@ type User struct {
 	PasswordHash      string         `json:"password_hash"`
 	CreatedAt         sql.NullTime   `json:"created_at"`
 	UpdatedAt         sql.NullTime   `json:"updated_at"`
-	IsSuspended       sql.NullBool   `json:"is_suspended"`
+	IsSuspended       bool           `json:"is_suspended"`
 	IsVerified        sql.NullBool   `json:"is_verified"`
 	IsEmailVerified   sql.NullBool   `json:"is_email_verified"`
 	IsDeleted         bool           `json:"is_deleted"`
@@ -100,10 +100,11 @@ type UserPreference struct {
 
 type UserProfile struct {
 	ID        int32          `json:"id"`
-	UserID    uuid.NullUUID  `json:"user_id"`
+	UserID    uuid.UUID      `json:"user_id"`
 	FirstName sql.NullString `json:"first_name"`
 	LastName  sql.NullString `json:"last_name"`
 	Phone     sql.NullString `json:"phone"`
+	ImageUrl  sql.NullString `json:"image_url"`
 }
 
 type UserRole struct {

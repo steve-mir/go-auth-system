@@ -76,7 +76,7 @@ func LoginUser(config utils.Config, store *sqlc.Store,
 	}
 
 	// Check if user should gain access
-	err = checkAccountStat(user.IsSuspended.Bool, user.IsDeleted)
+	err = checkAccountStat(user.IsSuspended, user.IsDeleted)
 	if err != nil {
 		l.Error("Checking account stat error", zap.Error(err))
 		return AuthUserResponse{User: User{}, Error: err}
@@ -127,14 +127,14 @@ func LoginUser(config utils.Config, store *sqlc.Store,
 
 	resp := AuthUserResponse{
 		User: User{
-			ID:                    user.ID,
-			Email:                 user.Email,
-			IsEmailVerified:       user.IsEmailVerified.Bool,
-			CreatedAt:             user.CreatedAt.Time,
-			AccessToken:           accessToken,
-			AccessTokenExpiresAt:  accessPayload.Expires,
-			RefreshToken:          refreshToken,
-			RefreshTokenExpiresAt: refreshPayload.Expires,
+			ID:                   user.ID,
+			Email:                user.Email,
+			IsEmailVerified:      user.IsEmailVerified.Bool,
+			CreatedAt:            user.CreatedAt.Time,
+			AccessToken:          accessToken,
+			AccessTokenExpiresAt: accessPayload.Expires,
+			// RefreshToken:          refreshToken,
+			// RefreshTokenExpiresAt: refreshPayload.Expires,
 			// SessionID:             refreshPayload.ID,
 		},
 		Error: nil,
