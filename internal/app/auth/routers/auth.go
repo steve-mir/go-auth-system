@@ -1,7 +1,6 @@
 package routers
 
 import (
-	"database/sql"
 	"flag"
 	"log"
 	"time"
@@ -11,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/steve-mir/go-auth-system/internal/app/auth/controllers"
 	"github.com/steve-mir/go-auth-system/internal/app/auth/middlewares"
+	"github.com/steve-mir/go-auth-system/internal/db/sqlc"
 	"github.com/steve-mir/go-auth-system/internal/utils"
 	"go.uber.org/ratelimit"
 	"go.uber.org/zap"
@@ -43,7 +43,7 @@ func leakBucket() gin.HandlerFunc {
 
 // ab -n 20 -c 5 -r -s 1 -p post-data.txt http://localhost:9100/register
 
-func Auth(config utils.Config, db *sql.DB, l *zap.Logger, r *gin.Engine) {
+func Auth(config utils.Config, store *sqlc.Store, l *zap.Logger, r *gin.Engine) {
 
 	limit = ratelimit.New(100)
 
@@ -54,17 +54,17 @@ func Auth(config utils.Config, db *sql.DB, l *zap.Logger, r *gin.Engine) {
 	// Requires throttling (rate limiting). No auth header required
 	// TODO: Implement throttling to prevent brute force attacks (rate limiting)
 	public := r.Group(defaultPath)
-	public.POST("/register", controllers.Register(config, db, l))      // Register a new user
-	public.POST("/login", controllers.Login(config, db, l))            // Authenticate a user based on email/username and password.
-	public.GET("/verify/", controllers.VerifyUserEmail(config, db, l)) // Log the user out.
+	public.POST("/register", controllers.Register(config, store, l))      // Register a new user
+	public.POST("/login", controllers.Login(config, store, l))            // Authenticate a user based on email/username and password.
+	public.GET("/verify/", controllers.VerifyUserEmail(config, store, l)) // Log the user out.
 
 	// Private routes
 	// Protected routes with auth header required
 	private := r.Group(defaultPath)
 	private.Use(middlewares.AuthMiddlerWare(config, l))
-	private.Use(middlewares.Verify(config, db, l))
-	private.GET("/logout", controllers.Logout(config, db, l))                      // Log the user out.
-	private.GET("/verify/link", controllers.VerifyUserEmailRequest(config, db, l)) // Send verification link to user
+	private.Use(middlewares.Verify(config, store, l))
+	private.GET("/logout", controllers.Logout(config, store, l))                      // Log the user out.
+	private.GET("/verify/link", controllers.VerifyUserEmailRequest(config, store, l)) // Send verification link to user
 
 	/*
 		// Initiate a password reset by providing an email or username.

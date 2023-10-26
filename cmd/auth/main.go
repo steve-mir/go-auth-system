@@ -74,6 +74,8 @@ func main() {
 }
 
 func setupRouter(db *sql.DB, config utils.Config, route *gin.Engine, l *zap.Logger) {
+	// Create db store and pass as injector
+	store := sqlc.NewStore(db)
 	// Create cors
 	corsConfig := cors.DefaultConfig()
 	corsConfig.AllowOrigins = []string{"https://localhost:3000"}
@@ -82,7 +84,7 @@ func setupRouter(db *sql.DB, config utils.Config, route *gin.Engine, l *zap.Logg
 	// Use structured logger middleware
 	route.Use(gin.Logger())
 
-	routers.Auth(config, db, l, route)
+	routers.Auth(config, store, l, route)
 
 	// Add auth middleware to protected routes
 	// maker, err := token.NewPasetoMaker(config.TokenSymmetricKey)

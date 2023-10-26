@@ -1,10 +1,10 @@
 package controllers
 
 import (
-	"database/sql"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 	"github.com/steve-mir/go-auth-system/internal/app/auth/services"
 	"github.com/steve-mir/go-auth-system/internal/db/sqlc"
 	"github.com/steve-mir/go-auth-system/internal/utils"
@@ -16,7 +16,7 @@ type UserRequest struct {
 	Password string `json:"password" validate:"required,min=8,max=64,strong_password"`
 }
 
-func Login(config utils.Config, db *sql.DB, l *zap.Logger) gin.HandlerFunc {
+func Login(config utils.Config, store *sqlc.Store, l *zap.Logger) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		var req UserRequest
 		if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -24,7 +24,14 @@ func Login(config utils.Config, db *sql.DB, l *zap.Logger) gin.HandlerFunc {
 			return
 		}
 
-		store := sqlc.NewStore(db)
+		// Validate
+		validate := validator.New()
+		// validate.RegisterValidation("strong_password", strongPasswordValidation)
+		if err := validate.Struct(req); err != nil {
+			l.Error("Go validator error", zap.Error(err))
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 
 		loginResp := services.LoginUser(config, store, ctx, l, req.Email, req.Password)
 		if loginResp.Error != nil {

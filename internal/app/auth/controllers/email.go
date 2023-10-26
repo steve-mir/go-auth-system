@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"database/sql"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -12,10 +11,8 @@ import (
 	"go.uber.org/zap"
 )
 
-func VerifyUserEmailRequest(config utils.Config, db *sql.DB, l *zap.Logger) gin.HandlerFunc {
+func VerifyUserEmailRequest(config utils.Config, store *sqlc.Store, l *zap.Logger) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-
-		store := sqlc.NewStore(db)
 
 		link, err := services.SendVerificationEmail(config, store, ctx, l)
 		if err != nil {
@@ -27,10 +24,8 @@ func VerifyUserEmailRequest(config utils.Config, db *sql.DB, l *zap.Logger) gin.
 	}
 }
 
-func VerifyUserEmail(config utils.Config, db *sql.DB, l *zap.Logger) gin.HandlerFunc {
+func VerifyUserEmail(config utils.Config, store *sqlc.Store, l *zap.Logger) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-
-		store := sqlc.NewStore(db)
 
 		link := "https://www.settle-in.com/verify/bbd2518c-1d94-472c-8563-cb5ab7608bf0-1698282576-2023-10-26T02:09:36Z-KS1vLFuXAg90acMmdGvTRn77gppKcvis27jCGWcNRU="
 		err := services.VerifyEmail(config, store, link, l)

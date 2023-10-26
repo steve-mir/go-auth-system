@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"database/sql"
 	"fmt"
 	"net/http"
 
@@ -12,10 +11,9 @@ import (
 	"go.uber.org/zap"
 )
 
-func Logout(config utils.Config, db *sql.DB, l *zap.Logger) gin.HandlerFunc {
+func Logout(config utils.Config, store *sqlc.Store, l *zap.Logger) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 
-		fmt.Println("In logout")
 		// Open a database connection
 		// db, err := sql.Open(config.DBDriver, config.DBSource)
 		// if err != nil {
@@ -23,16 +21,15 @@ func Logout(config utils.Config, db *sql.DB, l *zap.Logger) gin.HandlerFunc {
 		// }
 		// defer db.Close()
 
-		store := sqlc.NewStore(db) // TODO: Add store as dependency injector
+		// store := sqlc.NewStore(db)
 
+		fmt.Println("In logout")
 		err := services.LogoutUser(config, store, ctx)
 		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
-		verifyCode, _ := utils.GenerateUniqueToken("bbd2518c-1d94-472c-8563-cb5ab7608bf0")
-
-		ctx.JSON(http.StatusOK, gin.H{"msg": "User logout successfully lol.", "link": verifyCode})
+		ctx.JSON(http.StatusOK, gin.H{"msg": "User logout successfully lol."})
 	}
 }

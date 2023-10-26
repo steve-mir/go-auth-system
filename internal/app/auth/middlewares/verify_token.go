@@ -18,7 +18,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func Verify(config utils.Config, db *sql.DB, l *zap.Logger) gin.HandlerFunc {
+func Verify(config utils.Config, store *sqlc.Store, l *zap.Logger) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 
 		if payload, exists := ctx.Get(AuthorizationPayloadKey); exists {
@@ -28,17 +28,7 @@ func Verify(config utils.Config, db *sql.DB, l *zap.Logger) gin.HandlerFunc {
 					l.Error("wrong token error", zap.Error(errors.New("use of refresh token detected")))
 					ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "no refresh token on payload"})
 					return
-					// ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-					// return
 				}
-				// Open a database connection
-				// db, err := sql.Open(config.DBDriver, config.DBSource)
-				// if err != nil {
-				// 	log.Fatal("Cannot connect to db:", err)
-				// }
-				// defer db.Close()
-
-				store := sqlc.NewStore(db)
 
 				// Get the user from db
 				user, err := store.GetUserByID(context.Background(), data.UserId) // ! 1

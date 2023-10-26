@@ -11,6 +11,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/steve-mir/go-auth-system/internal/app/auth/routers"
+	profiles "github.com/steve-mir/go-auth-system/internal/app/profiles/routers"
 	"github.com/steve-mir/go-auth-system/internal/db/sqlc"
 	"github.com/steve-mir/go-auth-system/internal/utils"
 	"go.uber.org/zap"
@@ -73,6 +74,8 @@ func main() {
 }
 
 func setupRouter(db *sql.DB, config utils.Config, route *gin.Engine, l *zap.Logger) {
+	// Create db store and pass as injector
+	store := sqlc.NewStore(db)
 	// Create cors
 	corsConfig := cors.DefaultConfig()
 	corsConfig.AllowOrigins = []string{"https://localhost:3000"}
@@ -80,5 +83,6 @@ func setupRouter(db *sql.DB, config utils.Config, route *gin.Engine, l *zap.Logg
 
 	// Use structured logger middleware
 	route.Use(gin.Logger())
-	routers.Auth(config, db, l, route)
+	routers.Auth(config, store, l, route)
+	profiles.Profile(config, store, l, route)
 }
