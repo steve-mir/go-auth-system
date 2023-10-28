@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"database/sql"
 	"net/http"
 	"regexp"
 
@@ -13,7 +14,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func Register(config utils.Config, store *sqlc.Store, l *zap.Logger) gin.HandlerFunc {
+func Register(config utils.Config, db *sql.DB, store *sqlc.Store, l *zap.Logger) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		var req auth.UserAuth
 		if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -31,7 +32,7 @@ func Register(config utils.Config, store *sqlc.Store, l *zap.Logger) gin.Handler
 			return
 		}
 
-		newUserResp := services.CreateUser(config, ctx, store, l, req)
+		newUserResp := services.CreateUser(config, ctx, db, store, l, req)
 		if newUserResp.Error != nil {
 			l.Error("Create User error", zap.Error(newUserResp.Error))
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": newUserResp.Error.Error()})

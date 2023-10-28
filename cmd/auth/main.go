@@ -84,7 +84,7 @@ func setupRouter(db *sql.DB, config utils.Config, route *gin.Engine, l *zap.Logg
 	// Use structured logger middleware
 	route.Use(gin.Logger())
 
-	routers.Auth(config, store, l, route)
+	routers.Auth(config, db, store, l, route)
 
 	// Add auth middleware to protected routes
 	// maker, err := token.NewPasetoMaker(config.TokenSymmetricKey)

@@ -1,6 +1,7 @@
 package routers
 
 import (
+	"database/sql"
 	"flag"
 	"log"
 	"time"
@@ -43,7 +44,7 @@ func leakBucket() gin.HandlerFunc {
 
 // ab -n 20 -c 5 -r -s 1 -p post-data.txt http://localhost:9100/register
 
-func Auth(config utils.Config, store *sqlc.Store, l *zap.Logger, r *gin.Engine) {
+func Auth(config utils.Config, db *sql.DB, store *sqlc.Store, l *zap.Logger, r *gin.Engine) {
 
 	limit = ratelimit.New(100)
 
@@ -54,7 +55,7 @@ func Auth(config utils.Config, store *sqlc.Store, l *zap.Logger, r *gin.Engine) 
 	// Requires throttling (rate limiting). No auth header required
 	// TODO: Implement throttling to prevent brute force attacks (rate limiting)
 	public := r.Group(defaultPath)
-	public.POST("/register", controllers.Register(config, store, l))      // Register a new user
+	public.POST("/register", controllers.Register(config, db, store, l))  // Register a new user
 	public.POST("/login", controllers.Login(config, store, l))            // Authenticate a user based on email/username and password.
 	public.GET("/verify/", controllers.VerifyUserEmail(config, store, l)) // Log the user out.
 

@@ -37,3 +37,9 @@ WHERE id = $1;
 
 -- name: DeleteUserByID :exec
 DELETE FROM users WHERE id = $1;
+
+-- name: GetUserAndRoleByID :one
+SELECT users.*, user_roles.role_id
+FROM users
+JOIN user_roles ON users.id = user_roles.user_id
+WHERE users.id = $1;

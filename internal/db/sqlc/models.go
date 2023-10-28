@@ -38,8 +38,8 @@ type LoginFailure struct {
 }
 
 type Role struct {
-	ID   int32          `json:"id"`
-	Name sql.NullString `json:"name"`
+	ID   int32  `json:"id"`
+	Name string `json:"name"`
 }
 
 type SecurityQuestion struct {
@@ -108,7 +108,7 @@ type UserProfile struct {
 }
 
 type UserRole struct {
-	ID     int32         `json:"id"`
-	UserID uuid.NullUUID `json:"user_id"`
-	RoleID sql.NullInt32 `json:"role_id"`
+	ID     int32     `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+	RoleID int32     `json:"role_id"`
 }
