@@ -16,12 +16,16 @@ import (
 	"github.com/steve-mir/go-auth-system/internal/utils"
 )
 
+var (
+	emailTokenLen = 42
+)
+
 // TODO: limit email sending rate per user
 func SendVerificationEmail(config utils.Config, store *sqlc.Store, ctx *gin.Context, l *zap.Logger) (string, error) {
 	if payload, exists := ctx.Get("authorization_payload"); exists {
 		if data, ok := payload.(*token.Payload); ok {
 
-			verifyCode, err := utils.GenerateUniqueToken(data.UserId.String(), 42)
+			verifyCode, err := utils.GenerateUniqueToken(emailTokenLen)
 			if err != nil {
 				return "", err
 
@@ -42,12 +46,12 @@ func SendVerificationEmail(config utils.Config, store *sqlc.Store, ctx *gin.Cont
 				UserID:     data.UserId,
 				Email:      data.Email,
 				Token:      verifyCode, //link,
-				IsVerified: sql.NullBool{Valid: false, Bool: false},
+				IsVerified: sql.NullBool{Valid: true, Bool: false},
 				ExpiresAt:  time.Now().Add(time.Minute * 15),
 			})
 			if err != nil {
 				l.Error("Error creating email verification request", zap.Error(err))
-				ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "error getting payload from ctx"})
+				ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "an unexpected error"})
 				ctx.Abort()
 
 				return "", err
@@ -73,19 +77,23 @@ func SendVerificationEmail(config utils.Config, store *sqlc.Store, ctx *gin.Cont
 }
 
 func VerifyEmail(config utils.Config, store *sqlc.Store, link string, l *zap.Logger) error {
-	fmt.Println(link)
+	// if len(link) != emailTokenLen {
+	// 	l.Error("email verify error", zap.Error(errors.New("invalid token")))
+	// 	return errors.New("invalid token")
+	// }
+
 	linkData, err := store.GetEmailVerificationRequestByToken(context.Background(), link)
 	if err != nil {
-		l.Error("error getting email link from db", zap.Error(err))
+		l.Error("error getting email token from db", zap.Error(err))
 		return err
 	}
 
 	if condition := linkData.ExpiresAt.Before(time.Now()); condition {
-		return fmt.Errorf("link expired")
+		return fmt.Errorf("token expired")
 	}
 
 	if condition := linkData.IsVerified.Bool; condition {
-		return fmt.Errorf("link already verified")
+		return fmt.Errorf("token already verified")
 	}
 
 	err = store.UpdateByToken(context.Background(), sqlc.UpdateByTokenParams{

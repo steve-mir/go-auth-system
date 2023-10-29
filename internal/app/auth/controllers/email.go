@@ -19,8 +19,8 @@ func VerifyUserEmailRequest(config utils.Config, store *sqlc.Store, l *zap.Logge
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-
-		ctx.JSON(http.StatusOK, gin.H{"msg": "Verification email sent. Please check your email", "link": link})
+		l.Info("email verification sent", zap.String("email verification", link))
+		ctx.JSON(http.StatusOK, gin.H{"msg": "Verification email sent. Please check your email"})
 	}
 }
 

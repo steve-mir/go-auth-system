@@ -28,13 +28,14 @@ CREATE TABLE "email_verification_requests" (
   "expires_at" timestamptz NOT NULL
 );
 
+-- TODO: Use or remove
 CREATE TABLE "user_preferences" (
   "user_id" uuid,
   "preferences" json
 );
 
 CREATE INDEX ON "user_roles" ("role_id");
-CREATE INDEX ON "email_verification_requests" ("user_id", "token", "email", "created_at");
+CREATE INDEX ON "email_verification_requests" ("user_id", "token", "email", "expires_at");
 
 
 ALTER TABLE "user_profiles" ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id");

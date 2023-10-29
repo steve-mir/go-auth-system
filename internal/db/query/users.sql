@@ -24,6 +24,11 @@ SET name = $2, email = $3, username = $4, password_hash = $5, updated_at = $6, i
 WHERE id = $1;
 
 
+-- name: UpdateUserPassword :exec
+UPDATE users
+SET password_hash = $2
+WHERE email = $1;
+
 -- name: UpdateUserSuspension :exec
 UPDATE users
 SET is_suspended = $3, suspended_at = $2

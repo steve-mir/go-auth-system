@@ -37,6 +37,15 @@ type LoginFailure struct {
 	IpAddress pqtype.Inet    `json:"ip_address"`
 }
 
+type PasswordResetRequest struct {
+	ID        int32        `json:"id"`
+	Email     string       `json:"email"`
+	Token     string       `json:"token"`
+	Used      sql.NullBool `json:"used"`
+	CreatedAt sql.NullTime `json:"created_at"`
+	ExpiresAt time.Time    `json:"expires_at"`
+}
+
 type Role struct {
 	ID   int32  `json:"id"`
 	Name string `json:"name"`
@@ -62,6 +71,24 @@ type Session struct {
 	ExpiresAt    time.Time      `json:"expires_at"`
 	CreatedAt    sql.NullTime   `json:"created_at"`
 	LastActiveAt sql.NullTime   `json:"last_active_at"`
+}
+
+type TwoFactorBackupCode struct {
+	UserID uuid.NullUUID  `json:"user_id"`
+	Code   sql.NullString `json:"code"`
+}
+
+type TwoFactorRevocation struct {
+	ID        int32         `json:"id"`
+	UserID    uuid.NullUUID `json:"user_id"`
+	RevokedAt sql.NullTime  `json:"revoked_at"`
+}
+
+type TwoFactorSecret struct {
+	ID            int32                 `json:"id"`
+	UserID        uuid.NullUUID         `json:"user_id"`
+	SecretKey     sql.NullString        `json:"secret_key"`
+	RecoveryCodes pqtype.NullRawMessage `json:"recovery_codes"`
 }
 
 type User struct {

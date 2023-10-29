@@ -2,18 +2,12 @@ package routers
 
 import (
 	"database/sql"
-	"flag"
-	"log"
-	"time"
-
-	"github.com/fatih/color"
 
 	"github.com/gin-gonic/gin"
 	"github.com/steve-mir/go-auth-system/internal/app/auth/controllers"
 	"github.com/steve-mir/go-auth-system/internal/app/auth/middlewares"
 	"github.com/steve-mir/go-auth-system/internal/db/sqlc"
 	"github.com/steve-mir/go-auth-system/internal/utils"
-	"go.uber.org/ratelimit"
 	"go.uber.org/zap"
 )
 
@@ -27,29 +21,29 @@ const (
 )
 
 // Test ratelimiting
-var (
-	limit ratelimit.Limiter
-	rps   = flag.Int("rps", 100, "request per second")
-)
+// var (
+// 	limit ratelimit.Limiter
+// 	rps   = flag.Int("rps", 100, "request per second")
+// )
 
-func leakBucket() gin.HandlerFunc {
-	prev := time.Now()
-	return func(ctx *gin.Context) {
-		now := limit.Take()
-		log.Print(now.Sub(prev))
-		log.Print(color.CyanString("%v", now.Sub(prev)))
-		prev = now
-	}
-}
+// func leakBucket() gin.HandlerFunc {
+// 	prev := time.Now()
+// 	return func(ctx *gin.Context) {
+// 		now := limit.Take()
+// 		log.Print(now.Sub(prev))
+// 		log.Print(color.CyanString("%v", now.Sub(prev)))
+// 		prev = now
+// 	}
+// }
 
 // ab -n 20 -c 5 -r -s 1 -p post-data.txt http://localhost:9100/register
 
 func Auth(config utils.Config, db *sql.DB, store *sqlc.Store, l *zap.Logger, r *gin.Engine) {
 
-	limit = ratelimit.New(100)
+	// limit = ratelimit.New(100)
 
-	r.Use(leakBucket())
-	log.Printf("Current Rate Limit: %v requests/s", rps)
+	// r.Use(leakBucket())
+	// log.Printf("Current Rate Limit: %v requests/s", rps)
 
 	// Public routes
 	// Requires throttling (rate limiting). No auth header required

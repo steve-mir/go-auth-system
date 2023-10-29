@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/steve-mir/go-auth-system/internal/app/auth/routers"
 	profiles "github.com/steve-mir/go-auth-system/internal/app/profiles/routers"
+	security "github.com/steve-mir/go-auth-system/internal/app/security/routers"
 	"github.com/steve-mir/go-auth-system/internal/db/sqlc"
 	"github.com/steve-mir/go-auth-system/internal/utils"
 	"go.uber.org/zap"
@@ -84,5 +85,6 @@ func setupRouter(db *sql.DB, config utils.Config, route *gin.Engine, l *zap.Logg
 	// Use structured logger middleware
 	route.Use(gin.Logger())
 	routers.Auth(config, db, store, l, route)
+	security.Security(config, db, store, l, route)
 	profiles.Profile(config, store, l, route)
 }
