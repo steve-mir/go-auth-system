@@ -26,7 +26,7 @@ func Login(config utils.Config, store *sqlc.Store, l *zap.Logger) gin.HandlerFun
 
 		// Validate
 		validate := validator.New()
-		// validate.RegisterValidation("strong_password", strongPasswordValidation)
+		validate.RegisterValidation("strong_password", strongPasswordValidation)
 		if err := validate.Struct(req); err != nil {
 			l.Error("Go validator error", zap.Error(err))
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

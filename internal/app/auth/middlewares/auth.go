@@ -73,6 +73,11 @@ func AuthMiddlerWare(config utils.Config, l *zap.Logger) gin.HandlerFunc {
 		}
 
 		accessToken := fields[1]
+		// accessToken, err := ctx.Cookie("accessToken")
+		// if err != nil {
+		// 	ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "Cookie not found"})
+		// 	return
+		// }
 
 		tokenMaker, err := token.NewPasetoMaker(utils.GetKeyForToken(config, false))
 		if err != nil {

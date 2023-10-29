@@ -140,8 +140,8 @@ func LoginUser(config utils.Config, store *sqlc.Store,
 		Error: nil,
 	}
 
-	fmt.Println("ACCESS TOKEN")
 	fmt.Println(accessToken)
+	// ctx.SetCookie("accessToken", accessToken, 36000, "/", "http://localhost:9100/", false, true)
 
 	//! 3 User logged in successfully. Record it
 	err = recordLoginSuccess(store, user.ID, ctx.Request.UserAgent(), clientIP)

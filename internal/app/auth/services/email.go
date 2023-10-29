@@ -21,13 +21,13 @@ func SendVerificationEmail(config utils.Config, store *sqlc.Store, ctx *gin.Cont
 	if payload, exists := ctx.Get("authorization_payload"); exists {
 		if data, ok := payload.(*token.Payload); ok {
 
-			verifyCode, err := utils.GenerateUniqueToken(data.UserId.String())
+			verifyCode, err := utils.GenerateUniqueToken(data.UserId.String(), 42)
 			if err != nil {
 				return "", err
 
 			}
 
-			link := config.AppUrl + "/verify/" + verifyCode
+			link := config.AppUrl + "/verify?token=" + verifyCode
 			msg := "Hello " + data.Username + ", please verify your email address" + "with this link.\n" + link
 			fmt.Println(msg)
 			fmt.Println("Sent to ", data.Email)
@@ -41,7 +41,7 @@ func SendVerificationEmail(config utils.Config, store *sqlc.Store, ctx *gin.Cont
 			err = store.CreateEmailVerificationRequest(context.Background(), sqlc.CreateEmailVerificationRequestParams{
 				UserID:     data.UserId,
 				Email:      data.Email,
-				Token:      link,
+				Token:      verifyCode, //link,
 				IsVerified: sql.NullBool{Valid: false, Bool: false},
 				ExpiresAt:  time.Now().Add(time.Minute * 15),
 			})
@@ -73,7 +73,7 @@ func SendVerificationEmail(config utils.Config, store *sqlc.Store, ctx *gin.Cont
 }
 
 func VerifyEmail(config utils.Config, store *sqlc.Store, link string, l *zap.Logger) error {
-
+	fmt.Println(link)
 	linkData, err := store.GetEmailVerificationRequestByToken(context.Background(), link)
 	if err != nil {
 		l.Error("error getting email link from db", zap.Error(err))

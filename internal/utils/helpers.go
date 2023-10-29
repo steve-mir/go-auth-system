@@ -91,20 +91,31 @@ func GetKeyForToken(config Config, isRefresh bool) string {
 }
 
 // GenerateUniqueToken generates a unique verification token.
-func GenerateUniqueToken(userID string) (string, error) {
+func GenerateUniqueToken(userID string, len int) (string, error) {
 	// Generate a cryptographically secure random value
-	randomBytes := make([]byte, 32)
+	randomBytes := make([]byte, len)
 	_, err := rand.Read(randomBytes)
 	if err != nil {
 		return "", err
 	}
-	fmt.Println(randomBytes)
 
 	// Create a unique token by combining user ID, timestamp, and random value
-	timestamp := time.Now().Unix()
-	token := fmt.Sprintf("%s-%d-%s", userID, timestamp, formatConsistentToken(timestamp, base64.URLEncoding.EncodeToString(randomBytes)))
+	// timestamp := time.Now().Unix()
+	// token := fmt.Sprintf("%s-%d-%s", userID, timestamp, formatConsistentToken(timestamp, base64.URLEncoding.EncodeToString(randomBytes)))
+	token := base64.URLEncoding.EncodeToString(randomBytes)
 
 	return token, nil
+}
+
+func GenerateUniquePwdResetToken() (string, error) {
+	// Generate a cryptographically secure random value
+	randomBytes := make([]byte, 102)
+	_, err := rand.Read(randomBytes)
+	if err != nil {
+		return "", err
+	}
+
+	return base64.URLEncoding.EncodeToString(randomBytes), nil
 }
 
 func formatConsistentToken(timestamp int64, randomString string) string {
