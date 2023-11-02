@@ -37,6 +37,7 @@ Extract auth logic into service layer
 Add OpenAPI docs for the login API
 */
 
+// TODO: When login fails after 3 attempts, block user (to be reset through pwd reset)
 func LoginUser(config utils.Config, store *sqlc.Store,
 	ctx *gin.Context, l *zap.Logger, email string, pwd string,
 ) AuthUserResponse {

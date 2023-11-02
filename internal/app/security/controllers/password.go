@@ -2,6 +2,7 @@ package security
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -84,6 +85,13 @@ func ResetPwd(config utils.Config, store *sqlc.Store, l *zap.Logger) gin.Handler
 			return
 		}
 
+		ctx.JSON(http.StatusOK, gin.H{"msg": "Password successfully changed"})
+	}
+}
+
+func SetPwd() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		fmt.Println("Inside pwd reset sec")
 		ctx.JSON(http.StatusOK, gin.H{"msg": "Password successfully changed"})
 	}
 }
