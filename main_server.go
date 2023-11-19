@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -51,6 +52,7 @@ func main() {
 		WriteTimeout: 1 * time.Second,
 	}
 
+	// ? OLD
 	go func() {
 		if err := srv.ListenAndServe(); err != nil {
 			l.Error("Server error", zap.Error(err))
@@ -59,8 +61,7 @@ func main() {
 
 	// Graceful shutdown handling
 	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt)
-	// signal.Notify(sigChan, os.Kill)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM) // os.Interrupt
 	sig := <-sigChan
 	l.Info("Received terminate, graceful shutdown", zap.String("signal", sig.String()))
 	defer db.Close() // close db connection
@@ -71,6 +72,33 @@ func main() {
 	if err := srv.Shutdown(ctx); err != nil {
 		l.Error("Graceful shutdown error", zap.Error(err))
 	}
+
+	// ! NEW
+	// shutdownErr := make(chan error)
+	// go func() {
+	// 	quit := make(chan os.Signal, 1)
+	// 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	// 	sig := <-quit
+	// 	l.Info("Received terminate, graceful shutdown", zap.String("signal", sig.String()))
+	// 	defer db.Close() // close db connection
+
+	// 	// Create a context with a 20-seconds timeout
+	// 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	// 	defer cancel()
+
+	// 	shutdownErr <- srv.Shutdown(ctx)
+
+	// 	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+	// 		l.Error("Server error", zap.Error(err))
+	// 	}
+
+	// 	err = <-shutdownErr
+	// 	if err != nil {
+	// 		l.Error("Shutdown error error", zap.Error(err))
+	// 	}
+	// 	l.Info("Graceful shutdown successful", zap.String("signal", sig.String()))
+
+	// }()
 
 }
 
