@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 
 	"github.com/steve-mir/go-auth-system/internal/db/sqlc"
@@ -21,7 +22,7 @@ var (
 )
 
 // TODO: limit email sending rate per user
-func SendVerificationEmail(config utils.Config, store *sqlc.Store, ctx *gin.Context, l *zap.Logger) (string, error) {
+func ReSendVerificationEmail(config utils.Config, store *sqlc.Store, ctx *gin.Context, l *zap.Logger) (string, error) {
 	if payload, exists := ctx.Get("authorization_payload"); exists {
 		if data, ok := payload.(*token.Payload); ok {
 
@@ -116,5 +117,44 @@ func VerifyEmail(config utils.Config, store *sqlc.Store, link string, l *zap.Log
 	}
 
 	return nil
+
+}
+
+func SendVerificationEmailOnRegister(uid uuid.UUID, email string, username string, config utils.Config, store *sqlc.Store, ctx *gin.Context, l *zap.Logger) (string, error) {
+
+	verifyCode, err := utils.GenerateUniqueToken(emailTokenLen)
+	if err != nil {
+		return "", err
+
+	}
+
+	link := config.AppUrl + "/verify?token=" + verifyCode
+	msg := "Hello " + username + ", please verify your email address" + "with this link.\n" + link
+	fmt.Println(msg)
+	fmt.Println("Sent to ", email)
+
+	// TODO: send email here.
+
+	//   "is_verified" boolean DEFAULT false,
+	//   "created_at" timestamptz DEFAULT (now()),
+
+	// Add link to db
+	err = store.CreateEmailVerificationRequest(context.Background(), sqlc.CreateEmailVerificationRequestParams{
+		UserID:     uid,
+		Email:      email,
+		Token:      verifyCode, //link,
+		IsVerified: sql.NullBool{Valid: true, Bool: false},
+		ExpiresAt:  time.Now().Add(time.Minute * 15),
+	})
+	if err != nil {
+		l.Error("Error creating email verification request", zap.Error(err))
+		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "an unexpected error"})
+		ctx.Abort()
+
+		return "", err
+
+	}
+
+	return link, nil
 
 }

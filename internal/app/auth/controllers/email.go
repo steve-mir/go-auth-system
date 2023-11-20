@@ -14,7 +14,7 @@ import (
 func VerifyUserEmailRequest(config utils.Config, store *sqlc.Store, l *zap.Logger) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 
-		link, err := services.SendVerificationEmail(config, store, ctx, l)
+		link, err := services.ReSendVerificationEmail(config, store, ctx, l)
 		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return

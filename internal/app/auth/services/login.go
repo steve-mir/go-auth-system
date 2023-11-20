@@ -49,7 +49,7 @@ func LoginUser(config utils.Config, store *sqlc.Store,
 		return AuthUserResponse{User: User{}, Error: err}
 	}
 
-	tokenID, err := uuid.NewRandom()
+	sessionID, err := uuid.NewRandom()
 	if err != nil {
 		l.Error("UUID error", zap.Error(err))
 		return AuthUserResponse{User: User{}, Error: errors.New("an unexpected error occurred")}
@@ -85,7 +85,7 @@ func LoginUser(config utils.Config, store *sqlc.Store,
 
 	// Refresh token
 	refreshToken, refreshPayload, err := CreateUserToken(
-		true, "", config, tokenID, true, user.Email, user.ID, user.IsEmailVerified.Bool,
+		true, "", config, sessionID, true, user.Email, user.ID, user.IsEmailVerified.Bool,
 		clientIP, ctx.Request.UserAgent(), config.RefreshTokenDuration,
 	)
 
@@ -96,7 +96,7 @@ func LoginUser(config utils.Config, store *sqlc.Store,
 
 	// Access token
 	accessToken, accessPayload, err := CreateUserToken(
-		false, refreshToken, config, tokenID, false, user.Email, user.ID, user.IsEmailVerified.Bool,
+		false, refreshToken, config, sessionID, false, user.Email, user.ID, user.IsEmailVerified.Bool,
 		clientIP, ctx.Request.UserAgent(), config.AccessTokenDuration,
 	)
 	if err != nil {
@@ -106,7 +106,7 @@ func LoginUser(config utils.Config, store *sqlc.Store,
 
 	_, err = store.CreateSession(context.Background(), sqlc.CreateSessionParams{
 
-		ID:           tokenID, //refreshPayload.ID,
+		ID:           sessionID, //refreshPayload.ID,
 		UserID:       user.ID,
 		Email:        sql.NullString{String: user.Email, Valid: true},
 		RefreshToken: refreshToken,
@@ -169,7 +169,7 @@ func checkAccountStat(isSuspended bool, isDeleted bool) error {
 	return nil
 }
 
-func CreateUserToken(isRefreshToken bool, refreshToken string, config utils.Config, tokenID uuid.UUID,
+func CreateUserToken(isRefreshToken bool, refreshToken string, config utils.Config, sessionID uuid.UUID,
 	isRefresh bool, email string, uid uuid.UUID, IsUserVerified bool,
 	ip pqtype.Inet, agent string, duration time.Duration,
 ) (string, *token.Payload, error) {
@@ -185,7 +185,7 @@ func CreateUserToken(isRefreshToken bool, refreshToken string, config utils.Conf
 			// Role: "user",
 			RefreshID:       refreshToken,
 			IsRefresh:       isRefresh,
-			SessionID:       tokenID,
+			SessionID:       sessionID,
 			UserId:          uid,
 			Username:        email,
 			Email:           email,

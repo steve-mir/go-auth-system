@@ -136,17 +136,21 @@ func CreateUser(config utils.Config, ctx *gin.Context, db *sql.DB,
 
 	qtx := store.WithTx(tx)
 
-	createUserChan := make(chan createUserResult)
+	// TODO: Refactor and bring back go routine for createUserChan
+	// createUserChan := make(chan createUserResult)
 	createAccessTokenChan := make(chan accessTokenResult)
 	createProfileChan := make(chan error)
 	createRoleChan := make(chan error)
-	// var cx, cancel = context.WithTimeout(context.Background(), 100*time.Second) // TODO: Check if cx with timeout is better
 
-	go func() {
-		user, err := qtx.CreateUser(context.Background(), params)
-		createUserChan <- createUserResult{userResult: user, Err: err}
-		// defer cancel()
-	}()
+	// go func() {
+	// 	user, err := qtx.CreateUser(context.Background(), params)
+	// 	createUserChan <- createUserResult{userResult: user, Err: err}
+	// }()
+	sqlcUser, err := store.CreateUser(context.Background(), params)
+	if err != nil {
+		l.Error("Error while creating user with email and password", zap.Error(err))
+		return AuthUserResponse{User: User{}, Error: err}
+	}
 
 	go func() {
 		accessToken, accessPayload, err := createToken(false, "register access token", req.Email,
@@ -172,12 +176,12 @@ func CreateUser(config utils.Config, ctx *gin.Context, db *sql.DB,
 		createRoleChan <- roleErr
 	}()
 
-	sqlcUser := <-createUserChan
-	if sqlcUser.Err != nil {
-		l.Error("Error while creating user", zap.Error(sqlcUser.Err))
-		tx.Rollback()
-		return AuthUserResponse{User: User{}, Error: sqlcUser.Err}
-	}
+	// sqlcUser := <-createUserChan
+	// if sqlcUser.Err != nil {
+	// 	l.Error("Error while creating user", zap.Error(sqlcUser.Err))
+	// 	tx.Rollback()
+	// 	return AuthUserResponse{User: User{}, Error: sqlcUser.Err}
+	// }
 
 	claims := <-createAccessTokenChan
 	if claims.err != nil {
@@ -200,11 +204,11 @@ func CreateUser(config utils.Config, ctx *gin.Context, db *sql.DB,
 
 	newUser = AuthUserResponse{
 		User: User{
-			ID:                   sqlcUser.userResult.ID,
-			Email:                sqlcUser.userResult.Email,
-			IsEmailVerified:      sqlcUser.userResult.IsEmailVerified.Bool,
-			PasswordChangedAt:    sqlcUser.userResult.CreatedAt.Time,
-			CreatedAt:            sqlcUser.userResult.CreatedAt.Time,
+			ID:                   sqlcUser.ID,
+			Email:                sqlcUser.Email,
+			IsEmailVerified:      sqlcUser.IsEmailVerified.Bool,
+			PasswordChangedAt:    sqlcUser.CreatedAt.Time,
+			CreatedAt:            sqlcUser.CreatedAt.Time,
 			AccessToken:          claims.accessToken,
 			AccessTokenExpiresAt: claims.payload.Expires,
 		},
@@ -213,6 +217,10 @@ func CreateUser(config utils.Config, ctx *gin.Context, db *sql.DB,
 
 	latency := time.Since(start)
 	fmt.Println("Create user Account time ", latency)
+
+	// Send verification email
+	SendVerificationEmailOnRegister(sqlcUser.ID, sqlcUser.Email, sqlcUser.Name.String, config, store, ctx, l)
+	fmt.Println("Email sent")
 	return newUser
 
 	/*start := time.Now()
@@ -222,7 +230,6 @@ func CreateUser(config utils.Config, ctx *gin.Context, db *sql.DB,
 			l.Error("Error while creating user with email and password", zap.Error(err))
 			return err
 		}
-
 
 		accessToken, accessPayload, err := createToken(false, "register access token", sqlcUser.Email,
 			false, // sqlcUser.IsEmailVerified.Bool,
@@ -242,7 +249,6 @@ func CreateUser(config utils.Config, ctx *gin.Context, db *sql.DB,
 			l.Error("Error creating User profile", zap.Error(err))
 			return err
 		}
-
 
 		_, err = store.CreateUserRole(context.Background(), sqlc.CreateUserRoleParams{
 			UserID: sqlcUser.ID,
