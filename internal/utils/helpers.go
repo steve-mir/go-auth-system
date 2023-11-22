@@ -14,6 +14,10 @@ import (
 // It takes a string parameter, clientIP, which represents the client's IP address.
 // It returns a pqtype.Inet value.
 func GetIpAddr(clientIP string) pqtype.Inet {
+	if clientIP == "::1" {
+		clientIP = "127.0.0.1"
+	}
+
 	ip := net.ParseIP(clientIP)
 
 	if ip == nil {

@@ -21,8 +21,10 @@ import (
 )
 
 func (server *Server) LoginUser(ctx context.Context, req *pb.LoginUserRequest) (*pb.LoginUserResponse, error) {
-	agent := utils.GetUserAgent(ctx)
-	clientIP := utils.GetIpAddr(utils.GetIP(ctx))
+	agent := server.extractMetadata(ctx).UserAgent
+	ip := server.extractMetadata(ctx).ClientIP
+
+	clientIP := utils.GetIpAddr(ip)
 	log.Println("User ip", clientIP, " Agent", agent)
 
 	err := HandleEmailPwdErrors(req.GetEmail(), req.GetPassword())

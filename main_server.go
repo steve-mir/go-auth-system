@@ -1,14 +1,17 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"net"
 	"net/http"
+
 	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/steve-mir/go-auth-system/gapi"
 	"github.com/steve-mir/go-auth-system/internal/app/auth/routers"
 	profiles "github.com/steve-mir/go-auth-system/internal/app/profiles/routers"
@@ -19,6 +22,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 func main() {
@@ -42,6 +46,7 @@ func main() {
 	// r.StaticFile("/swagger.yaml", "./swagger.yaml")
 
 	//**************** GRPC Server **********************/
+	go runGrpcGatewayServer(db, config, l)
 	runGrpcServer(db, config, l)
 
 	//**************** GIN Server***********************/
@@ -89,6 +94,45 @@ func runGrpcServer(db *sql.DB, config utils.Config, l *zap.Logger) {
 	err = grpcServer.Serve(listener)
 	if err != nil {
 		log.Fatal("cannot start grpc server")
+	}
+}
+
+func runGrpcGatewayServer(db *sql.DB, config utils.Config, l *zap.Logger) {
+	server, err := gapi.NewServer(db, config, l)
+	if err != nil {
+		log.Fatal("cannot create a server:", err)
+	}
+
+	jsonOptions := runtime.WithMarshalerOption(runtime.MIMEWildcard, &runtime.JSONPb{
+		MarshalOptions: protojson.MarshalOptions{
+			UseProtoNames: true,
+		},
+		UnmarshalOptions: protojson.UnmarshalOptions{
+			DiscardUnknown: true,
+		},
+	})
+
+	grpcMux := runtime.NewServeMux(jsonOptions)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	err = pb.RegisterUserAuthHandlerServer(ctx, grpcMux, server)
+	if err != nil {
+		log.Fatal("cannot register handler server")
+	}
+
+	mux := http.NewServeMux()
+	mux.Handle("/", grpcMux)
+
+	listener, err := net.Listen("tcp", config.HTTPServerAddress)
+	if err != nil {
+		log.Fatal("cannot create listener:", err)
+	}
+
+	log.Printf("start HTTP gateway server at %s", listener.Addr().String())
+	err = http.Serve(listener, mux)
+	if err != nil {
+		log.Fatal("cannot start HTTP Gateway server")
 	}
 }
 
