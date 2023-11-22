@@ -11,6 +11,12 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+
+	// "github.com/golang-migrate/migrate"
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/steve-mir/go-auth-system/gapi"
 	"github.com/steve-mir/go-auth-system/internal/app/auth/routers"
@@ -36,7 +42,7 @@ func main() {
 	}
 
 	// Run db migrations
-	runDbMigration("", "")
+	runDbMigration(config.MigrationUrl, config.DBSource)
 
 	// Create the routes
 	db, err := sqlc.CreateDbPool(config)
@@ -79,6 +85,15 @@ func main() {
 }
 
 func runDbMigration(migrationUrl string, dbSource string) {
+	migration, err := migrate.New(migrationUrl, dbSource)
+	if err != nil {
+		log.Fatal("cannot create new migration instance:", err)
+	}
+
+	if err = migration.Up(); err != nil && err != migrate.ErrNoChange {
+		log.Fatal("failed to run migrate up:", err)
+	}
+	log.Println("db migrated successfully")
 
 }
 
