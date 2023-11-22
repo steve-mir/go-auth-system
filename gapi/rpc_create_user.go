@@ -15,7 +15,9 @@ import (
 	"github.com/steve-mir/go-auth-system/internal/token"
 	"github.com/steve-mir/go-auth-system/internal/utils"
 	"github.com/steve-mir/go-auth-system/pb"
+	"github.com/steve-mir/go-auth-system/val"
 	"go.uber.org/zap"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -56,9 +58,11 @@ type accessTokenResult struct {
 	err         error
 }
 
-func (server *Server) CreateUser(ctx context.Context, req *pb.CreateUserRequest,
+func (server *Server) CreateUser(ctx context.Context, req *pb.CreateUserRequest) (*pb.CreateUserResponse, error) {
+	if violations := validateCreateUserRequest(req); violations != nil {
+		return nil, invalidArgumentErr(violations)
+	}
 
-) (*pb.CreateUserResponse, error) {
 	agent := utils.GetUserAgent(ctx)
 	clientIP := utils.GetIpAddr(utils.GetIP(ctx))
 	log.Println("User ip", clientIP, " Agent", agent)
@@ -214,15 +218,19 @@ func (server *Server) CreateUser(ctx context.Context, req *pb.CreateUserRequest,
 
 }
 
-// func (server *Server) LoginUser(ctx context.Context, req *pb.LoginUserRequest) (*pb.LoginUserResponse, error) {
-// 	return &pb.LoginUserResponse{
-// 		User: &pb.User{
-// 			Username: req.Email,
-// 			Email:    req.Password,
-// 			FullName: "req.FullName",
-// 		},
-// 	}, nil
-// }
+func validateCreateUserRequest(req *pb.CreateUserRequest) (violations []*errdetails.BadRequest_FieldViolation) {
+	if err := val.ValidateEmail(req.GetEmail()); err != nil {
+		violations = append(violations, fieldViolation("username", err))
+	}
+
+	if err := val.ValidatePassword(req.GetPassword()); err != nil {
+		violations = append(violations, fieldViolation("password", err))
+	}
+
+	// TODO: Add other field validations here
+
+	return violations
+}
 
 // ?----------------
 

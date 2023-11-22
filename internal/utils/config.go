@@ -8,6 +8,7 @@ import (
 
 type Config struct {
 	AppUrl                   string        `mapstructure:"APP_URL"`
+	MigrationUrl             string        `mapstructure:"MIGRATION_URL"`
 	DBDriver                 string        `mapstructure:"DB_DRIVER"`
 	DBSource                 string        `mapstructure:"DB_SOURCE"`
 	HTTPServerAddress        string        `mapstructure:"HTTP_SERVER_ADDRESS"`

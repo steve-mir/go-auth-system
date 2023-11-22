@@ -35,6 +35,9 @@ func main() {
 		l.Fatal("cannot load config", zap.Error(err))
 	}
 
+	// Run db migrations
+	runDbMigration("", "")
+
 	// Create the routes
 	db, err := sqlc.CreateDbPool(config)
 	if err != nil {
@@ -72,6 +75,10 @@ func main() {
 	// if err := srv.Shutdown(ctx); err != nil {
 	// 	l.Error("Graceful shutdown error", zap.Error(err))
 	// }
+
+}
+
+func runDbMigration(migrationUrl string, dbSource string) {
 
 }
 

@@ -11,7 +11,7 @@ import "rpc_login_user.proto";
 option go_package = "github.com/steve-mir/go-auth-system/pb";
 
 
-
+// option go_package = "github.com/grpc-ecosystem/grpc-gateway/v2/examples/internal/proto/examplepb";
 // option (protoc_gen_openapiv2.options.openapiv2_swagger) = {
 //   info: {
 //     title: "Auth System";
