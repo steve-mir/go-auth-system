@@ -52,6 +52,12 @@ test:
 run:
 	go run main.go
 
+proto:
+	rm -f pb/*.go
+	protoc --proto_path=protos --go_out=pb --go_opt=paths=source_relative \
+	--go-grpc_out=pb --go-grpc_opt=paths=source_relative \
+	protos/*.proto
+
 .PHONY: postgres createdb dropdb migrateup migrateup1 migratedown migratedown1 sqlc test run environ air_init air_run start_redis redis start_ps
 
 # migrate create -ext sql -dir db/migration -seq add_user_session

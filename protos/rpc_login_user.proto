@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package pb;
+
+import "user.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/steve-mir/go-auth-system/pb";
+
+message LoginUserRequest {
+    string email = 1;
+    string password = 2;
+}
+
+message LoginUserResponse {
+    User user = 1;
+    string access_token = 2;
+    string session_id = 3;
+    google.protobuf.Timestamp access_token_expires_at = 4;
+}
