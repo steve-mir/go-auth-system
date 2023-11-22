@@ -10,7 +10,8 @@ type Config struct {
 	AppUrl                   string        `mapstructure:"APP_URL"`
 	DBDriver                 string        `mapstructure:"DB_DRIVER"`
 	DBSource                 string        `mapstructure:"DB_SOURCE"`
-	ServerAddress            string        `mapstructure:"SERVER_ADDRESS"`
+	HTTPServerAddress        string        `mapstructure:"HTTP_SERVER_ADDRESS"`
+	GRPCServerAddress        string        `mapstructure:"GRPC_SERVER_ADDRESS"`
 	RefreshTokenSymmetricKey string        `mapstructure:"REFRESH_TOKEN_SYMMETRIC_KEY"`
 	AccessTokenSymmetricKey  string        `mapstructure:"ACCESS_TOKEN_SYMMETRIC_KEY"`
 	AccessTokenDuration      time.Duration `mapstructure:"ACCESS_TOKEN_DURATION"`

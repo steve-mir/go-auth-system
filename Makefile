@@ -58,6 +58,9 @@ proto:
 	--go-grpc_out=pb --go-grpc_opt=paths=source_relative \
 	protos/*.proto
 
+evans:
+	evans --host localhost --port 9901 -r repl
+
 .PHONY: postgres createdb dropdb migrateup migrateup1 migratedown migratedown1 sqlc test run environ air_init air_run start_redis redis start_ps
 
 # migrate create -ext sql -dir db/migration -seq add_user_session

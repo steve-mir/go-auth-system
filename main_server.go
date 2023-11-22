@@ -1,22 +1,24 @@
 package main
 
 import (
-	"context"
 	"database/sql"
+	"log"
+	"net"
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/steve-mir/go-auth-system/gapi"
 	"github.com/steve-mir/go-auth-system/internal/app/auth/routers"
 	profiles "github.com/steve-mir/go-auth-system/internal/app/profiles/routers"
 	security "github.com/steve-mir/go-auth-system/internal/app/security/routers"
 	"github.com/steve-mir/go-auth-system/internal/db/sqlc"
 	"github.com/steve-mir/go-auth-system/internal/utils"
+	"github.com/steve-mir/go-auth-system/pb"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 func main() {
@@ -29,77 +31,80 @@ func main() {
 		l.Fatal("cannot load config", zap.Error(err))
 	}
 
-	port := config.ServerAddress
-
-	router := gin.New()
-
 	// Create the routes
 	db, err := sqlc.CreateDbPool(config)
 	if err != nil {
 		l.Error("cannot create db pool", zap.Error(err))
 		return
 	}
-	setupRouter(db, config, router, l)
 
 	// Serve your Swagger documentation if needed
 	// r.StaticFile("/swagger.yaml", "./swagger.yaml")
 
-	srv := &http.Server{
+	//**************** GRPC Server **********************/
+	runGrpcServer(db, config, l)
+
+	//**************** GIN Server***********************/
+	// srv := createGinServer(db, config, l)
+
+	// // ? OLD
+	// go func() {
+	// 	if err := srv.ListenAndServe(); err != nil {
+	// 		l.Error("Server error", zap.Error(err))
+	// 	}
+	// }()
+
+	// // Graceful shutdown handling
+	// sigChan := make(chan os.Signal, 1)
+	// signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM) // os.Interrupt
+	// sig := <-sigChan
+	// l.Info("Received terminate, graceful shutdown", zap.String("signal", sig.String()))
+	// defer db.Close() // close db connection
+
+	// // Graceful shutdown with error handling
+	// ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	// defer cancel()
+	// if err := srv.Shutdown(ctx); err != nil {
+	// 	l.Error("Graceful shutdown error", zap.Error(err))
+	// }
+
+}
+
+func runGrpcServer(db *sql.DB, config utils.Config, l *zap.Logger) {
+	server, err := gapi.NewServer(db, config, l)
+	if err != nil {
+		log.Fatal("cannot create a server:", err)
+	}
+
+	grpcServer := grpc.NewServer()
+	pb.RegisterUserAuthServer(grpcServer, server)
+	reflection.Register(grpcServer)
+
+	listener, err := net.Listen("tcp", config.GRPCServerAddress)
+	if err != nil {
+		log.Fatal("cannot create listener:", err)
+	}
+
+	log.Printf("start grpc server at %s", listener.Addr().String())
+	err = grpcServer.Serve(listener)
+	if err != nil {
+		log.Fatal("cannot start grpc server")
+	}
+}
+
+func createGinServer(db *sql.DB, config utils.Config, l *zap.Logger) *http.Server {
+	port := config.HTTPServerAddress
+	router := gin.New()
+
+	setupRouter(db, config, router, l)
+
+	return &http.Server{
 		Addr:         port, //":" + port,
 		Handler:      router,
 		IdleTimeout:  120 * time.Second,
 		ReadTimeout:  1 * time.Second,
 		WriteTimeout: 1 * time.Second,
 	}
-
-	// ? OLD
-	go func() {
-		if err := srv.ListenAndServe(); err != nil {
-			l.Error("Server error", zap.Error(err))
-		}
-	}()
-
-	// Graceful shutdown handling
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM) // os.Interrupt
-	sig := <-sigChan
-	l.Info("Received terminate, graceful shutdown", zap.String("signal", sig.String()))
-	defer db.Close() // close db connection
-
-	// Graceful shutdown with error handling
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	if err := srv.Shutdown(ctx); err != nil {
-		l.Error("Graceful shutdown error", zap.Error(err))
-	}
-
-	// ! NEW
-	// shutdownErr := make(chan error)
-	// go func() {
-	// 	quit := make(chan os.Signal, 1)
-	// 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	// 	sig := <-quit
-	// 	l.Info("Received terminate, graceful shutdown", zap.String("signal", sig.String()))
-	// 	defer db.Close() // close db connection
-
-	// 	// Create a context with a 20-seconds timeout
-	// 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	// 	defer cancel()
-
-	// 	shutdownErr <- srv.Shutdown(ctx)
-
-	// 	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-	// 		l.Error("Server error", zap.Error(err))
-	// 	}
-
-	// 	err = <-shutdownErr
-	// 	if err != nil {
-	// 		l.Error("Shutdown error error", zap.Error(err))
-	// 	}
-	// 	l.Info("Graceful shutdown successful", zap.String("signal", sig.String()))
-
-	// }()
-
 }
 
 func setupRouter(db *sql.DB, config utils.Config, route *gin.Engine, l *zap.Logger) {

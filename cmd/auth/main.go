@@ -26,7 +26,7 @@ func main() {
 		l.Fatal("cannot load config", zap.Error(err))
 	}
 
-	port := config.ServerAddress
+	port := config.HTTPServerAddress
 
 	router := gin.New()
 
