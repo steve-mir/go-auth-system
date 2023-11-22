@@ -5,8 +5,32 @@ package pb;
 import "google/api/annotations.proto";
 import "rpc_create_user.proto";
 import "rpc_login_user.proto";
+// import "protoc-gen-openapiv2/options/annotations.proto";
+
 
 option go_package = "github.com/steve-mir/go-auth-system/pb";
+
+
+
+// option (protoc_gen_openapiv2.options.openapiv2_swagger) = {
+//   info: {
+//     title: "Auth System";
+//     version: "1.0";
+//     contact: {
+//       name: "Tamitrix";
+//       url: "github.com/steve-mir/go-auth-system";
+//       email: "ekechukwuemeka25@gmail.com";
+//     };
+//     license: {
+//       name: "BSD 3-Clause License";
+//       url: "https://github.com/grpc-ecosystem/grpc-gateway/blob/main/LICENSE";
+//     };
+//     extensions: {
+//       key: "x-something-something";
+//       value {string_value: "yadda"}
+//     }
+//   };
+// };
 
 service UserAuth {
     rpc CreateUser(CreateUserRequest) returns (CreateUserResponse) {
