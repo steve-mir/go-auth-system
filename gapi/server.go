@@ -14,7 +14,7 @@ type Server struct {
 	config utils.Config
 	store  *sqlc.Store
 	l      *zap.Logger
-	// db *sql.DB
+	db     *sql.DB
 }
 
 // GRPC server
@@ -22,6 +22,7 @@ func NewServer(db *sql.DB, config utils.Config, l *zap.Logger) (*Server, error) 
 	// Create db store and pass as injector
 	return &Server{
 		config: config,
+		db:     db,
 		store:  sqlc.NewStore(db),
 		l:      l,
 	}, nil

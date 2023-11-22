@@ -9,8 +9,9 @@ option go_package = "github.com/steve-mir/go-auth-system/pb";
 message CreateUserRequest {
     string email = 1;
     string username = 2;
-    string full_name = 3;
-    string password = 4;
+    string first_name = 3;
+    string last_name = 4;
+    string password = 5;
 }
 
 message CreateUserResponse {
