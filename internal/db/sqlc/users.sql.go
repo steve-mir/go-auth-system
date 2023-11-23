@@ -237,7 +237,6 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username sql.NullString
 }
 
 const updateUser = `-- name: UpdateUser :one
-
 UPDATE users
 SET
     name = COALESCE($1, name),

@@ -24,7 +24,6 @@ SET name = $2, email = $3, username = $4, password_hash = $5, updated_at = $6, i
 WHERE id = $1;
 
 -- name: UpdateUser :one
-
 UPDATE users
 SET
     name = COALESCE(sqlc.narg('name'), name),
