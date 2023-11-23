@@ -63,8 +63,10 @@ func (server *Server) CreateUser(ctx context.Context, req *pb.CreateUserRequest)
 		return nil, invalidArgumentErr(violations)
 	}
 
-	agent := utils.GetUserAgent(ctx)
-	clientIP := utils.GetIpAddr(utils.GetIP(ctx))
+	agent := server.extractMetadata(ctx).UserAgent
+	ip := server.extractMetadata(ctx).ClientIP
+
+	clientIP := utils.GetIpAddr(ip)
 	log.Println("User ip", clientIP, " Agent", agent)
 
 	server.l.Info("Registration request received for email", zap.String("email", req.GetEmail()))
