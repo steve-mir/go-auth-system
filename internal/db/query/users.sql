@@ -23,6 +23,17 @@ UPDATE users
 SET name = $2, email = $3, username = $4, password_hash = $5, updated_at = $6, is_suspended = $7, is_deleted = $8, login_attempts = $9, lockout_duration = $10, lockout_until = $11
 WHERE id = $1;
 
+-- --name UpdateUserNew one
+-- UPDATE users
+-- SET
+--     password_hash = COALESCE(sqlc.narg('password_hash'), password_hash),
+--     email = COALESCE(sqlc.narg('email'), email),
+--     username = COALESCE(sqlc.narg('username'), username)
+-- WHERE 
+--     id = sqlc.arg('id')
+-- RETURNING *;
+
+
 
 -- name: UpdateUserPassword :exec
 UPDATE users
