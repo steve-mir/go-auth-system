@@ -10,12 +10,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/hibiken/asynq"
 	"github.com/sqlc-dev/pqtype"
 	"github.com/steve-mir/go-auth-system/internal/db/sqlc"
 	"github.com/steve-mir/go-auth-system/internal/token"
 	"github.com/steve-mir/go-auth-system/internal/utils"
 	"github.com/steve-mir/go-auth-system/pb"
 	"github.com/steve-mir/go-auth-system/val"
+	"github.com/steve-mir/go-auth-system/worker"
 	"go.uber.org/zap"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
@@ -186,7 +188,7 @@ func (server *Server) CreateUser(ctx context.Context, req *pb.CreateUserRequest)
 	if <-createRoleChan != nil {
 		server.l.Error("Error creating User role", zap.Error(<-createRoleChan))
 		tx.Rollback()
-		return nil, status.Errorf(codes.Unimplemented, "error creating User role %s", <-createRoleChan)
+		return nil, status.Errorf(codes.Internal, "error creating User role %s", <-createRoleChan)
 	}
 
 	// newUser := AuthUserResponse{
@@ -205,8 +207,22 @@ func (server *Server) CreateUser(ctx context.Context, req *pb.CreateUserRequest)
 	latency := time.Since(start)
 	fmt.Println("Create user Account time ", latency)
 
+	//TODO:  Use db transaction
 	// Send verification email
-	// TODO: services.SendVerificationEmailOnRegister(sqlcUser.ID, sqlcUser.Email, sqlcUser.Name.String, config, store, ctx, l)
+	taskPayload := &worker.PayloadSendVerifyEmail{
+		Username: sqlcUser.Email,
+	}
+
+	opts := []asynq.Option{
+		asynq.MaxRetry(10),
+		asynq.ProcessIn(10 * time.Second),
+		asynq.Queue(worker.QueueCritical),
+	}
+
+	err = server.taskDistributor.DistributeTaskSendVerifyEmail(ctx, taskPayload, opts...)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to distribute task to send verify email %s", err)
+	}
 	fmt.Println("Implement send Email")
 
 	return &pb.CreateUserResponse{

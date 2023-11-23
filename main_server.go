@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/hibiken/asynq"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -28,6 +29,7 @@ import (
 	"github.com/steve-mir/go-auth-system/internal/db/sqlc"
 	"github.com/steve-mir/go-auth-system/internal/utils"
 	"github.com/steve-mir/go-auth-system/pb"
+	"github.com/steve-mir/go-auth-system/worker"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -58,12 +60,17 @@ func main() {
 		return
 	}
 
-	// Serve your Swagger documentation if needed
-	// r.StaticFile("/swagger.yaml", "./swagger.yaml")
+	// Connect to redis
+	redisOpt := asynq.RedisClientOpt{
+		Addr: config.RedisAddress,
+	}
 
+	taskDistributor := worker.NewRedisTaskDistributor(redisOpt)
+
+	go runTaskProcessor(redisOpt, *sqlc.NewStore(db)) // TODO: Change to use db instead of store
 	//**************** GRPC Server **********************/
-	go runGrpcGatewayServer(db, config, l)
-	runGrpcServer(db, config, l)
+	go runGrpcGatewayServer(db, config, taskDistributor, l)
+	runGrpcServer(db, config, taskDistributor, l)
 
 	//**************** GIN Server***********************/
 	// srv := createGinServer(db, config, l)
@@ -91,6 +98,16 @@ func main() {
 
 }
 
+func runTaskProcessor(redisOpt asynq.RedisClientOpt, store sqlc.Store) {
+	mailer := worker.NewRedisTaskProcessor(redisOpt, store)
+	log.Info().Msg("Starting task processor")
+	err := mailer.Start()
+	if err != nil {
+		log.Fatal().Msg("cannot start task processor")
+	}
+
+}
+
 func runDbMigration(migrationUrl string, dbSource string) {
 	migration, err := migrate.New(migrationUrl, dbSource)
 	if err != nil {
@@ -104,8 +121,8 @@ func runDbMigration(migrationUrl string, dbSource string) {
 
 }
 
-func runGrpcServer(db *sql.DB, config utils.Config, l *zap.Logger) {
-	server, err := gapi.NewServer(db, config, l)
+func runGrpcServer(db *sql.DB, config utils.Config, taskDistributor worker.TaskDistributor, l *zap.Logger) {
+	server, err := gapi.NewServer(db, config, taskDistributor, l)
 	if err != nil {
 		log.Fatal().Msg("cannot create a server:") //, err)
 	}
@@ -127,8 +144,8 @@ func runGrpcServer(db *sql.DB, config utils.Config, l *zap.Logger) {
 	}
 }
 
-func runGrpcGatewayServer(db *sql.DB, config utils.Config, l *zap.Logger) {
-	server, err := gapi.NewServer(db, config, l)
+func runGrpcGatewayServer(db *sql.DB, config utils.Config, taskDistributor worker.TaskDistributor, l *zap.Logger) {
+	server, err := gapi.NewServer(db, config, taskDistributor, l)
 	if err != nil {
 		log.Fatal().Msg("cannot create a server:") //, err)
 	}
