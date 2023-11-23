@@ -221,7 +221,7 @@ func (server *Server) CreateUser(ctx context.Context, req *pb.CreateUserRequest)
 			Email:     sqlcUser.Email,
 			CreatedAt: timestamppb.New(sqlcUser.CreatedAt.Time),
 		},
-	}, nil
+	}, tx.Commit()
 
 }
 
