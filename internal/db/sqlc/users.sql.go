@@ -236,32 +236,48 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username sql.NullString
 	return i, err
 }
 
-const updateUser = `-- name: UpdateUser :exec
+const updateUser = `-- name: UpdateUser :one
+
 UPDATE users
-SET name = $2, email = $3, username = $4, password_hash = $5, updated_at = $6, is_suspended = $7, is_deleted = $8, login_attempts = $9, lockout_duration = $10, lockout_until = $11
-WHERE id = $1
+SET
+    name = COALESCE($1, name),
+    username = COALESCE($2,username),
+    email = COALESCE($3,email),
+    password_hash = COALESCE($4,password_hash),
+    updated_at = COALESCE($5,updated_at),
+    is_suspended = COALESCE($6,is_suspended),
+    is_deleted = COALESCE($7,is_deleted),
+    login_attempts = COALESCE($8,login_attempts),
+    lockout_duration = COALESCE($9,lockout_duration),
+    lockout_until = COALESCE($10,lockout_until),
+    password_changed_at = COALESCE($11,password_changed_at),
+    is_verified = COALESCE($12,is_verified)
+WHERE
+    id = $13
+RETURNING id, name, email, username, password_hash, created_at, updated_at, is_suspended, is_verified, is_email_verified, is_deleted, login_attempts, lockout_duration, lockout_until, password_changed_at, deleted_at, suspended_at, email_verified_at
 `
 
 type UpdateUserParams struct {
-	ID              uuid.UUID      `json:"id"`
-	Name            sql.NullString `json:"name"`
-	Email           string         `json:"email"`
-	Username        sql.NullString `json:"username"`
-	PasswordHash    string         `json:"password_hash"`
-	UpdatedAt       sql.NullTime   `json:"updated_at"`
-	IsSuspended     bool           `json:"is_suspended"`
-	IsDeleted       bool           `json:"is_deleted"`
-	LoginAttempts   sql.NullInt32  `json:"login_attempts"`
-	LockoutDuration sql.NullInt32  `json:"lockout_duration"`
-	LockoutUntil    sql.NullTime   `json:"lockout_until"`
+	Name              sql.NullString `json:"name"`
+	Username          sql.NullString `json:"username"`
+	Email             sql.NullString `json:"email"`
+	PasswordHash      sql.NullString `json:"password_hash"`
+	UpdatedAt         sql.NullTime   `json:"updated_at"`
+	IsSuspended       sql.NullBool   `json:"is_suspended"`
+	IsDeleted         sql.NullBool   `json:"is_deleted"`
+	LoginAttempts     sql.NullInt32  `json:"login_attempts"`
+	LockoutDuration   sql.NullInt32  `json:"lockout_duration"`
+	LockoutUntil      sql.NullTime   `json:"lockout_until"`
+	PasswordChangedAt sql.NullTime   `json:"password_changed_at"`
+	IsVerified        sql.NullBool   `json:"is_verified"`
+	ID                uuid.UUID      `json:"id"`
 }
 
-func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) error {
-	_, err := q.db.ExecContext(ctx, updateUser,
-		arg.ID,
+func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, updateUser,
 		arg.Name,
-		arg.Email,
 		arg.Username,
+		arg.Email,
 		arg.PasswordHash,
 		arg.UpdatedAt,
 		arg.IsSuspended,
@@ -269,8 +285,32 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) error {
 		arg.LoginAttempts,
 		arg.LockoutDuration,
 		arg.LockoutUntil,
+		arg.PasswordChangedAt,
+		arg.IsVerified,
+		arg.ID,
 	)
-	return err
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Email,
+		&i.Username,
+		&i.PasswordHash,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IsSuspended,
+		&i.IsVerified,
+		&i.IsEmailVerified,
+		&i.IsDeleted,
+		&i.LoginAttempts,
+		&i.LockoutDuration,
+		&i.LockoutUntil,
+		&i.PasswordChangedAt,
+		&i.DeletedAt,
+		&i.SuspendedAt,
+		&i.EmailVerifiedAt,
+	)
+	return i, err
 }
 
 const updateUserEmailVerified = `-- name: UpdateUserEmailVerified :exec
@@ -291,10 +331,44 @@ func (q *Queries) UpdateUserEmailVerified(ctx context.Context, arg UpdateUserEma
 	return err
 }
 
+const updateUserOld = `-- name: UpdateUserOld :exec
+UPDATE users
+SET name = $2, email = $3, username = $4, password_hash = $5, updated_at = $6, is_suspended = $7, is_deleted = $8, login_attempts = $9, lockout_duration = $10, lockout_until = $11
+WHERE id = $1
+`
+
+type UpdateUserOldParams struct {
+	ID              uuid.UUID      `json:"id"`
+	Name            sql.NullString `json:"name"`
+	Email           string         `json:"email"`
+	Username        sql.NullString `json:"username"`
+	PasswordHash    string         `json:"password_hash"`
+	UpdatedAt       sql.NullTime   `json:"updated_at"`
+	IsSuspended     bool           `json:"is_suspended"`
+	IsDeleted       bool           `json:"is_deleted"`
+	LoginAttempts   sql.NullInt32  `json:"login_attempts"`
+	LockoutDuration sql.NullInt32  `json:"lockout_duration"`
+	LockoutUntil    sql.NullTime   `json:"lockout_until"`
+}
+
+func (q *Queries) UpdateUserOld(ctx context.Context, arg UpdateUserOldParams) error {
+	_, err := q.db.ExecContext(ctx, updateUserOld,
+		arg.ID,
+		arg.Name,
+		arg.Email,
+		arg.Username,
+		arg.PasswordHash,
+		arg.UpdatedAt,
+		arg.IsSuspended,
+		arg.IsDeleted,
+		arg.LoginAttempts,
+		arg.LockoutDuration,
+		arg.LockoutUntil,
+	)
+	return err
+}
+
 const updateUserPassword = `-- name: UpdateUserPassword :exec
-
-
-
 UPDATE users
 SET password_hash = $2
 WHERE email = $1
@@ -305,19 +379,6 @@ type UpdateUserPasswordParams struct {
 	PasswordHash string `json:"password_hash"`
 }
 
-// --name UpdateUserNew one
-// UPDATE users
-// SET
-//
-//	password_hash = COALESCE(sqlc.narg('password_hash'), password_hash),
-//	email = COALESCE(sqlc.narg('email'), email),
-//	username = COALESCE(sqlc.narg('username'), username)
-//
-// WHERE
-//
-//	id = sqlc.arg('id')
-//
-// RETURNING *;
 func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error {
 	_, err := q.db.ExecContext(ctx, updateUserPassword, arg.Email, arg.PasswordHash)
 	return err
