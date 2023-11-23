@@ -5,6 +5,7 @@ package pb;
 import "google/api/annotations.proto";
 import "rpc_create_user.proto";
 import "rpc_login_user.proto";
+import "rpc_update_user.proto";
 // import "protoc-gen-openapiv2/options/annotations.proto";
 
 
@@ -42,6 +43,13 @@ service UserAuth {
     rpc LoginUser(LoginUserRequest) returns (LoginUserResponse) {
         option (google.api.http) = {
             post: "/v1/auth/login"
+            body: "*"
+        };
+    }
+
+    rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse) {
+        option (google.api.http) = {
+            patch: "/v1/auth/update_user"
             body: "*"
         };
     }
