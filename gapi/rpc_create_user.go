@@ -191,23 +191,11 @@ func (server *Server) CreateUser(ctx context.Context, req *pb.CreateUserRequest)
 		return nil, status.Errorf(codes.Internal, "error creating User role %s", <-createRoleChan)
 	}
 
-	// newUser := AuthUserResponse{
-	// 	User: User{
-	// 		ID:                   sqlcUser.ID,
-	// 		Email:                sqlcUser.Email,
-	// 		IsEmailVerified:      sqlcUser.IsEmailVerified.Bool,
-	// 		PasswordChangedAt:    sqlcUser.CreatedAt.Time,
-	// 		CreatedAt:            sqlcUser.CreatedAt.Time,
-	// 		AccessToken:          claims.accessToken,
-	// 		AccessTokenExpiresAt: claims.payload.Expires,
-	// 	},
-	// 	Error: tx.Commit(),
-	// }
-
 	latency := time.Since(start)
 	fmt.Println("Create user Account time ", latency)
 
-	//TODO:  Use db transaction
+	//TODO:  Add to transaction. If process fails, do not run
+	// *****************************************/
 	// Send verification email
 	taskPayload := &worker.PayloadSendVerifyEmail{
 		Username: sqlcUser.Email,
@@ -223,6 +211,7 @@ func (server *Server) CreateUser(ctx context.Context, req *pb.CreateUserRequest)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to distribute task to send verify email %s", err)
 	}
+	// *****************************************/
 	fmt.Println("Implement send Email")
 
 	return &pb.CreateUserResponse{
