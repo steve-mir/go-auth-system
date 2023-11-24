@@ -129,12 +129,27 @@ func (server *Server) LoginUser(ctx context.Context, req *pb.LoginUserRequest) (
 		return nil, status.Errorf(codes.Internal, "error creating login record %s", err)
 	}
 
+	/**
+
+
+
+
+	  google.protobuf.Timestamp password_changed_at = 5;
+	  google.protobuf.Timestamp created_at = 6;
+
+	*/
 	// return resp
 	return &pb.LoginUserResponse{
 		User: &pb.User{
-			Username: user.ID.String(),
-			Email:    req.GetEmail(),
-			FullName: req.GetEmail(),
+			Uid:               user.ID.String(),
+			IsEmailVerified:   user.IsEmailVerified.Bool,
+			IsVerified:        user.IsVerified.Bool,
+			IsDeleted:         user.IsDeleted,
+			Username:          user.ID.String(),
+			Email:             req.GetEmail(),
+			FullName:          req.GetEmail(),
+			CreatedAt:         timestamppb.New(user.CreatedAt.Time),
+			PasswordChangedAt: timestamppb.New(user.PasswordChangedAt.Time),
 		},
 		AccessToken:          accessToken,
 		AccessTokenExpiresAt: timestamppb.New(accessPayload.Expires),

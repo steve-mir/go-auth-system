@@ -23,6 +23,11 @@ type Config struct {
 	DBMaxOpenConn            int           `mapstructure:"DB_MAX_OPEN_CONN"`
 	DBMaxIdleTime            int           `mapstructure:"DB_MAX_IDLE_TIME"`
 	DBMaxLifeTime            int           `mapstructure:"DB_MAX_LIFE_TIME"`
+	SMTPName                 string        `mapstructure:"SMTP_NAME"`
+	SMTPAddr                 string        `mapstructure:"SMTP_ADDR"`
+	SMTPHost                 string        `mapstructure:"SMTP_HOST"`
+	SMTPUsername             string        `mapstructure:"SMTP_USERNAME"`
+	SMTPPassword             string        `mapstructure:"SMTP_PASSWORD"`
 }
 
 // LoadConfig reads configuration from a file or environment variables.

@@ -205,6 +205,9 @@
     "pbUser": {
       "type": "object",
       "properties": {
+        "uid": {
+          "type": "string"
+        },
         "username": {
           "type": "string"
         },
@@ -221,6 +224,15 @@
         "createdAt": {
           "type": "string",
           "format": "date-time"
+        },
+        "isEmailVerified": {
+          "type": "boolean"
+        },
+        "isVerified": {
+          "type": "boolean"
+        },
+        "isDeleted": {
+          "type": "boolean"
         }
       }
     },

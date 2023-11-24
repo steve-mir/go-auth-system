@@ -216,10 +216,14 @@ func (server *Server) CreateUser(ctx context.Context, req *pb.CreateUserRequest)
 
 	return &pb.CreateUserResponse{
 		User: &pb.User{
-			FullName:  req.LastName,
-			Username:  sqlcUser.Email,
-			Email:     sqlcUser.Email,
-			CreatedAt: timestamppb.New(sqlcUser.CreatedAt.Time),
+			Uid:             uid.String(),
+			IsEmailVerified: sqlcUser.IsEmailVerified.Bool,
+			IsVerified:      sqlcUser.IsVerified.Bool,
+			IsDeleted:       sqlcUser.IsDeleted,
+			FullName:        req.LastName,
+			Username:        sqlcUser.Email,
+			Email:           sqlcUser.Email,
+			CreatedAt:       timestamppb.New(sqlcUser.CreatedAt.Time),
 		},
 	}, tx.Commit()
 

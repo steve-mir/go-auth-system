@@ -7,9 +7,13 @@ import "google/protobuf/timestamp.proto";
 option go_package = "github.com/steve-mir/go-auth-system/pb";
 
 message User {
-    string username = 1;
-    string full_name = 2;
-    string email = 3;
-    google.protobuf.Timestamp password_changed_at = 4;
-    google.protobuf.Timestamp created_at = 5;
+    string uid = 1;
+    string username = 2;
+    string full_name = 3;
+    string email = 4;
+    google.protobuf.Timestamp password_changed_at = 5;
+    google.protobuf.Timestamp created_at = 6;
+    bool is_email_verified = 7;
+    bool is_verified = 8;
+    bool is_deleted = 9;
 }
