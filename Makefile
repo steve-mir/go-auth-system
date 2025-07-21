@@ -20,25 +20,25 @@ redis:
 	docker run --name redis -p 6379:6379 -d redis:7.0-alpine
 
 createdb:
-	docker exec -it postgres16 createdb --username=root --owner=root go_auth_system
+	docker exec -it postgres16 createdb --username=root --owner=root auth_system
 
 dropdb:
-	docker exec -it postgres16 dropdb go_auth_system
+	docker exec -it postgres16 dropdb auth_system
 
 migrate_init:
-	migrate create -ext sql -dir internal/db/migration -seq users
+	migrate create -ext sql -dir sql/migrations -seq init_schema
 
 migrateup:
-	migrate -path internal/db/migration -database "postgresql://root:toor@localhost:5433/go_auth_system?sslmode=disable" -verbose up
+	migrate -path sql/migrations -database "postgresql://root:toor@localhost:5434/auth_system?sslmode=disable" -verbose up
 
 migrateup1:
-	migrate -path internal/db/migration -database "postgresql://root:toor@localhost:5433/go_auth_system?sslmode=disable" -verbose up 1
+	migrate -path sql/migrations -database "postgresql://root:toor@localhost:5434/auth_system?sslmode=disable" -verbose up 1
 
 migratedown:
-	migrate -path internal/db/migration -database "postgresql://root:toor@localhost:5433/go_auth_system?sslmode=disable" -verbose down
+	migrate -path sql/migrations -database "postgresql://root:toor@localhost:5434/auth_system?sslmode=disable" -verbose down
 
 migratedown1:
-	migrate -path internal/db/migration -database "postgresql://root:toor@localhost:5433/go_auth_system?sslmode=disable" -verbose down 1
+	migrate -path sql/migrations -database "postgresql://root:toor@localhost:5434/auth_system?sslmode=disable" -verbose down 1
 
 sqlc_init:
 	sqlc init
@@ -49,8 +49,37 @@ sqlc:
 test:
 	go test -v -cover ./...
 
+build:
+	go build -o bin/go-auth-system ./cmd/server
+
 run:
-	go run main.go
+	go run ./cmd/server
+
+run-config:
+	go run ./cmd/server -config=config.example.yaml
+
+tidy:
+	go mod tidy
+
+clean:
+	rm -rf bin/
+
+# Development helpers
+dev-setup: postgres redis createdb
+	@echo "Development environment setup complete"
+
+dev-start: start_ps start_redis
+	@echo "Development services started"
+
+dev-stop:
+	docker stop postgres16 redis || true
+
+dev-clean: dev-stop
+	docker rm postgres16 redis || true
+
+# Configuration validation
+validate-config:
+	go run ./cmd/server -config=config.example.yaml --validate-only
 
 proto:
 	rm -f pb/*.go
@@ -64,7 +93,7 @@ proto:
 evans:
 	evans --host localhost --port 9901 -r repl
 
-.PHONY: postgres createdb dropdb migrateup migrateup1 migratedown migratedown1 sqlc test run environ air_init air_run start_redis redis start_ps
+.PHONY: postgres createdb dropdb migrateup migrateup1 migratedown migratedown1 sqlc test run environ air_init air_run start_redis redis start_ps dev-setup dev-start dev-stop dev-clean validate-config
 
 # migrate create -ext sql -dir db/migration -seq add_user_session
 

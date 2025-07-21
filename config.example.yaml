@@ -1,0 +1,168 @@
+# Example configuration file for go-auth-system
+# Copy this file to config.yaml and modify as needed
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  grpc_port: 9090
+  read_timeout: "30s"
+  write_timeout: "30s"
+  idle_timeout: "120s"
+  tls:
+    enabled: false
+    cert_file: ""
+    key_file: ""
+
+database:
+  host: "localhost"
+  port: 5432
+  name: "auth_system"
+  user: "postgres"
+  password: "postgres"
+  ssl_mode: "disable"
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: "5m"
+  conn_max_idle_time: "5m"
+
+redis:
+  host: "localhost"
+  port: 6379
+  password: ""
+  db: 0
+  pool_size: 10
+  min_idle_conns: 2
+  dial_timeout: "5s"
+  read_timeout: "3s"
+  write_timeout: "3s"
+
+security:
+  password_hash:
+    algorithm: "argon2"  # "argon2" or "bcrypt"
+    argon2:
+      memory: 65536      # 64 MB
+      iterations: 3
+      parallelism: 2
+      salt_length: 16
+      key_length: 32
+    bcrypt:
+      cost: 12
+  
+  token:
+    type: "jwt"          # "jwt" or "paseto"
+    access_ttl: "15m"
+    refresh_ttl: "168h"  # 7 days
+    signing_key: "your-secret-signing-key-here"
+    encryption_key: "your-encryption-key-for-paseto"
+    issuer: "go-auth-system"
+    audience: "go-auth-system"
+  
+  rate_limit:
+    enabled: true
+    requests_per_minute: 100
+    burst_size: 10
+    window_size: "1m"
+    cleanup_period: "5m"
+  
+  encryption:
+    algorithm: "aes-256-gcm"
+    key_size: 32
+    master_key: "your-master-encryption-key-here"
+    key_rotation: false
+    key_management: "local"  # "local" or "vault"
+
+features:
+  mfa:
+    enabled: false
+    totp:
+      enabled: false
+      issuer: "go-auth-system"
+      period: 30
+      digits: 6
+      algorithm: "SHA1"
+    sms:
+      enabled: false
+      provider: ""
+      api_key: ""
+      from: ""
+    email:
+      enabled: false
+      provider: ""
+      from: ""
+      subject: "Your verification code"
+    webauthn:
+      enabled: false
+      rp_display_name: "Go Auth System"
+      rp_id: ""
+      rp_origin: ""
+  
+  social_auth:
+    google:
+      enabled: false
+      client_id: ""
+      client_secret: ""
+      redirect_url: ""
+      scopes: ["openid", "profile", "email"]
+    facebook:
+      enabled: false
+      client_id: ""
+      client_secret: ""
+      redirect_url: ""
+      scopes: ["email", "public_profile"]
+    github:
+      enabled: false
+      client_id: ""
+      client_secret: ""
+      redirect_url: ""
+      scopes: ["user:email"]
+  
+  enterprise_sso:
+    saml:
+      enabled: false
+      metadata_url: ""
+      entity_id: ""
+      acs_url: ""
+      certificate: ""
+      private_key: ""
+    oidc:
+      enabled: false
+      issuer_url: ""
+      client_id: ""
+      client_secret: ""
+      redirect_url: ""
+      scopes: ["openid", "profile", "email"]
+    ldap:
+      enabled: false
+      host: ""
+      port: 389
+      base_dn: ""
+      bind_dn: ""
+      bind_password: ""
+      user_filter: ""
+      group_filter: ""
+      tls: false
+  
+  admin_dashboard:
+    enabled: true
+    path: "/admin"
+    title: "Go Auth System Admin"
+  
+  audit_logging:
+    enabled: true
+    level: "info"
+    format: "json"
+    output: "stdout"
+    retention_days: 90
+
+external:
+  monitoring:
+    enabled: true
+    prometheus:
+      enabled: true
+      path: "/metrics"
+      port: 8081
+  
+  logging:
+    level: "info"
+    format: "json"
+    output: "stdout"
