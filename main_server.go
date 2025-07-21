@@ -51,7 +51,7 @@ func main() {
 	}
 
 	// Run db migrations
-	runDbMigration(config.MigrationUrl, config.DBSource)
+	// runDbMigration(config.MigrationUrl, config.DBSource)
 
 	// Create the routes
 	db, err := sqlc.CreateDbPool(config)
@@ -122,14 +122,23 @@ func runDbMigration(migrationUrl string, dbSource string) {
 }
 
 func runGrpcServer(db *sql.DB, config utils.Config, taskDistributor worker.TaskDistributor, l *zap.Logger) {
+	// Auth server
 	server, err := gapi.NewServer(db, config, taskDistributor, l)
+	if err != nil {
+		log.Fatal().Msg("cannot create a server:") //, err)
+	}
+
+	// Social media server
+	socialMediaServer, err := gapi.NewSocialMediaServer(db, config)
 	if err != nil {
 		log.Fatal().Msg("cannot create a server:") //, err)
 	}
 
 	grpcLogger := grpc.UnaryInterceptor(gapi.GrpcLogger)
 	grpcServer := grpc.NewServer(grpcLogger)
+
 	pb.RegisterUserAuthServer(grpcServer, server)
+	pb.RegisterSocialMediaServiceServer(grpcServer, socialMediaServer)
 	reflection.Register(grpcServer)
 
 	listener, err := net.Listen("tcp", config.GRPCServerAddress)
