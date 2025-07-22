@@ -16,6 +16,15 @@ func (s *Server) setupOAuthRoutes(group *gin.RouterGroup) {
 		oauth.DELETE("/unlink/:provider", s.requireAuth(), s.unlinkSocialAccountHandler)
 		oauth.GET("/linked", s.requireAuth(), s.getLinkedAccountsHandler)
 	}
+
+	// SAML 2.0 routes
+	saml := group.Group("/saml")
+	{
+		saml.GET("/metadata", s.samlMetadataHandler)
+		saml.POST("/login", s.samlInitiateHandler)
+		saml.POST("/acs", s.samlAssertionConsumerHandler)
+		saml.POST("/slo", s.samlSingleLogoutHandler)
+	}
 }
 
 // oauthInitiateHandler initiates OAuth flow
@@ -189,6 +198,134 @@ func (s *Server) getLinkedAccountsHandler(c *gin.Context) {
 	s.successResponse(c, http.StatusOK, gin.H{
 		"accounts": accounts,
 		"count":    len(accounts),
+	})
+}
+
+// SAML 2.0 handlers
+
+// samlMetadataHandler returns SAML Service Provider metadata
+func (s *Server) samlMetadataHandler(c *gin.Context) {
+	metadata, err := s.ssoService.GetSAMLMetadata(c.Request.Context())
+	if err != nil {
+		s.handleServiceError(c, err)
+		return
+	}
+
+	c.Header("Content-Type", "application/samlmetadata+xml")
+	c.Data(http.StatusOK, "application/samlmetadata+xml", metadata)
+}
+
+// samlInitiateHandler initiates SAML authentication
+func (s *Server) samlInitiateHandler(c *gin.Context) {
+	var req struct {
+		IDPEntityID string `json:"idp_entity_id" binding:"required"`
+		RelayState  string `json:"relay_state,omitempty"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		s.errorResponse(c, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request format", gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	// Initiate SAML login
+	authRequest, err := s.ssoService.InitiateSAMLLogin(c.Request.Context(), req.IDPEntityID, req.RelayState)
+	if err != nil {
+		s.handleServiceError(c, err)
+		return
+	}
+
+	s.successResponse(c, http.StatusOK, gin.H{
+		"auth_url":      authRequest.URL,
+		"request_id":    authRequest.ID,
+		"relay_state":   authRequest.RelayState,
+		"idp_entity_id": authRequest.IDPEntityID,
+		"created_at":    authRequest.CreatedAt,
+	})
+}
+
+// samlAssertionConsumerHandler handles SAML assertion consumer service (ACS)
+func (s *Server) samlAssertionConsumerHandler(c *gin.Context) {
+	// SAML responses can come as form data or JSON
+	var samlResponse, relayState string
+
+	// Try to get from form data first (standard SAML POST binding)
+	if c.Request.Header.Get("Content-Type") == "application/x-www-form-urlencoded" {
+		samlResponse = c.PostForm("SAMLResponse")
+		relayState = c.PostForm("RelayState")
+	} else {
+		// Try JSON format
+		var req struct {
+			SAMLResponse string `json:"saml_response" binding:"required"`
+			RelayState   string `json:"relay_state,omitempty"`
+		}
+
+		if err := c.ShouldBindJSON(&req); err != nil {
+			s.errorResponse(c, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request format", gin.H{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		samlResponse = req.SAMLResponse
+		relayState = req.RelayState
+	}
+
+	if samlResponse == "" {
+		s.errorResponse(c, http.StatusBadRequest, "MISSING_SAML_RESPONSE", "SAML response is required", nil)
+		return
+	}
+
+	// Handle SAML response
+	result, err := s.ssoService.HandleSAMLResponse(c.Request.Context(), samlResponse, relayState)
+	if err != nil {
+		s.handleServiceError(c, err)
+		return
+	}
+
+	// Return authentication result
+	s.successResponse(c, http.StatusOK, gin.H{
+		"user_id":       result.UserID,
+		"email":         result.Email,
+		"name":          result.Name,
+		"name_id":       result.NameID,
+		"session_index": result.SessionIndex,
+		"idp_entity_id": result.IDPEntityID,
+		"is_new_user":   result.IsNewUser,
+		"attributes":    result.Attributes,
+		"expires_at":    result.ExpiresAt,
+	})
+}
+
+// samlSingleLogoutHandler handles SAML Single Logout (SLO)
+func (s *Server) samlSingleLogoutHandler(c *gin.Context) {
+	// This is a placeholder for SAML Single Logout functionality
+	// In a full implementation, this would handle logout requests from IdP
+
+	var req struct {
+		SAMLRequest string `json:"saml_request,omitempty"`
+		RelayState  string `json:"relay_state,omitempty"`
+	}
+
+	// Try to get from form data first
+	if c.Request.Header.Get("Content-Type") == "application/x-www-form-urlencoded" {
+		req.SAMLRequest = c.PostForm("SAMLRequest")
+		req.RelayState = c.PostForm("RelayState")
+	} else {
+		// Try JSON format
+		if err := c.ShouldBindJSON(&req); err != nil {
+			s.errorResponse(c, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request format", gin.H{
+				"error": err.Error(),
+			})
+			return
+		}
+	}
+
+	// For now, just acknowledge the logout request
+	s.successResponse(c, http.StatusOK, gin.H{
+		"message":     "Logout request processed",
+		"relay_state": req.RelayState,
 	})
 }
 

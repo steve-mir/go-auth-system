@@ -14,6 +14,12 @@ type SSOService interface {
 	LinkSocialAccount(ctx context.Context, userID string, provider string, socialID string) error
 	UnlinkSocialAccount(ctx context.Context, userID string, provider string) error
 	GetLinkedAccounts(ctx context.Context, userID string) ([]LinkedAccount, error)
+
+	// SAML 2.0 Service Provider
+	GetSAMLMetadata(ctx context.Context) ([]byte, error)
+	InitiateSAMLLogin(ctx context.Context, idpEntityID string, relayState string) (*SAMLAuthRequest, error)
+	HandleSAMLResponse(ctx context.Context, samlResponse string, relayState string) (*SAMLResult, error)
+	ValidateSAMLAssertion(ctx context.Context, assertion *SAMLAssertion) error
 }
 
 // OAuthResult represents the result of OAuth authentication

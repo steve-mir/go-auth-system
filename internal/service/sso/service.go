@@ -24,6 +24,7 @@ type ssoService struct {
 	stateStore        StateStore
 	hashService       hash.HashService
 	encryptor         crypto.Encryptor
+	samlService       *SAMLService
 }
 
 // StateStore defines the interface for storing OAuth states
@@ -54,6 +55,12 @@ func NewSSOService(
 
 	// Initialize OAuth providers
 	service.initializeProviders()
+
+	// Initialize SAML service if enabled
+	if cfg.Features.EnterpriseSSO.SAML.Enabled {
+		samlConfig := service.buildSAMLConfig(cfg)
+		service.samlService = NewSAMLService(samlConfig, stateStore)
+	}
 
 	return service
 }
@@ -461,6 +468,197 @@ func (s *ssoService) generateSecureState() (string, error) {
 		return "", err
 	}
 	return base64.URLEncoding.EncodeToString(b), nil
+}
+
+// SAML 2.0 Service Provider methods
+
+// GetSAMLMetadata returns SAML Service Provider metadata
+func (s *ssoService) GetSAMLMetadata(ctx context.Context) ([]byte, error) {
+	if s.samlService == nil {
+		return nil, fmt.Errorf("SAML service not enabled")
+	}
+	return s.samlService.GetMetadata(ctx)
+}
+
+// InitiateSAMLLogin initiates SAML authentication with an Identity Provider
+func (s *ssoService) InitiateSAMLLogin(ctx context.Context, idpEntityID string, relayState string) (*SAMLAuthRequest, error) {
+	if s.samlService == nil {
+		return nil, fmt.Errorf("SAML service not enabled")
+	}
+	return s.samlService.InitiateLogin(ctx, idpEntityID, relayState)
+}
+
+// HandleSAMLResponse processes SAML response from Identity Provider
+func (s *ssoService) HandleSAMLResponse(ctx context.Context, samlResponse string, relayState string) (*SAMLResult, error) {
+	if s.samlService == nil {
+		return nil, fmt.Errorf("SAML service not enabled")
+	}
+
+	// Process SAML response
+	result, err := s.samlService.HandleResponse(ctx, samlResponse, relayState)
+	if err != nil {
+		return nil, fmt.Errorf("failed to handle SAML response: %w", err)
+	}
+
+	// Check if user exists by email
+	existingUser, err := s.userRepo.GetUserByEmail(ctx, result.Email)
+	if err != nil && !isNotFoundError(err) {
+		return nil, fmt.Errorf("failed to check existing user: %w", err)
+	}
+
+	if existingUser != nil {
+		// User exists, update result with user ID
+		result.UserID = existingUser.ID
+		result.IsNewUser = false
+
+		// Update user attributes from SAML if needed
+		if err := s.syncUserAttributesFromSAML(ctx, existingUser, result); err != nil {
+			return nil, fmt.Errorf("failed to sync user attributes: %w", err)
+		}
+	} else {
+		// Create new user from SAML attributes
+		newUser, err := s.createUserFromSAML(ctx, result)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create user from SAML: %w", err)
+		}
+
+		result.UserID = newUser.ID
+		result.IsNewUser = true
+	}
+
+	return result, nil
+}
+
+// ValidateSAMLAssertion validates a SAML assertion
+func (s *ssoService) ValidateSAMLAssertion(ctx context.Context, assertion *SAMLAssertion) error {
+	if s.samlService == nil {
+		return fmt.Errorf("SAML service not enabled")
+	}
+	return s.samlService.ValidateAssertion(ctx, assertion)
+}
+
+// buildSAMLConfig builds SAML configuration from application config
+func (s *ssoService) buildSAMLConfig(cfg *config.Config) *SAMLConfig {
+	samlCfg := cfg.Features.EnterpriseSSO.SAML
+
+	// Build service provider configuration
+	sp := SAMLServiceProvider{
+		EntityID:                    samlCfg.EntityID,
+		AssertionConsumerServiceURL: samlCfg.ACSURL,
+		X509Certificate:             samlCfg.Certificate,
+		PrivateKey:                  samlCfg.PrivateKey,
+		NameIDFormat:                "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress",
+		WantAssertionsSigned:        true,
+		AuthnRequestsSigned:         true,
+	}
+
+	// Default attribute mapping
+	attributeMapping := SAMLAttributeMapping{
+		Email:     "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
+		FirstName: "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname",
+		LastName:  "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname",
+		FullName:  "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name",
+		Groups:    "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/groups",
+		Roles:     "http://schemas.microsoft.com/ws/2008/06/identity/claims/role",
+	}
+
+	return &SAMLConfig{
+		ServiceProvider:    sp,
+		IdentityProviders:  make(map[string]SAMLIdentityProvider), // Will be populated from metadata
+		AttributeMapping:   attributeMapping,
+		SessionTimeout:     3600, // 1 hour
+		ClockSkewTolerance: 300,  // 5 minutes
+		MaxAssertionAge:    3600, // 1 hour
+	}
+}
+
+// createUserFromSAML creates a new user from SAML authentication result
+func (s *ssoService) createUserFromSAML(ctx context.Context, samlResult *SAMLResult) (*UserData, error) {
+	// Parse name from SAML attributes
+	firstName, lastName := s.parseNameFromSAML(samlResult)
+
+	// Create user data
+	createUserData := &CreateUserData{
+		Email:         samlResult.Email,
+		Username:      "", // Username can be set later
+		PasswordHash:  "", // No password for SAML users initially
+		HashAlgorithm: s.config.Security.PasswordHash.Algorithm,
+		FirstName:     firstName,
+		LastName:      lastName,
+		Phone:         "",
+		EmailVerified: true, // SAML users are considered verified
+		PhoneVerified: false,
+	}
+
+	// Create user
+	newUser, err := s.userRepo.CreateUser(ctx, createUserData)
+	if err != nil {
+		return nil, err
+	}
+
+	return newUser, nil
+}
+
+// syncUserAttributesFromSAML synchronizes user attributes from SAML
+func (s *ssoService) syncUserAttributesFromSAML(ctx context.Context, user *UserData, samlResult *SAMLResult) error {
+	// Parse name from SAML attributes
+	firstName, lastName := s.parseNameFromSAML(samlResult)
+
+	// Check if we need to update user attributes
+	needsUpdate := false
+	updateData := &UpdateUserData{
+		ID: user.ID,
+	}
+
+	// Decrypt current names to compare
+	currentFirstName, currentLastName, err := s.decryptUserNames(user)
+	if err != nil {
+		return fmt.Errorf("failed to decrypt current user names: %w", err)
+	}
+
+	if currentFirstName != firstName {
+		updateData.FirstName = firstName
+		needsUpdate = true
+	}
+
+	if currentLastName != lastName {
+		updateData.LastName = lastName
+		needsUpdate = true
+	}
+
+	// Update user if needed
+	if needsUpdate {
+		if err := s.userRepo.UpdateUser(ctx, updateData); err != nil {
+			return fmt.Errorf("failed to update user attributes: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// parseNameFromSAML parses name from SAML attributes
+func (s *ssoService) parseNameFromSAML(samlResult *SAMLResult) (string, string) {
+	// Try to get first and last name from attributes
+	firstName := samlResult.Attributes[s.samlService.config.AttributeMapping.FirstName]
+	lastName := samlResult.Attributes[s.samlService.config.AttributeMapping.LastName]
+
+	// If we have both, return them
+	if firstName != "" && lastName != "" {
+		return firstName, lastName
+	}
+
+	// Try to get full name and parse it
+	fullName := samlResult.Attributes[s.samlService.config.AttributeMapping.FullName]
+	if fullName != "" {
+		return s.parseName(fullName)
+	}
+
+	// Use the name from the result
+	if samlResult.Name != "" {
+		return s.parseName(samlResult.Name)
+	}
+
+	return "", ""
 }
 
 // isNotFoundError checks if an error is a not found error

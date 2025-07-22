@@ -35,6 +35,9 @@ type UserRepository interface {
 
 	// CreateUser creates a new user
 	CreateUser(ctx context.Context, user *CreateUserData) (*UserData, error)
+
+	// UpdateUser updates an existing user
+	UpdateUser(ctx context.Context, user *UpdateUserData) error
 }
 
 // UserData represents user data from the repository
@@ -67,4 +70,12 @@ type CreateUserData struct {
 	Phone         string
 	EmailVerified bool
 	PhoneVerified bool
+}
+
+// UpdateUserData represents data for updating an existing user
+type UpdateUserData struct {
+	ID        string
+	FirstName string
+	LastName  string
+	Phone     string
 }

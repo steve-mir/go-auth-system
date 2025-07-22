@@ -115,3 +115,103 @@ type GitHubEmail struct {
 	Primary  bool   `json:"primary"`
 	Verified bool   `json:"verified"`
 }
+
+// SAML 2.0 related types
+
+// SAMLAuthRequest represents a SAML authentication request
+type SAMLAuthRequest struct {
+	ID          string `json:"id"`
+	URL         string `json:"url"`
+	RelayState  string `json:"relay_state"`
+	RequestXML  string `json:"request_xml"`
+	IDPEntityID string `json:"idp_entity_id"`
+	CreatedAt   int64  `json:"created_at"`
+}
+
+// SAMLResult represents the result of SAML authentication
+type SAMLResult struct {
+	UserID       string            `json:"user_id"`
+	Email        string            `json:"email"`
+	Name         string            `json:"name"`
+	NameID       string            `json:"name_id"`
+	SessionIndex string            `json:"session_index"`
+	IDPEntityID  string            `json:"idp_entity_id"`
+	IsNewUser    bool              `json:"is_new_user"`
+	Attributes   map[string]string `json:"attributes"`
+	ExpiresAt    int64             `json:"expires_at"`
+}
+
+// SAMLAssertion represents a SAML assertion
+type SAMLAssertion struct {
+	ID           string            `json:"id"`
+	Issuer       string            `json:"issuer"`
+	Subject      string            `json:"subject"`
+	NameID       string            `json:"name_id"`
+	SessionIndex string            `json:"session_index"`
+	NotBefore    int64             `json:"not_before"`
+	NotOnOrAfter int64             `json:"not_on_or_after"`
+	Audience     string            `json:"audience"`
+	Attributes   map[string]string `json:"attributes"`
+	Signature    string            `json:"signature"`
+}
+
+// SAMLIdentityProvider represents a SAML Identity Provider configuration
+type SAMLIdentityProvider struct {
+	EntityID               string `json:"entity_id"`
+	SingleSignOnServiceURL string `json:"sso_service_url"`
+	SingleLogoutServiceURL string `json:"slo_service_url"`
+	X509Certificate        string `json:"x509_certificate"`
+	NameIDFormat           string `json:"name_id_format"`
+	WantAssertionsSigned   bool   `json:"want_assertions_signed"`
+	WantResponseSigned     bool   `json:"want_response_signed"`
+}
+
+// SAMLServiceProvider represents SAML Service Provider metadata
+type SAMLServiceProvider struct {
+	EntityID                    string `json:"entity_id"`
+	AssertionConsumerServiceURL string `json:"acs_url"`
+	SingleLogoutServiceURL      string `json:"slo_url"`
+	X509Certificate             string `json:"x509_certificate"`
+	PrivateKey                  string `json:"private_key"`
+	NameIDFormat                string `json:"name_id_format"`
+	WantAssertionsSigned        bool   `json:"want_assertions_signed"`
+	AuthnRequestsSigned         bool   `json:"authn_requests_signed"`
+}
+
+// SAMLConfig represents SAML configuration for the service
+type SAMLConfig struct {
+	ServiceProvider    SAMLServiceProvider             `json:"service_provider"`
+	IdentityProviders  map[string]SAMLIdentityProvider `json:"identity_providers"`
+	AttributeMapping   SAMLAttributeMapping            `json:"attribute_mapping"`
+	SessionTimeout     int64                           `json:"session_timeout"`
+	ClockSkewTolerance int64                           `json:"clock_skew_tolerance"`
+	MaxAssertionAge    int64                           `json:"max_assertion_age"`
+}
+
+// SAMLAttributeMapping defines how SAML attributes map to user fields
+type SAMLAttributeMapping struct {
+	Email     string `json:"email"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	FullName  string `json:"full_name"`
+	Groups    string `json:"groups"`
+	Roles     string `json:"roles"`
+}
+
+// SAMLRequest represents a SAML authentication request
+type SAMLRequest struct {
+	IDPEntityID string `json:"idp_entity_id" validate:"required"`
+	RelayState  string `json:"relay_state,omitempty"`
+}
+
+// SAMLResponse represents a SAML authentication response
+type SAMLResponse struct {
+	SAMLResponse string `json:"saml_response" validate:"required"`
+	RelayState   string `json:"relay_state,omitempty"`
+}
+
+// SAMLMetadataResponse represents SAML metadata response
+type SAMLMetadataResponse struct {
+	Metadata    string `json:"metadata"`
+	ContentType string `json:"content_type"`
+}
