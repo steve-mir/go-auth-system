@@ -1,0 +1,125 @@
+syntax = "proto3";
+
+package auth.v1;
+
+option go_package = "github.com/steve-mir/go-auth-system/internal/api/grpc/auth;auth";
+
+import "google/protobuf/timestamp.proto";
+
+// AuthService handles core authentication operations
+service AuthService {
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc Login(LoginRequest) returns (LoginResponse);
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
+  rpc RefreshToken(RefreshTokenRequest) returns (TokenResponse);
+  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
+}
+
+// Register request message
+message RegisterRequest {
+  string email = 1;
+  string username = 2;
+  string password = 3;
+  string first_name = 4;
+  string last_name = 5;
+  string phone = 6;
+}
+
+// Register response message
+message RegisterResponse {
+  string user_id = 1;
+  string email = 2;
+  string username = 3;
+  google.protobuf.Timestamp created_at = 4;
+  bool email_verification_required = 5;
+}
+
+// Login request message
+message LoginRequest {
+  string identifier = 1; // email or username
+  string password = 2;
+  string ip_address = 3;
+  string user_agent = 4;
+  bool remember_me = 5;
+}
+
+// Login response message
+message LoginResponse {
+  string user_id = 1;
+  string access_token = 2;
+  string refresh_token = 3;
+  google.protobuf.Timestamp expires_at = 4;
+  UserProfile user_profile = 5;
+  bool mfa_required = 6;
+  string mfa_token = 7;
+}
+
+// Logout request message
+message LogoutRequest {
+  string access_token = 1;
+  string refresh_token = 2;
+}
+
+// Logout response message
+message LogoutResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// Refresh token request message
+message RefreshTokenRequest {
+  string refresh_token = 1;
+}
+
+// Token response message
+message TokenResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  google.protobuf.Timestamp expires_at = 3;
+  string token_type = 4;
+}
+
+// Validate token request message
+message ValidateTokenRequest {
+  string token = 1;
+}
+
+// Validate token response message
+message ValidateTokenResponse {
+  bool valid = 1;
+  string user_id = 2;
+  repeated string roles = 3;
+  repeated string permissions = 4;
+  google.protobuf.Timestamp expires_at = 5;
+  TokenClaims claims = 6;
+}
+
+// Token claims message
+message TokenClaims {
+  string user_id = 1;
+  string email = 2;
+  string username = 3;
+  repeated string roles = 4;
+  repeated string permissions = 5;
+  google.protobuf.Timestamp issued_at = 6;
+  google.protobuf.Timestamp expires_at = 7;
+  string issuer = 8;
+  string audience = 9;
+}
+
+// User profile message
+message UserProfile {
+  string user_id = 1;
+  string email = 2;
+  string username = 3;
+  string first_name = 4;
+  string last_name = 5;
+  string phone = 6;
+  bool email_verified = 7;
+  bool phone_verified = 8;
+  bool account_locked = 9;
+  google.protobuf.Timestamp last_login_at = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+  repeated string roles = 13;
+}
