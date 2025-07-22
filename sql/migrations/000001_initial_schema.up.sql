@@ -63,6 +63,24 @@ CREATE TABLE user_mfa (
     last_used_at TIMESTAMP
 );
 
+-- Social accounts for OAuth integration
+CREATE TABLE social_accounts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    provider VARCHAR(50) NOT NULL, -- 'google', 'facebook', 'github'
+    social_id VARCHAR(255) NOT NULL,
+    email VARCHAR(255),
+    name VARCHAR(255),
+    access_token TEXT,
+    refresh_token TEXT,
+    expires_at TIMESTAMP,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(provider, social_id),
+    UNIQUE(user_id, provider)
+);
+
 -- Audit logs
 CREATE TABLE audit_logs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -84,6 +102,10 @@ CREATE INDEX idx_user_sessions_user_id ON user_sessions(user_id);
 CREATE INDEX idx_user_sessions_token_hash ON user_sessions(token_hash);
 CREATE INDEX idx_user_sessions_expires_at ON user_sessions(expires_at);
 CREATE INDEX idx_user_mfa_user_id ON user_mfa(user_id);
+CREATE INDEX idx_social_accounts_user_id ON social_accounts(user_id);
+CREATE INDEX idx_social_accounts_provider ON social_accounts(provider);
+CREATE INDEX idx_social_accounts_social_id ON social_accounts(social_id);
+CREATE INDEX idx_social_accounts_provider_social_id ON social_accounts(provider, social_id);
 CREATE INDEX idx_audit_logs_user_id ON audit_logs(user_id);
 CREATE INDEX idx_audit_logs_timestamp ON audit_logs(timestamp);
 CREATE INDEX idx_audit_logs_action ON audit_logs(action);
@@ -101,4 +123,7 @@ CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_roles_updated_at BEFORE UPDATE ON roles
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_social_accounts_updated_at BEFORE UPDATE ON social_accounts
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
