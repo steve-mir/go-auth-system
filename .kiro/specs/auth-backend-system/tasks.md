@@ -20,7 +20,7 @@
   - Create comprehensive unit tests for both hashing algorithms
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
-- [ ] 4. Build flexible token management system
+- [x] 4. Build flexible token management system
   - Create TokenService interface supporting both JWT and Paseto
   - Implement JWT token generation, validation, and refresh logic
   - Implement Paseto token generation, validation, and refresh logic
@@ -52,7 +52,7 @@
   - Write unit tests for all user management operations
   - _Requirements: 4.3, 8.2_
 
-- [ ] 8. Implement role-based access control system
+- [ ] 8. Implement role-based access control system with attribute-based access control
   - Create RoleService interface for role and permission management
   - Implement role creation, update, and deletion functionality
   - Create permission validation and inheritance logic
