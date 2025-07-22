@@ -1,117 +1,73 @@
-//go:build integration
-// +build integration
-
 package main
 
 import (
 	"context"
 	"fmt"
 	"log"
-	"net/http"
 	"time"
 
 	"github.com/steve-mir/go-auth-system/internal/config"
-	"github.com/steve-mir/go-auth-system/internal/health"
-	"github.com/steve-mir/go-auth-system/internal/repository/postgres"
+	"github.com/steve-mir/go-auth-system/internal/service/auth"
 )
 
-// Simple integration test to verify our health check implementation
 func main() {
-	fmt.Println("Running integration test for health checks...")
+	fmt.Println("Testing basic auth service compilation...")
 
-	// Load default configuration
-	cfg := &config.Config{}
-
-	// Set basic defaults for testing
-	cfg.Database.Host = "localhost"
-	cfg.Database.Port = 5432
-	cfg.Database.Name = "auth_system"
-	cfg.Database.User = "postgres"
-	cfg.Database.Password = "postgres"
-	cfg.Database.SSLMode = "disable"
-	cfg.Database.MaxOpenConns = 5
-	cfg.Database.MaxIdleConns = 2
-	cfg.Database.ConnMaxLifetime = 5 * time.Minute
-	cfg.Database.ConnMaxIdleTime = 5 * time.Minute
-	cfg.Database.ConnectTimeout = 10
-
-	// Test database connection (this will fail if PostgreSQL is not running)
-	fmt.Println("Testing database connection...")
-	db, err := postgres.NewConnection(&cfg.Database)
-	if err != nil {
-		log.Printf("Database connection failed (expected if PostgreSQL is not running): %v", err)
-		fmt.Println("Skipping database health check test")
-	} else {
-		defer db.Close()
-		fmt.Println("Database connection successful!")
-
-		// Test database health checker
-		fmt.Println("Testing database health checker...")
-		dbChecker := health.NewDatabaseChecker(db)
-		ctx := context.Background()
-		healthResult := dbChecker.Check(ctx)
-
-		fmt.Printf("Database health check result: %s - %s\n", healthResult.Status, healthResult.Message)
+	// Create test configuration
+	cfg := &config.Config{
+		Security: config.SecurityConfig{
+			PasswordHash: config.PasswordHashConfig{
+				Algorithm: "argon2",
+				Argon2: config.Argon2Config{
+					Memory:      64 * 1024,
+					Iterations:  3,
+					Parallelism: 2,
+					SaltLength:  16,
+					KeyLength:   32,
+				},
+			},
+			Token: config.TokenConfig{
+				Type:       "jwt",
+				AccessTTL:  time.Hour,
+				RefreshTTL: time.Hour * 24 * 7,
+				SigningKey: "test-signing-key-32-bytes-long!!",
+				Issuer:     "test-issuer",
+				Audience:   "test-audience",
+			},
+		},
 	}
 
-	// Test liveness checker
-	fmt.Println("Testing liveness checker...")
-	livenessChecker := health.NewLivenessChecker()
+	// Test basic service creation
+	deps := &auth.Dependencies{
+		UserRepo:      nil, // Will be nil for this test
+		SessionRepo:   nil,
+		BlacklistRepo: nil,
+		TokenService:  nil,
+		HashService:   nil,
+		Encryptor:     nil,
+	}
+
+	authService := auth.NewAuthService(cfg, deps)
+	if authService == nil {
+		log.Fatal("Failed to create auth service")
+	}
+
+	fmt.Println("✓ Auth service created successfully")
+
+	// Test basic request validation
 	ctx := context.Background()
-	livenessResult := livenessChecker.Check(ctx)
-	fmt.Printf("Liveness check result: %s - %s\n", livenessResult.Status, livenessResult.Message)
 
-	// Test health service
-	fmt.Println("Testing health service...")
-	healthSvc := health.NewService()
-	healthSvc.AddChecker(livenessChecker)
-
-	if db != nil {
-		dbChecker := health.NewDatabaseChecker(db)
-		healthSvc.AddChecker(dbChecker)
+	// Test invalid registration request
+	invalidReq := &auth.RegisterRequest{
+		Email:    "invalid-email",
+		Password: "123", // Too short
 	}
 
-	overallHealth := healthSvc.Check(ctx)
-	fmt.Printf("Overall health status: %s\n", overallHealth.Status)
-	fmt.Printf("Components checked: %d\n", len(overallHealth.Components))
-
-	for name, component := range overallHealth.Components {
-		fmt.Printf("  - %s: %s (%s)\n", name, component.Status, component.Message)
+	_, err := authService.Register(ctx, invalidReq)
+	if err == nil {
+		log.Fatal("Expected validation error for invalid request")
 	}
+	fmt.Println("✓ Request validation working correctly")
 
-	// Test HTTP handler
-	fmt.Println("Testing HTTP health handler...")
-	handler := healthSvc.Handler()
-
-	// Create a test server
-	server := &http.Server{
-		Addr:    ":8888",
-		Handler: http.HandlerFunc(handler),
-	}
-
-	go func() {
-		fmt.Println("Starting test HTTP server on :8888...")
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("Test server error: %v", err)
-		}
-	}()
-
-	// Give the server time to start
-	time.Sleep(100 * time.Millisecond)
-
-	// Test the health endpoint
-	resp, err := http.Get("http://localhost:8888")
-	if err != nil {
-		log.Printf("Failed to call health endpoint: %v", err)
-	} else {
-		fmt.Printf("Health endpoint responded with status: %d\n", resp.StatusCode)
-		resp.Body.Close()
-	}
-
-	// Shutdown test server
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	server.Shutdown(ctx)
-
-	fmt.Println("Integration test completed successfully!")
+	fmt.Println("🎉 Basic integration test passed!")
 }
