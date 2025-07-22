@@ -2,10 +2,26 @@ syntax = "proto3";
 
 package user.v1;
 
-option go_package = "github.com/steve-mir/go-auth-system/internal/api/grpc/user;user";
+option go_package = "github.com/steve-mir/go-auth-system/pb";
 
-// import "google/protobuf/timestamp.proto";
-import "auth.proto";
+import "google/protobuf/timestamp.proto";
+
+// User profile message
+message UserProfile {
+  string user_id = 1;
+  string email = 2;
+  string username = 3;
+  string first_name = 4;
+  string last_name = 5;
+  string phone = 6;
+  bool email_verified = 7;
+  bool phone_verified = 8;
+  bool account_locked = 9;
+  google.protobuf.Timestamp last_login_at = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+  repeated string roles = 13;
+}
 
 // UserService manages user profiles and data
 service UserService {
@@ -25,7 +41,7 @@ message GetProfileRequest {
 
 // Get profile response message
 message GetProfileResponse {
-  auth.v1.UserProfile user_profile = 1;
+  UserProfile user_profile = 1;
 }
 
 // Update profile request message
@@ -39,7 +55,7 @@ message UpdateProfileRequest {
 
 // Update profile response message
 message UpdateProfileResponse {
-  auth.v1.UserProfile user_profile = 1;
+  UserProfile user_profile = 1;
   string message = 2;
 }
 
@@ -68,7 +84,7 @@ message ListUsersRequest {
 
 // List users response message
 message ListUsersResponse {
-  repeated auth.v1.UserProfile users = 1;
+  repeated UserProfile users = 1;
   int32 total_count = 2;
   int32 page = 3;
   int32 page_size = 4;

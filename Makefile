@@ -49,8 +49,6 @@ proto:
 	--grpc-gateway_out=pb --grpc-gateway_opt=paths=source_relative \
 	--openapiv2_out=docs/swagger --openapiv2_opt=allow_merge=true,merge_file_name=go-auth-system \
 	proto/*.proto
-# proto:
-# 	protoc --go_out=. --go-grpc_out=. proto/*.proto
 
 
 # Testing

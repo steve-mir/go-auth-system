@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package role.v1;
 
-option go_package = "github.com/steve-mir/go-auth-system/internal/api/grpc/role;role";
+option go_package = "github.com/steve-mir/go-auth-system/pb";
 
 import "google/protobuf/timestamp.proto";
 

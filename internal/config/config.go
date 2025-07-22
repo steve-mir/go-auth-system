@@ -27,6 +27,7 @@ type ServerConfig struct {
 	WriteTimeout time.Duration `yaml:"write_timeout"`
 	IdleTimeout  time.Duration `yaml:"idle_timeout"`
 	TLS          TLSConfig     `yaml:"tls"`
+	Environment  string        `yaml:"environment"`
 }
 
 // TLSConfig contains TLS configuration
@@ -314,6 +315,7 @@ func loadFromFile(config *Config, path string) error {
 func loadFromEnv(config *Config) {
 	// Server configuration
 	config.Server.Host = getEnvString("SERVER_HOST", config.Server.Host)
+	config.Server.Environment = getEnvString("Environment", config.Server.Environment)
 	config.Server.Port = getEnvInt("SERVER_PORT", config.Server.Port)
 	config.Server.GRPCPort = getEnvInt("SERVER_GRPC_PORT", config.Server.GRPCPort)
 	config.Server.ReadTimeout = getEnvDuration("SERVER_READ_TIMEOUT", config.Server.ReadTimeout)
