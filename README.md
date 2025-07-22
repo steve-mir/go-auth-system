@@ -129,6 +129,36 @@ The REST API is available at `http://localhost:8080/api/v1/` with the following 
 
 The gRPC API is available at `localhost:9090`. Protocol buffer definitions are in the `proto/` directory.
 
+### Health Check Endpoints
+
+The application provides comprehensive health check endpoints for monitoring:
+
+- `GET /health` - Overall system health with component details
+- `GET /health/live` - Liveness probe (always returns 200 if app is running)
+- `GET /health/ready` - Readiness probe (returns 200 when ready to serve requests)
+
+Example health check response:
+```json
+{
+  "status": "healthy",
+  "timestamp": "2024-01-15T10:30:00Z",
+  "components": {
+    "database": {
+      "status": "healthy",
+      "message": "Connected (pool: 2/25)",
+      "duration_ms": 5
+    },
+    "liveness": {
+      "status": "healthy",
+      "message": "Application is alive",
+      "duration_ms": 1
+    }
+  }
+}
+```
+
+For detailed health check documentation, see [docs/health-checks.md](docs/health-checks.md).
+
 ## Development
 
 ### Building

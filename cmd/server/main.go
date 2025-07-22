@@ -7,9 +7,14 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
+	"time"
 
 	"github.com/steve-mir/go-auth-system/internal/config"
+	"github.com/steve-mir/go-auth-system/internal/health"
+	"github.com/steve-mir/go-auth-system/internal/repository/postgres"
+	"github.com/steve-mir/go-auth-system/internal/server"
 )
 
 func main() {
@@ -68,17 +73,90 @@ func printConfigSummary(cfg *config.Config) {
 
 // runServer initializes and runs the server
 func runServer(ctx context.Context, cfg *config.Config) error {
-	log.Printf("Starting server on %s:%d", cfg.Server.Host, cfg.Server.Port)
-	log.Printf("Starting gRPC server on %s:%d", cfg.Server.Host, cfg.Server.GRPCPort)
+	log.Printf("Initializing go-auth-system server...")
 
-	// TODO: Initialize database connection
+	// Initialize database connection
+	log.Printf("Connecting to database...")
+	db, err := postgres.NewConnection(&cfg.Database)
+	if err != nil {
+		return fmt.Errorf("failed to connect to database: %w", err)
+	}
+	defer db.Close()
+	log.Printf("Database connection established")
+
+	// Run database migrations
+	log.Printf("Running database migrations...")
+	migrationManager := postgres.NewMigrationManager(db)
+	if err := migrationManager.MigrateUp(ctx); err != nil {
+		log.Printf("Migration warning: %v", err)
+		// Don't fail startup on migration errors in case they're already applied
+	} else {
+		log.Printf("Database migrations completed successfully")
+	}
+
+	// Initialize health service
+	healthSvc := health.NewService()
+
+	// Add database health checker
+	dbChecker := health.NewDatabaseChecker(db)
+	healthSvc.AddChecker(dbChecker)
+
+	// Add liveness checker
+	livenessChecker := health.NewLivenessChecker()
+	healthSvc.AddChecker(livenessChecker)
+
+	// Add readiness checker
+	readinessChecker := health.NewReadinessChecker(dbChecker)
+	healthSvc.AddChecker(readinessChecker)
+
+	log.Printf("Health checks initialized")
+
+	// Initialize HTTP server
+	httpServer := server.NewHTTPServer(&cfg.Server, healthSvc)
+
+	// Start servers
+	var wg sync.WaitGroup
+	errChan := make(chan error, 2)
+
+	// Start HTTP server
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := httpServer.Start(ctx); err != nil {
+			errChan <- fmt.Errorf("HTTP server error: %w", err)
+		}
+	}()
+
+	log.Printf("HTTP server started on %s:%d", cfg.Server.Host, cfg.Server.Port)
+	log.Printf("Health endpoints available:")
+	log.Printf("  - Health: http://%s:%d/health", cfg.Server.Host, cfg.Server.Port)
+	log.Printf("  - Liveness: http://%s:%d/health/live", cfg.Server.Host, cfg.Server.Port)
+	log.Printf("  - Readiness: http://%s:%d/health/ready", cfg.Server.Host, cfg.Server.Port)
+
 	// TODO: Initialize Redis connection
 	// TODO: Initialize security services (hash, token, encryption)
 	// TODO: Initialize business services (auth, user, role)
-	// TODO: Initialize API servers (REST, gRPC)
-	// TODO: Start servers
+	// TODO: Initialize gRPC server
 
-	// For now, just wait for context cancellation
-	<-ctx.Done()
+	// Wait for shutdown signal or error
+	select {
+	case <-ctx.Done():
+		log.Printf("Shutdown signal received, stopping servers...")
+	case err := <-errChan:
+		log.Printf("Server error: %v", err)
+		return err
+	}
+
+	// Graceful shutdown
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := httpServer.Stop(shutdownCtx); err != nil {
+		log.Printf("Error stopping HTTP server: %v", err)
+	}
+
+	wg.Wait()
+	log.Printf("All servers stopped")
+
 	return nil
 }

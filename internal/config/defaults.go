@@ -27,6 +27,7 @@ func setDefaults(config *Config) {
 	config.Database.MaxIdleConns = 5
 	config.Database.ConnMaxLifetime = 5 * time.Minute
 	config.Database.ConnMaxIdleTime = 5 * time.Minute
+	config.Database.ConnectTimeout = 10
 
 	// Redis defaults
 	config.Redis.Host = "localhost"

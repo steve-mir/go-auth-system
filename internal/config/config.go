@@ -48,6 +48,7 @@ type DatabaseConfig struct {
 	MaxIdleConns    int           `yaml:"max_idle_conns"`
 	ConnMaxLifetime time.Duration `yaml:"conn_max_lifetime"`
 	ConnMaxIdleTime time.Duration `yaml:"conn_max_idle_time"`
+	ConnectTimeout  int           `yaml:"connect_timeout"`
 }
 
 // RedisConfig contains Redis connection configuration
@@ -335,6 +336,7 @@ func loadFromEnv(config *Config) {
 	config.Database.MaxIdleConns = getEnvInt("DB_MAX_IDLE_CONNS", config.Database.MaxIdleConns)
 	config.Database.ConnMaxLifetime = getEnvDuration("DB_CONN_MAX_LIFETIME", config.Database.ConnMaxLifetime)
 	config.Database.ConnMaxIdleTime = getEnvDuration("DB_CONN_MAX_IDLE_TIME", config.Database.ConnMaxIdleTime)
+	config.Database.ConnectTimeout = getEnvInt("DB_CONNECT_TIMEOUT", config.Database.ConnectTimeout)
 
 	// Redis configuration
 	config.Redis.Host = getEnvString("REDIS_HOST", config.Redis.Host)
@@ -375,4 +377,163 @@ func loadFromEnv(config *Config) {
 	config.External.Monitoring.Enabled = getEnvBool("MONITORING_ENABLED", config.External.Monitoring.Enabled)
 	config.External.Monitoring.Prometheus.Enabled = getEnvBool("PROMETHEUS_ENABLED", config.External.Monitoring.Prometheus.Enabled)
 	config.External.Monitoring.Prometheus.Port = getEnvInt("PROMETHEUS_PORT", config.External.Monitoring.Prometheus.Port)
+}
+
+// validate validates the configuration
+func validate(config *Config) error {
+	// Validate server configuration
+	if err := validateServer(&config.Server); err != nil {
+		return fmt.Errorf("server validation failed: %w", err)
+	}
+
+	// Validate database configuration
+	if err := validateDatabase(&config.Database); err != nil {
+		return fmt.Errorf("database validation failed: %w", err)
+	}
+
+	// Validate Redis configuration
+	if err := validateRedis(&config.Redis); err != nil {
+		return fmt.Errorf("redis validation failed: %w", err)
+	}
+
+	// Validate security configuration
+	if err := validateSecurity(&config.Security); err != nil {
+		return fmt.Errorf("security validation failed: %w", err)
+	}
+
+	return nil
+}
+
+// validateServer validates server configuration
+func validateServer(server *ServerConfig) error {
+	if server.Port < 1 || server.Port > 65535 {
+		return ErrInvalidPort
+	}
+	if server.GRPCPort < 1 || server.GRPCPort > 65535 {
+		return ErrInvalidPort
+	}
+	if server.Port == server.GRPCPort {
+		return ErrPortConflict
+	}
+	if server.TLS.Enabled {
+		if server.TLS.CertFile == "" {
+			return ErrMissingTLSCert
+		}
+		if server.TLS.KeyFile == "" {
+			return ErrMissingTLSKey
+		}
+	}
+	return nil
+}
+
+// validateDatabase validates database configuration
+func validateDatabase(db *DatabaseConfig) error {
+	if db.Host == "" {
+		return ErrMissingDBHost
+	}
+	if db.Name == "" {
+		return ErrMissingDBName
+	}
+	if db.User == "" {
+		return ErrMissingDBUser
+	}
+	if db.MaxOpenConns <= 0 {
+		return ErrInvalidMaxOpenConns
+	}
+	if db.MaxIdleConns < 0 || db.MaxIdleConns > db.MaxOpenConns {
+		return ErrInvalidMaxIdleConns
+	}
+	return nil
+}
+
+// validateRedis validates Redis configuration
+func validateRedis(redis *RedisConfig) error {
+	if redis.Host == "" {
+		return ErrMissingRedisHost
+	}
+	if redis.DB < 0 || redis.DB > 15 {
+		return ErrInvalidRedisDB
+	}
+	if redis.PoolSize <= 0 {
+		return ErrInvalidPoolSize
+	}
+	if redis.MinIdleConns < 0 || redis.MinIdleConns > redis.PoolSize {
+		return ErrInvalidMinIdleConns
+	}
+	return nil
+}
+
+// validateSecurity validates security configuration
+func validateSecurity(security *SecurityConfig) error {
+	// Validate password hash configuration
+	if security.PasswordHash.Algorithm != "argon2" && security.PasswordHash.Algorithm != "bcrypt" {
+		return ErrInvalidHashAlgorithm
+	}
+
+	if security.PasswordHash.Algorithm == "argon2" {
+		if security.PasswordHash.Argon2.Memory < 1024 {
+			return ErrInvalidArgon2Memory
+		}
+		if security.PasswordHash.Argon2.Iterations < 1 {
+			return ErrInvalidArgon2Iterations
+		}
+		if security.PasswordHash.Argon2.Parallelism < 1 {
+			return ErrInvalidArgon2Parallelism
+		}
+		if security.PasswordHash.Argon2.SaltLength < 8 {
+			return ErrInvalidArgon2SaltLength
+		}
+		if security.PasswordHash.Argon2.KeyLength < 16 {
+			return ErrInvalidArgon2KeyLength
+		}
+	}
+
+	if security.PasswordHash.Algorithm == "bcrypt" {
+		if security.PasswordHash.Bcrypt.Cost < 4 || security.PasswordHash.Bcrypt.Cost > 31 {
+			return ErrInvalidBcryptCost
+		}
+	}
+
+	// Validate token configuration
+	if security.Token.Type != "jwt" && security.Token.Type != "paseto" {
+		return ErrInvalidTokenType
+	}
+	if security.Token.AccessTTL <= 0 {
+		return ErrInvalidAccessTTL
+	}
+	if security.Token.RefreshTTL <= 0 {
+		return ErrInvalidRefreshTTL
+	}
+	if security.Token.RefreshTTL <= security.Token.AccessTTL {
+		return ErrInvalidTTLRatio
+	}
+	if security.Token.SigningKey == "" {
+		return ErrMissingSigningKey
+	}
+	if security.Token.Type == "paseto" && security.Token.EncryptionKey == "" {
+		return ErrMissingEncryptionKey
+	}
+
+	// Validate rate limiting
+	if security.RateLimit.Enabled {
+		if security.RateLimit.RequestsPerMin <= 0 {
+			return ErrInvalidRequestsPerMin
+		}
+		if security.RateLimit.BurstSize <= 0 {
+			return ErrInvalidBurstSize
+		}
+	}
+
+	// Validate encryption
+	if security.Encryption.Algorithm != "aes-256-gcm" {
+		return ErrInvalidEncryptionAlgorithm
+	}
+	if security.Encryption.KeySize < 16 {
+		return ErrInvalidKeySize
+	}
+	if security.Encryption.MasterKey == "" {
+		return ErrMissingMasterKey
+	}
+
+	return nil
 }

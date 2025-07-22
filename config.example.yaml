@@ -1,4 +1,4 @@
-# Example configuration file for go-auth-system
+# Go Auth System Configuration Example
 # Copy this file to config.yaml and modify as needed
 
 server:
@@ -24,6 +24,7 @@ database:
   max_idle_conns: 5
   conn_max_lifetime: "5m"
   conn_max_idle_time: "5m"
+  connect_timeout: 10
 
 redis:
   host: "localhost"
@@ -52,8 +53,8 @@ security:
     type: "jwt"          # "jwt" or "paseto"
     access_ttl: "15m"
     refresh_ttl: "168h"  # 7 days
-    signing_key: "your-secret-signing-key-here"
-    encryption_key: "your-encryption-key-for-paseto"
+    signing_key: "your-secret-signing-key-change-in-production"
+    encryption_key: "your-encryption-key-for-paseto-tokens"
     issuer: "go-auth-system"
     audience: "go-auth-system"
   
@@ -67,7 +68,7 @@ security:
   encryption:
     algorithm: "aes-256-gcm"
     key_size: 32
-    master_key: "your-master-encryption-key-here"
+    master_key: "your-master-encryption-key-32-chars"
     key_rotation: false
     key_management: "local"  # "local" or "vault"
 

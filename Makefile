@@ -1,103 +1,124 @@
-# docker run --name postgres16 -p 5432:5432 -e POSTGRES_USER=root -e POSTGRES_PASSWORD=toor -d postgres:16.0-alpine3.18
-environ:
-	export PATH="$PATH:$(go env GOPATH)/bin"
-air_init:
-	air init
+# Go Auth System Makefile
 
-air_run:
-	air
+# Variables
+BINARY_NAME=go-auth-system
+MAIN_PATH=./cmd/server
+MIGRATE_PATH=./cmd/migrate
 
-start_ps:
-	docker start postgres16
+# Build commands
+.PHONY: build
+build:
+	go build -o bin/$(BINARY_NAME) $(MAIN_PATH)
 
-start_redis:
-	docker start redis
+.PHONY: build-migrate
+build-migrate:
+	go build -o bin/migrate $(MIGRATE_PATH)
 
-postgres:
-	docker run --name postgres16 -p 5434:5432 -e POSTGRES_USER=root -e POSTGRES_PASSWORD=toor -d postgres:16.0-alpine3.18
+.PHONY: run
+run:
+	go run $(MAIN_PATH)
 
-redis:
-	docker run --name redis -p 6379:6379 -d redis:7.0-alpine
+.PHONY: run-config
+run-config:
+	go run $(MAIN_PATH) -config=config.yaml
 
-createdb:
-	docker exec -it postgres16 createdb --username=root --owner=root auth_system
+# Database commands
+.PHONY: migrate-up
+migrate-up: build-migrate
+	./bin/migrate -command=up
 
-dropdb:
-	docker exec -it postgres16 dropdb auth_system
+.PHONY: migrate-down
+migrate-down: build-migrate
+	./bin/migrate -command=down
 
-migrate_init:
-	migrate create -ext sql -dir sql/migrations -seq init_schema
+.PHONY: migrate-status
+migrate-status: build-migrate
+	./bin/migrate -command=status
 
-migrateup:
-	migrate -path sql/migrations -database "postgresql://root:toor@localhost:5434/auth_system?sslmode=disable" -verbose up
-
-migrateup1:
-	migrate -path sql/migrations -database "postgresql://root:toor@localhost:5434/auth_system?sslmode=disable" -verbose up 1
-
-migratedown:
-	migrate -path sql/migrations -database "postgresql://root:toor@localhost:5434/auth_system?sslmode=disable" -verbose down
-
-migratedown1:
-	migrate -path sql/migrations -database "postgresql://root:toor@localhost:5434/auth_system?sslmode=disable" -verbose down 1
-
-sqlc_init:
-	sqlc init
-
+# Code generation
+.PHONY: sqlc
 sqlc:
 	sqlc generate
 
+.PHONY: proto
+proto:
+	protoc --go_out=. --go-grpc_out=. proto/*.proto
+
+# Testing
+.PHONY: test
 test:
-	go test -v -cover ./...
+	go test -v ./...
 
-build:
-	go build -o bin/go-auth-system ./cmd/server
+.PHONY: test-coverage
+test-coverage:
+	go test -v -coverprofile=coverage.out ./...
+	go tool cover -html=coverage.out -o coverage.html
 
-run:
-	go run ./cmd/server
+.PHONY: test-integration
+test-integration:
+	go run -tags=integration test_integration.go
 
-run-config:
-	go run ./cmd/server -config=config.example.yaml
+# Docker commands
+.PHONY: docker-build
+docker-build:
+	docker build -t $(BINARY_NAME):latest .
 
-tidy:
-	go mod tidy
+.PHONY: docker-up
+docker-up:
+	docker-compose up -d
 
-clean:
-	rm -rf bin/
+.PHONY: docker-down
+docker-down:
+	docker-compose down
+
+.PHONY: docker-logs
+docker-logs:
+	docker-compose logs -f
 
 # Development helpers
-dev-setup: postgres redis createdb
-	@echo "Development environment setup complete"
+.PHONY: postgres
+postgres:
+	docker run --name postgres-auth -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=auth_system -p 5432:5432 -d postgres:16-alpine
 
-dev-start: start_ps start_redis
-	@echo "Development services started"
+.PHONY: redis
+redis:
+	docker run --name redis-auth -p 6379:6379 -d redis:7-alpine
 
-dev-stop:
-	docker stop postgres16 redis || true
+.PHONY: clean
+clean:
+	rm -rf bin/
+	rm -f coverage.out coverage.html
+	docker-compose down --volumes --remove-orphans
 
-dev-clean: dev-stop
-	docker rm postgres16 redis || true
+# Health check test
+.PHONY: health-check
+health-check:
+	@echo "Testing health endpoints..."
+	@curl -s http://localhost:8080/health | jq . || echo "Health endpoint not available"
+	@curl -s http://localhost:8080/health/live | jq . || echo "Liveness endpoint not available"
+	@curl -s http://localhost:8080/health/ready | jq . || echo "Readiness endpoint not available"
 
-# Configuration validation
-validate-config:
-	go run ./cmd/server -config=config.example.yaml --validate-only
-
-proto:
-	rm -f pb/*.go
-	rm -f docs/swagger/*.swagger.json
-	protoc --proto_path=protos --go_out=pb --go_opt=paths=source_relative \
-	--go-grpc_out=pb --go-grpc_opt=paths=source_relative \
-	--grpc-gateway_out=pb --grpc-gateway_opt=paths=source_relative \
-	--openapiv2_out=docs/swagger --openapiv2_opt=allow_merge=true,merge_file_name=auth_system \
-	protos/*.proto
-
-evans:
-	evans --host localhost --port 9901 -r repl
-
-.PHONY: postgres createdb dropdb migrateup migrateup1 migratedown migratedown1 sqlc test run environ air_init air_run start_redis redis start_ps dev-setup dev-start dev-stop dev-clean validate-config
-
-# migrate create -ext sql -dir db/migration -seq add_user_session
-
-# instal swagger
-# brew tap go-swagger/go-swagger
-# brew install go-swagger
-# goswagger.io
+# Help
+.PHONY: help
+help:
+	@echo "Available commands:"
+	@echo "  build          - Build the main application"
+	@echo "  build-migrate  - Build the migration tool"
+	@echo "  run            - Run the application"
+	@echo "  run-config     - Run with config file"
+	@echo "  migrate-up     - Run database migrations"
+	@echo "  migrate-down   - Rollback database migrations"
+	@echo "  migrate-status - Show migration status"
+	@echo "  sqlc           - Generate SQLC code"
+	@echo "  proto          - Generate protobuf code"
+	@echo "  test           - Run tests"
+	@echo "  test-coverage  - Run tests with coverage"
+	@echo "  test-integration - Run integration tests"
+	@echo "  docker-build   - Build Docker image"
+	@echo "  docker-up      - Start with Docker Compose"
+	@echo "  docker-down    - Stop Docker Compose"
+	@echo "  postgres       - Start PostgreSQL container"
+	@echo "  redis          - Start Redis container"
+	@echo "  health-check   - Test health endpoints"
+	@echo "  clean          - Clean build artifacts"
+	@echo "  help           - Show this help"
