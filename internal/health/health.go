@@ -43,6 +43,12 @@ type Checker interface {
 // Service manages health checks for the application
 type Service struct {
 	checkers []Checker
+	monitor  MonitoringService
+}
+
+// MonitoringService interface for health check monitoring
+type MonitoringService interface {
+	UpdateSystemHealth(component string, healthy bool)
 }
 
 // NewService creates a new health service
@@ -50,6 +56,11 @@ func NewService() *Service {
 	return &Service{
 		checkers: make([]Checker, 0),
 	}
+}
+
+// SetMonitoring sets the monitoring service for health checks
+func (s *Service) SetMonitoring(monitor MonitoringService) {
+	s.monitor = monitor
 }
 
 // AddChecker adds a health checker to the service
@@ -68,12 +79,23 @@ func (s *Service) Check(ctx context.Context) HealthResponse {
 		health := checker.Check(ctx)
 		components[checker.Name()] = health
 
+		// Update monitoring metrics if available
+		if s.monitor != nil {
+			healthy := health.Status == StatusHealthy
+			s.monitor.UpdateSystemHealth(checker.Name(), healthy)
+		}
+
 		// Determine overall status
 		if health.Status == StatusUnhealthy {
 			overallStatus = StatusUnhealthy
 		} else if health.Status == StatusDegraded && overallStatus == StatusHealthy {
 			overallStatus = StatusDegraded
 		}
+	}
+
+	// Update overall system health
+	if s.monitor != nil {
+		s.monitor.UpdateSystemHealth("overall", overallStatus == StatusHealthy)
 	}
 
 	return HealthResponse{
@@ -219,6 +241,55 @@ func (c *LivenessChecker) Check(ctx context.Context) ComponentHealth {
 	return ComponentHealth{
 		Status:    StatusHealthy,
 		Message:   "Application is alive",
+		Timestamp: start,
+		Duration:  time.Since(start),
+	}
+}
+
+// RedisChecker implements health checking for Redis cache
+type RedisChecker struct {
+	client *redis.Client
+}
+
+// NewRedisChecker creates a new Redis health checker
+func NewRedisChecker(client *redis.Client) *RedisChecker {
+	return &RedisChecker{client: client}
+}
+
+// Name returns the name of this health checker
+func (c *RedisChecker) Name() string {
+	return "redis"
+}
+
+// Check performs the Redis health check
+func (c *RedisChecker) Check(ctx context.Context) ComponentHealth {
+	start := time.Now()
+
+	// Check Redis connection with ping
+	if err := c.client.Ping(ctx).Err(); err != nil {
+		return ComponentHealth{
+			Status:    StatusUnhealthy,
+			Message:   fmt.Sprintf("Redis connection failed: %v", err),
+			Timestamp: start,
+			Duration:  time.Since(start),
+		}
+	}
+
+	// Get Redis info
+	info, err := c.client.Info(ctx, "memory").Result()
+	if err != nil {
+		return ComponentHealth{
+			Status:    StatusDegraded,
+			Message:   fmt.Sprintf("Redis info command failed: %v", err),
+			Timestamp: start,
+			Duration:  time.Since(start),
+		}
+	}
+
+	// Basic check - if we can ping and get info, Redis is healthy
+	return ComponentHealth{
+		Status:    StatusHealthy,
+		Message:   "Redis connection healthy",
 		Timestamp: start,
 		Duration:  time.Since(start),
 	}
