@@ -13,7 +13,7 @@
   - Create database connection pooling and health checks
   - _Requirements: 9.1, 9.2, 9.4_
 
-- [ ] 3. Implement configurable password hashing service
+- [x] 3. Implement configurable password hashing service
   - Create HashService interface with Argon2 and bcrypt implementations
   - Write configuration-driven hash service factory
   - Implement password verification and rehashing detection
