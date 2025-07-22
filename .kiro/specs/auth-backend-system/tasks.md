@@ -101,7 +101,7 @@
   - Write integration tests for REST API endpoints
   - _Requirements: 1.1, 1.4_
 
-- [ ] 14. Implement multi-factor authentication system
+- [x] 14. Implement multi-factor authentication system
   - Create MFAService interface supporting multiple MFA methods
   - Implement TOTP-based authentication with QR code generation
   - Create SMS-based MFA with verification code sending
@@ -109,7 +109,7 @@
   - Write comprehensive tests for MFA functionality
   - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ] 15. Build WebAuthn/FIDO2 support
+- [x] 15. Build WebAuthn/FIDO2 support
   - Integrate WebAuthn library for hardware key support
   - Implement registration and authentication flows for hardware keys
   - Create credential storage and management

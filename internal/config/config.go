@@ -168,10 +168,12 @@ type EmailConfig struct {
 
 // WebAuthnConfig contains WebAuthn configuration
 type WebAuthnConfig struct {
-	Enabled       bool   `yaml:"enabled"`
-	RPDisplayName string `yaml:"rp_display_name"`
-	RPID          string `yaml:"rp_id"`
-	RPOrigin      string `yaml:"rp_origin"`
+	Enabled        bool     `yaml:"enabled"`
+	RPDisplayName  string   `yaml:"rp_display_name"`
+	RPID           string   `yaml:"rp_id"`
+	RPName         string   `yaml:"rp_name"`
+	RPOrigin       string   `yaml:"rp_origin"`
+	AllowedOrigins []string `yaml:"allowed_origins"`
 }
 
 // SocialAuthConfig contains social authentication configuration
