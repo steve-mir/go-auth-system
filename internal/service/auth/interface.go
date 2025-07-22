@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/steve-mir/go-auth-system/internal/security/crypto"
+	"github.com/steve-mir/go-auth-system/internal/security/hash"
 	"github.com/steve-mir/go-auth-system/internal/security/token"
 )
 
@@ -131,6 +132,7 @@ type SessionData struct {
 	UserID    string
 	TokenHash string
 	TokenType string
+	Roles     []string
 	ExpiresAt int64
 	IPAddress string
 	UserAgent string

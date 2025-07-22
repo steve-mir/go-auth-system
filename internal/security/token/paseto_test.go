@@ -369,7 +369,7 @@ func TestPasetoService_InvalidEncryptionKey(t *testing.T) {
 }
 
 func TestPasetoService_IssuerAudienceValidation(t *testing.T) {
-	config := &config.TokenConfig{
+	configPasetoService := &config.TokenConfig{
 		Type:          "paseto",
 		EncryptionKey: "this-is-a-32-character-key-for-testing",
 		AccessTTL:     time.Minute * 15,
@@ -378,7 +378,7 @@ func TestPasetoService_IssuerAudienceValidation(t *testing.T) {
 		Audience:      "test-audience",
 	}
 
-	service, err := NewPasetoService(config)
+	service, err := NewPasetoService(configPasetoService)
 	if err != nil {
 		t.Fatalf("NewPasetoService() error = %v", err)
 	}

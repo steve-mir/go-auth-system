@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/stdlib"
-	"github.com/steve-mir/go-auth-system/migrations"
+	migrations "github.com/steve-mir/go-auth-system/sql"
 )
 
 // Migration represents a database migration
@@ -58,9 +58,9 @@ func (m *MigrationManager) InitMigrationTable(ctx context.Context) error {
 
 // LoadMigrations loads all migration files from the embedded filesystem
 func (m *MigrationManager) LoadMigrations() ([]Migration, error) {
-	entries, err := migrations.Files.ReadDir("sql/migrations")
+	entries, err := migrations.Files.ReadDir("migrations")
 	if err != nil {
-		return nil, fmt.Errorf("failed to read migration directory: %w", err)
+		return nil, fmt.Errorf("failed to read migration directory: %w. Entries: %+v", err, entries)
 	}
 
 	migrationMap := make(map[int]*Migration)
@@ -80,7 +80,7 @@ func (m *MigrationManager) LoadMigrations() ([]Migration, error) {
 			continue // Skip invalid filenames
 		}
 
-		content, err := migrations.Files.ReadFile(filepath.Join("sql/migrations", filename))
+		content, err := migrations.Files.ReadFile(filepath.Join("migrations", filename))
 		if err != nil {
 			return nil, fmt.Errorf("failed to read migration file %s: %w", filename, err)
 		}

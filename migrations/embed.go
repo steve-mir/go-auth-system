@@ -1,6 +1,9 @@
 package migrations
 
-import "embed"
+// TODO: Remove
+// import "embed"
 
-//go:embed ../sql/migrations/*.sql
-var Files embed.FS
+// // // go:embed ../sql/migrations/*.sql
+
+// //go:embed migrations
+// var Files embed.FS

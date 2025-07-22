@@ -33,8 +33,9 @@ func NewClient(cfg *config.RedisConfig) (*Client, error) {
 		WriteTimeout: cfg.WriteTimeout,
 
 		// Connection pool settings
-		PoolTimeout:     30 * time.Second,
-		IdleTimeout:     5 * time.Minute,
+		PoolTimeout: 30 * time.Second,
+		// TODO: Include.
+		// IdleTimeout:     5 * time.Minute,
 		MaxRetries:      3,
 		MinRetryBackoff: 8 * time.Millisecond,
 		MaxRetryBackoff: 512 * time.Millisecond,

@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"log"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,6 +18,7 @@ func TestUserServiceIntegration(t *testing.T) {
 	}
 
 	service, userRepo, sessionRepo, auditRepo, hashService, encryptor := setupUserService()
+	log.Println("HashService", hashService) // TODO: Remove line.
 	ctx := context.Background()
 
 	t.Run("complete user profile workflow", func(t *testing.T) {

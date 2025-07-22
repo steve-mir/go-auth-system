@@ -113,9 +113,25 @@ func (r *PostgresUserRepository) UpdateUserLoginInfo(ctx context.Context, userID
 }
 
 func (r *PostgresUserRepository) GetUserRoles(ctx context.Context, userID string) ([]string, error) {
-	// This would require additional queries to get user roles
-	// For now, return empty slice as roles functionality is in a later task
-	return []string{}, nil
+	// Parse userID to UUID
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get user roles from database
+	roles, err := r.queries.GetUserRoles(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to string slice
+	roleNames := make([]string, len(roles))
+	for i, role := range roles {
+		roleNames[i] = role.Name
+	}
+
+	return roleNames, nil
 }
 
 func (r *PostgresUserRepository) convertDBUserToUserData(dbUser *db.User) *UserData {
@@ -187,7 +203,7 @@ func NewRedisSessionRepository(sessionStore *redis.SessionStore) SessionReposito
 func (r *RedisSessionRepository) CreateSession(ctx context.Context, session *SessionData) error {
 	redisSession := &redis.SessionData{
 		UserID:    session.UserID,
-		Roles:     []string{}, // Will be populated when roles are implemented
+		Roles:     session.Roles, // Now properly populated with user roles
 		IPAddress: session.IPAddress,
 		UserAgent: session.UserAgent,
 		CreatedAt: time.Unix(session.CreatedAt, 0),
@@ -218,7 +234,7 @@ func (r *RedisSessionRepository) GetSession(ctx context.Context, sessionID strin
 func (r *RedisSessionRepository) UpdateSession(ctx context.Context, sessionID string, session *SessionData) error {
 	redisSession := &redis.SessionData{
 		UserID:    session.UserID,
-		Roles:     []string{}, // Will be populated when roles are implemented
+		Roles:     session.Roles, // Now properly populated with user roles
 		IPAddress: session.IPAddress,
 		UserAgent: session.UserAgent,
 		CreatedAt: time.Unix(session.CreatedAt, 0),

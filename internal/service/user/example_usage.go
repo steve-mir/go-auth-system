@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/steve-mir/go-auth-system/internal/config"
 	"github.com/steve-mir/go-auth-system/internal/repository/postgres/db"
 	"github.com/steve-mir/go-auth-system/internal/repository/redis"
 	"github.com/steve-mir/go-auth-system/internal/security/crypto"
@@ -24,7 +25,7 @@ func ExampleUserServiceUsage() {
 	auditRepo := NewPostgresAuditRepository(queries)
 
 	// Create security services
-	hashService, _ := hash.NewArgon2HashService(&hash.Argon2Config{
+	hashService := hash.NewArgon2Service(config.Argon2Config{
 		Memory:      64 * 1024,
 		Iterations:  3,
 		Parallelism: 2,

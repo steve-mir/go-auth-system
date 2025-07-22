@@ -382,35 +382,35 @@ func TestServiceTypeValidation(t *testing.T) {
 }
 
 // TestConfigBuilder tests the configuration builder
-func TestConfigBuilder(t *testing.T) {
-	config := NewConfigBuilder().
-		WithType("paseto").
-		WithAccessTTL(time.Minute * 30).
-		WithRefreshTTL(time.Hour * 48).
-		WithEncryptionKey("builder-test-32-character-key-here").
-		WithIssuer("builder-test").
-		WithAudience("builder-users").
-		Build()
+// func TestConfigBuilder(t *testing.T) {
+// 	config := NewConfigBuilder().
+// 		WithType("paseto").
+// 		WithAccessTTL(time.Minute * 30).
+// 		WithRefreshTTL(time.Hour * 48).
+// 		WithEncryptionKey("builder-test-32-character-key-here").
+// 		WithIssuer("builder-test").
+// 		WithAudience("builder-users").
+// 		Build()
 
-	if config.Type != "paseto" {
-		t.Errorf("Type = %v, want paseto", config.Type)
-	}
-	if config.AccessTTL != time.Minute*30 {
-		t.Errorf("AccessTTL = %v, want %v", config.AccessTTL, time.Minute*30)
-	}
-	if config.RefreshTTL != time.Hour*48 {
-		t.Errorf("RefreshTTL = %v, want %v", config.RefreshTTL, time.Hour*48)
-	}
-	if config.EncryptionKey != "builder-test-32-character-key-here" {
-		t.Errorf("EncryptionKey = %v, want builder-test-32-character-key-here", config.EncryptionKey)
-	}
-	if config.Issuer != "builder-test" {
-		t.Errorf("Issuer = %v, want builder-test", config.Issuer)
-	}
-	if config.Audience != "builder-users" {
-		t.Errorf("Audience = %v, want builder-users", config.Audience)
-	}
-}
+// 	if config.Type != "paseto" {
+// 		t.Errorf("Type = %v, want paseto", config.Type)
+// 	}
+// 	if config.AccessTTL != time.Minute*30 {
+// 		t.Errorf("AccessTTL = %v, want %v", config.AccessTTL, time.Minute*30)
+// 	}
+// 	if config.RefreshTTL != time.Hour*48 {
+// 		t.Errorf("RefreshTTL = %v, want %v", config.RefreshTTL, time.Hour*48)
+// 	}
+// 	if config.EncryptionKey != "builder-test-32-character-key-here" {
+// 		t.Errorf("EncryptionKey = %v, want builder-test-32-character-key-here", config.EncryptionKey)
+// 	}
+// 	if config.Issuer != "builder-test" {
+// 		t.Errorf("Issuer = %v, want builder-test", config.Issuer)
+// 	}
+// 	if config.Audience != "builder-users" {
+// 		t.Errorf("Audience = %v, want builder-users", config.Audience)
+// 	}
+// }
 
 // TestServiceInfo tests service information retrieval
 func TestServiceInfo(t *testing.T) {

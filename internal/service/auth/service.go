@@ -185,6 +185,7 @@ func (s *authService) Login(ctx context.Context, req *LoginRequest) (*LoginRespo
 		UserID:    user.ID,
 		TokenHash: s.hashToken(tokenPair.AccessToken),
 		TokenType: "access",
+		Roles:     roles,
 		ExpiresAt: tokenPair.ExpiresAt.Unix(),
 		IPAddress: req.IPAddress,
 		UserAgent: req.UserAgent,
@@ -331,6 +332,7 @@ func (s *authService) RefreshToken(ctx context.Context, req *RefreshTokenRequest
 		for _, session := range sessions {
 			if session.TokenHash == oldTokenHash {
 				session.TokenHash = tokenHash
+				session.Roles = roles // Update roles in case they changed
 				session.ExpiresAt = tokenPair.ExpiresAt.Unix()
 				session.LastUsed = time.Now().Unix()
 				s.sessionRepo.UpdateSession(ctx, session.ID, session)

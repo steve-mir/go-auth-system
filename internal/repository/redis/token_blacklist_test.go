@@ -347,10 +347,10 @@ func TestTokenBlacklist_GetStats(t *testing.T) {
 		{"refresh-token-2", "refresh", "logout"},
 	}
 
-	for _, t := range tokens {
-		err := blacklist.BlacklistToken(ctx, t.token, userID, expiresAt, t.reason, t.tokenType)
+	for _, tk := range tokens {
+		err := blacklist.BlacklistToken(ctx, tk.token, userID, expiresAt, tk.reason, tk.tokenType)
 		if err != nil {
-			t.Fatalf("BlacklistToken() error for %s: %v", t.token, err)
+			t.Fatalf("BlacklistToken() error for %s: %v", tk.token, err)
 		}
 	}
 

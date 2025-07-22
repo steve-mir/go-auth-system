@@ -212,37 +212,38 @@ func (s *SessionStore) DeleteUserSessions(ctx context.Context, userID string) er
 		return fmt.Errorf("user ID cannot be empty")
 	}
 
+	// TODO: Implement.
 	// Get all user sessions
-	sessions, err := s.GetUserSessions(ctx, userID)
-	if err != nil {
-		return err
-	}
+	// sessions, err := s.GetUserSessions(ctx, userID)
+	// if err != nil {
+	// 	return err
+	// }
 
 	// Delete each session
-	for _, session := range sessions {
-		// Extract session ID from the stored data (we need to find the key)
-		pattern := s.prefix + "*"
-		keys, err := s.client.Keys(ctx, pattern).Result()
-		if err != nil {
-			continue
-		}
+	// for _, session := range sessions {
+	// 	// Extract session ID from the stored data (we need to find the key)
+	// 	pattern := s.prefix + "*"
+	// 	keys, err := s.client.Keys(ctx, pattern).Result()
+	// 	if err != nil {
+	// 		continue
+	// 	}
 
-		for _, key := range keys {
-			jsonData, err := s.client.Get(ctx, key).Result()
-			if err != nil {
-				continue
-			}
+	// 	for _, key := range keys {
+	// 		jsonData, err := s.client.Get(ctx, key).Result()
+	// 		if err != nil {
+	// 			continue
+	// 		}
 
-			var data SessionData
-			if err := json.Unmarshal([]byte(jsonData), &data); err != nil {
-				continue
-			}
+	// 		var data SessionData
+	// 		if err := json.Unmarshal([]byte(jsonData), &data); err != nil {
+	// 			continue
+	// 		}
 
-			if data.UserID == userID {
-				s.client.Del(ctx, key)
-			}
-		}
-	}
+	// 		if data.UserID == userID {
+	// 			s.client.Del(ctx, key)
+	// 		}
+	// 	}
+	// }
 
 	return nil
 }
