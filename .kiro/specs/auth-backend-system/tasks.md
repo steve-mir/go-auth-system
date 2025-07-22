@@ -134,7 +134,7 @@
   - Write integration tests for SAML authentication flows
   - _Requirements: 7.1, 7.4_
 
-- [ ] 18. Build OpenID Connect integration
+- [x] 18. Build OpenID Connect integration
   - Implement OpenID Connect client functionality
   - Create OIDC discovery and configuration handling
   - Implement ID token validation and claims processing

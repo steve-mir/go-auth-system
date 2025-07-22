@@ -20,6 +20,12 @@ type SSOService interface {
 	InitiateSAMLLogin(ctx context.Context, idpEntityID string, relayState string) (*SAMLAuthRequest, error)
 	HandleSAMLResponse(ctx context.Context, samlResponse string, relayState string) (*SAMLResult, error)
 	ValidateSAMLAssertion(ctx context.Context, assertion *SAMLAssertion) error
+
+	// OpenID Connect
+	GetOIDCAuthURL(ctx context.Context, provider string, state string, nonce string) (string, error)
+	HandleOIDCCallback(ctx context.Context, provider, code, state string) (*OIDCResult, error)
+	ValidateOIDCIDToken(ctx context.Context, provider, idToken string) (*OIDCIDTokenClaims, error)
+	RefreshOIDCToken(ctx context.Context, provider, refreshToken string) (*OIDCTokenResponse, error)
 }
 
 // OAuthResult represents the result of OAuth authentication

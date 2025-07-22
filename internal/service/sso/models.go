@@ -215,3 +215,122 @@ type SAMLMetadataResponse struct {
 	Metadata    string `json:"metadata"`
 	ContentType string `json:"content_type"`
 }
+
+// OpenID Connect related types
+
+// OIDCDiscoveryDocument represents the OpenID Connect discovery document
+type OIDCDiscoveryDocument struct {
+	Issuer                            string   `json:"issuer"`
+	AuthorizationEndpoint             string   `json:"authorization_endpoint"`
+	TokenEndpoint                     string   `json:"token_endpoint"`
+	UserInfoEndpoint                  string   `json:"userinfo_endpoint"`
+	JWKSUri                           string   `json:"jwks_uri"`
+	EndSessionEndpoint                string   `json:"end_session_endpoint,omitempty"`
+	ScopesSupported                   []string `json:"scopes_supported"`
+	ResponseTypesSupported            []string `json:"response_types_supported"`
+	SubjectTypesSupported             []string `json:"subject_types_supported"`
+	IDTokenSigningAlgValuesSupported  []string `json:"id_token_signing_alg_values_supported"`
+	TokenEndpointAuthMethodsSupported []string `json:"token_endpoint_auth_methods_supported"`
+	ClaimsSupported                   []string `json:"claims_supported"`
+}
+
+// OIDCTokenResponse represents the OIDC token response
+type OIDCTokenResponse struct {
+	AccessToken  string `json:"access_token"`
+	TokenType    string `json:"token_type"`
+	RefreshToken string `json:"refresh_token,omitempty"`
+	ExpiresIn    int64  `json:"expires_in"`
+	IDToken      string `json:"id_token"`
+	Scope        string `json:"scope,omitempty"`
+}
+
+// OIDCIDTokenClaims represents the claims in an OIDC ID token
+type OIDCIDTokenClaims struct {
+	Issuer            string                 `json:"iss"`
+	Subject           string                 `json:"sub"`
+	Audience          interface{}            `json:"aud"` // Can be string or []string
+	ExpiresAt         int64                  `json:"exp"`
+	IssuedAt          int64                  `json:"iat"`
+	AuthTime          int64                  `json:"auth_time,omitempty"`
+	Nonce             string                 `json:"nonce,omitempty"`
+	Email             string                 `json:"email,omitempty"`
+	EmailVerified     bool                   `json:"email_verified,omitempty"`
+	Name              string                 `json:"name,omitempty"`
+	GivenName         string                 `json:"given_name,omitempty"`
+	FamilyName        string                 `json:"family_name,omitempty"`
+	Picture           string                 `json:"picture,omitempty"`
+	Locale            string                 `json:"locale,omitempty"`
+	PreferredUsername string                 `json:"preferred_username,omitempty"`
+	Groups            []string               `json:"groups,omitempty"`
+	Roles             []string               `json:"roles,omitempty"`
+	CustomClaims      map[string]interface{} `json:"-"` // For additional claims
+}
+
+// OIDCUserInfo represents user information from OIDC UserInfo endpoint
+type OIDCUserInfo struct {
+	Subject           string   `json:"sub"`
+	Email             string   `json:"email,omitempty"`
+	EmailVerified     bool     `json:"email_verified,omitempty"`
+	Name              string   `json:"name,omitempty"`
+	GivenName         string   `json:"given_name,omitempty"`
+	FamilyName        string   `json:"family_name,omitempty"`
+	Picture           string   `json:"picture,omitempty"`
+	Locale            string   `json:"locale,omitempty"`
+	PreferredUsername string   `json:"preferred_username,omitempty"`
+	Groups            []string `json:"groups,omitempty"`
+	Roles             []string `json:"roles,omitempty"`
+}
+
+// OIDCResult represents the result of OIDC authentication
+type OIDCResult struct {
+	UserID       string            `json:"user_id"`
+	Email        string            `json:"email"`
+	Name         string            `json:"name"`
+	Subject      string            `json:"subject"`
+	Provider     string            `json:"provider"`
+	IsNewUser    bool              `json:"is_new_user"`
+	AccessToken  string            `json:"access_token"`
+	RefreshToken string            `json:"refresh_token"`
+	IDToken      string            `json:"id_token"`
+	ExpiresAt    int64             `json:"expires_at"`
+	Claims       map[string]string `json:"claims"`
+}
+
+// OIDCAuthRequest represents an OIDC authentication request
+type OIDCAuthRequest struct {
+	Provider    string `json:"provider" validate:"required"`
+	RedirectURL string `json:"redirect_url,omitempty"`
+	Nonce       string `json:"nonce,omitempty"`
+}
+
+// OIDCCallbackRequest represents an OIDC callback request
+type OIDCCallbackRequest struct {
+	Provider string `json:"provider" validate:"required"`
+	Code     string `json:"code" validate:"required"`
+	State    string `json:"state" validate:"required"`
+}
+
+// OIDCConfig represents OIDC provider configuration
+type OIDCProviderConfig struct {
+	Name              string                 `json:"name"`
+	IssuerURL         string                 `json:"issuer_url"`
+	ClientID          string                 `json:"client_id"`
+	ClientSecret      string                 `json:"client_secret"`
+	RedirectURL       string                 `json:"redirect_url"`
+	Scopes            []string               `json:"scopes"`
+	DiscoveryDocument *OIDCDiscoveryDocument `json:"discovery_document,omitempty"`
+	JWKSKeys          interface{}            `json:"jwks_keys,omitempty"` // JWKS for token validation
+	ClaimsMapping     OIDCClaimsMapping      `json:"claims_mapping"`
+	AllowInsecure     bool                   `json:"allow_insecure"` // For development only
+}
+
+// OIDCClaimsMapping defines how OIDC claims map to user fields
+type OIDCClaimsMapping struct {
+	Email     string `json:"email"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	FullName  string `json:"full_name"`
+	Groups    string `json:"groups"`
+	Roles     string `json:"roles"`
+	Username  string `json:"username"`
+}

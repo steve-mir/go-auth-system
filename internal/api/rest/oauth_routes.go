@@ -25,6 +25,15 @@ func (s *Server) setupOAuthRoutes(group *gin.RouterGroup) {
 		saml.POST("/acs", s.samlAssertionConsumerHandler)
 		saml.POST("/slo", s.samlSingleLogoutHandler)
 	}
+
+	// OpenID Connect routes
+	oidc := group.Group("/oidc")
+	{
+		oidc.GET("/:provider", s.oidcInitiateHandler)
+		oidc.GET("/:provider/callback", s.oidcCallbackHandler)
+		oidc.POST("/token/validate", s.oidcValidateTokenHandler)
+		oidc.POST("/token/refresh", s.oidcRefreshTokenHandler)
+	}
 }
 
 // oauthInitiateHandler initiates OAuth flow
@@ -329,12 +338,176 @@ func (s *Server) samlSingleLogoutHandler(c *gin.Context) {
 	})
 }
 
+// OpenID Connect handlers
+
+// oidcInitiateHandler initiates OIDC authentication flow
+func (s *Server) oidcInitiateHandler(c *gin.Context) {
+	provider := c.Param("provider")
+
+	// Validate provider
+	if !isValidOIDCProvider(provider) {
+		s.errorResponse(c, http.StatusBadRequest, "INVALID_PROVIDER", "Invalid OIDC provider", gin.H{
+			"provider":        provider,
+			"valid_providers": []string{"oidc"},
+		})
+		return
+	}
+
+	// Get optional nonce from query parameters
+	nonce := c.Query("nonce")
+
+	// Generate OIDC authorization URL
+	authURL, err := s.ssoService.GetOIDCAuthURL(c.Request.Context(), provider, "", nonce)
+	if err != nil {
+		s.handleServiceError(c, err)
+		return
+	}
+
+	s.successResponse(c, http.StatusOK, gin.H{
+		"auth_url": authURL,
+		"provider": provider,
+	})
+}
+
+// oidcCallbackHandler handles OIDC callback
+func (s *Server) oidcCallbackHandler(c *gin.Context) {
+	provider := c.Param("provider")
+	code := c.Query("code")
+	state := c.Query("state")
+
+	// Validate parameters
+	if code == "" {
+		s.errorResponse(c, http.StatusBadRequest, "MISSING_CODE", "Authorization code is required", nil)
+		return
+	}
+
+	if state == "" {
+		s.errorResponse(c, http.StatusBadRequest, "MISSING_STATE", "State parameter is required", nil)
+		return
+	}
+
+	// Validate provider
+	if !isValidOIDCProvider(provider) {
+		s.errorResponse(c, http.StatusBadRequest, "INVALID_PROVIDER", "Invalid OIDC provider", gin.H{
+			"provider": provider,
+		})
+		return
+	}
+
+	// Handle OIDC callback
+	result, err := s.ssoService.HandleOIDCCallback(c.Request.Context(), provider, code, state)
+	if err != nil {
+		s.handleServiceError(c, err)
+		return
+	}
+
+	// Return authentication result
+	s.successResponse(c, http.StatusOK, gin.H{
+		"user_id":       result.UserID,
+		"email":         result.Email,
+		"name":          result.Name,
+		"subject":       result.Subject,
+		"provider":      result.Provider,
+		"is_new_user":   result.IsNewUser,
+		"access_token":  result.AccessToken,
+		"refresh_token": result.RefreshToken,
+		"id_token":      result.IDToken,
+		"expires_at":    result.ExpiresAt,
+		"claims":        result.Claims,
+	})
+}
+
+// oidcValidateTokenHandler validates an OIDC ID token
+func (s *Server) oidcValidateTokenHandler(c *gin.Context) {
+	var req struct {
+		Provider string `json:"provider" binding:"required"`
+		IDToken  string `json:"id_token" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		s.errorResponse(c, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request format", gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	// Validate provider
+	if !isValidOIDCProvider(req.Provider) {
+		s.errorResponse(c, http.StatusBadRequest, "INVALID_PROVIDER", "Invalid OIDC provider", gin.H{
+			"provider": req.Provider,
+		})
+		return
+	}
+
+	// Validate ID token
+	claims, err := s.ssoService.ValidateOIDCIDToken(c.Request.Context(), req.Provider, req.IDToken)
+	if err != nil {
+		s.handleServiceError(c, err)
+		return
+	}
+
+	s.successResponse(c, http.StatusOK, gin.H{
+		"valid":      true,
+		"claims":     claims,
+		"subject":    claims.Subject,
+		"email":      claims.Email,
+		"expires_at": claims.ExpiresAt,
+	})
+}
+
+// oidcRefreshTokenHandler refreshes an OIDC access token
+func (s *Server) oidcRefreshTokenHandler(c *gin.Context) {
+	var req struct {
+		Provider     string `json:"provider" binding:"required"`
+		RefreshToken string `json:"refresh_token" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		s.errorResponse(c, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request format", gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	// Validate provider
+	if !isValidOIDCProvider(req.Provider) {
+		s.errorResponse(c, http.StatusBadRequest, "INVALID_PROVIDER", "Invalid OIDC provider", gin.H{
+			"provider": req.Provider,
+		})
+		return
+	}
+
+	// Refresh token
+	tokenResp, err := s.ssoService.RefreshOIDCToken(c.Request.Context(), req.Provider, req.RefreshToken)
+	if err != nil {
+		s.handleServiceError(c, err)
+		return
+	}
+
+	s.successResponse(c, http.StatusOK, gin.H{
+		"access_token":  tokenResp.AccessToken,
+		"refresh_token": tokenResp.RefreshToken,
+		"id_token":      tokenResp.IDToken,
+		"token_type":    tokenResp.TokenType,
+		"expires_in":    tokenResp.ExpiresIn,
+		"scope":         tokenResp.Scope,
+	})
+}
+
 // isValidProvider checks if the provider is supported
 func isValidProvider(provider string) bool {
 	validProviders := map[string]bool{
 		"google":   true,
 		"facebook": true,
 		"github":   true,
+	}
+	return validProviders[provider]
+}
+
+// isValidOIDCProvider checks if the OIDC provider is supported
+func isValidOIDCProvider(provider string) bool {
+	validProviders := map[string]bool{
+		"oidc": true,
 	}
 	return validProviders[provider]
 }

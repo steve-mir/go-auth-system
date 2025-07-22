@@ -78,4 +78,5 @@ type UpdateUserData struct {
 	FirstName string
 	LastName  string
 	Phone     string
+	Username  string
 }

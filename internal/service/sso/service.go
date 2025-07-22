@@ -21,6 +21,7 @@ type ssoService struct {
 	userRepo          UserRepository
 	socialAccountRepo SocialAccountRepository
 	providers         map[string]OAuthProvider
+	oidcProviders     map[string]*OIDCProvider
 	stateStore        StateStore
 	hashService       hash.HashService
 	encryptor         crypto.Encryptor
@@ -48,6 +49,7 @@ func NewSSOService(
 		userRepo:          userRepo,
 		socialAccountRepo: socialAccountRepo,
 		providers:         make(map[string]OAuthProvider),
+		oidcProviders:     make(map[string]*OIDCProvider),
 		stateStore:        stateStore,
 		hashService:       hashService,
 		encryptor:         encryptor,
@@ -55,6 +57,9 @@ func NewSSOService(
 
 	// Initialize OAuth providers
 	service.initializeProviders()
+
+	// Initialize OIDC providers
+	service.initializeOIDCProviders()
 
 	// Initialize SAML service if enabled
 	if cfg.Features.EnterpriseSSO.SAML.Enabled {
@@ -98,6 +103,43 @@ func (s *ssoService) initializeProviders() {
 			Scopes:       s.config.Features.SocialAuth.GitHub.Scopes,
 		}
 		s.providers["github"] = NewGitHubProvider(githubConfig)
+	}
+}
+
+// initializeOIDCProviders initializes OIDC providers based on configuration
+func (s *ssoService) initializeOIDCProviders() {
+	// OIDC provider
+	if s.config.Features.EnterpriseSSO.OIDC.Enabled {
+		oidcConfig := OIDCProviderConfig{
+			Name:         "oidc",
+			IssuerURL:    s.config.Features.EnterpriseSSO.OIDC.IssuerURL,
+			ClientID:     s.config.Features.EnterpriseSSO.OIDC.ClientID,
+			ClientSecret: s.config.Features.EnterpriseSSO.OIDC.ClientSecret,
+			RedirectURL:  s.config.Features.EnterpriseSSO.OIDC.RedirectURL,
+			Scopes:       s.config.Features.EnterpriseSSO.OIDC.Scopes,
+			ClaimsMapping: OIDCClaimsMapping{
+				Email:     "email",
+				FirstName: "given_name",
+				LastName:  "family_name",
+				FullName:  "name",
+				Groups:    "groups",
+				Roles:     "roles",
+				Username:  "preferred_username",
+			},
+		}
+
+		// Set default scopes if not configured
+		if len(oidcConfig.Scopes) == 0 {
+			oidcConfig.Scopes = []string{"openid", "email", "profile"}
+		}
+
+		provider, err := NewOIDCProvider(oidcConfig)
+		if err != nil {
+			// Log error but don't fail service initialization
+			fmt.Printf("Failed to initialize OIDC provider: %v\n", err)
+		} else {
+			s.oidcProviders["oidc"] = provider
+		}
 	}
 }
 
@@ -679,4 +721,349 @@ func isNotFoundError(err error) bool {
 	}
 
 	return false
+}
+
+// OpenID Connect methods
+
+// GetOIDCAuthURL generates OIDC authorization URL
+func (s *ssoService) GetOIDCAuthURL(ctx context.Context, provider string, state string, nonce string) (string, error) {
+	// Validate provider
+	oidcProvider, exists := s.oidcProviders[provider]
+	if !exists {
+		return "", NewProviderNotSupportedError(provider)
+	}
+
+	// Generate state if not provided
+	if state == "" {
+		var err error
+		state, err = s.generateSecureState()
+		if err != nil {
+			return "", fmt.Errorf("failed to generate state: %w", err)
+		}
+	}
+
+	// Generate nonce if not provided
+	if nonce == "" {
+		var err error
+		nonce, err = GenerateNonce()
+		if err != nil {
+			return "", fmt.Errorf("failed to generate nonce: %w", err)
+		}
+	}
+
+	// Store state for validation (include nonce for validation)
+	oauthState := &OAuthState{
+		State:     state,
+		Provider:  provider,
+		ExpiresAt: time.Now().Add(10 * time.Minute), // State expires in 10 minutes
+		CreatedAt: time.Now(),
+	}
+
+	if err := s.stateStore.StoreState(ctx, oauthState); err != nil {
+		return "", fmt.Errorf("failed to store OIDC state: %w", err)
+	}
+
+	// Generate authorization URL
+	authURL := oidcProvider.GetAuthURL(state, nonce)
+	return authURL, nil
+}
+
+// HandleOIDCCallback handles OIDC callback and returns user information
+func (s *ssoService) HandleOIDCCallback(ctx context.Context, provider, code, state string) (*OIDCResult, error) {
+	// Validate provider
+	oidcProvider, exists := s.oidcProviders[provider]
+	if !exists {
+		return nil, NewProviderNotSupportedError(provider)
+	}
+
+	// Validate state
+	storedState, err := s.stateStore.GetState(ctx, state)
+	if err != nil {
+		return nil, NewInvalidStateError()
+	}
+
+	if storedState.Provider != provider {
+		return nil, NewInvalidStateError()
+	}
+
+	if time.Now().After(storedState.ExpiresAt) {
+		return nil, NewStateExpiredError()
+	}
+
+	// Clean up state
+	_ = s.stateStore.DeleteState(ctx, state)
+
+	// Exchange code for tokens
+	tokenResp, err := oidcProvider.ExchangeCode(ctx, code)
+	if err != nil {
+		return nil, NewOAuthExchangeFailedError(provider, err)
+	}
+
+	// Validate ID token
+	idTokenClaims, err := oidcProvider.ValidateIDToken(ctx, tokenResp.IDToken)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate ID token: %w", err)
+	}
+
+	// Get additional user info if UserInfo endpoint is available
+	var userInfo *OIDCUserInfo
+	if tokenResp.AccessToken != "" {
+		userInfo, err = oidcProvider.GetUserInfo(ctx, tokenResp.AccessToken)
+		if err != nil {
+			// UserInfo endpoint might not be available or accessible, continue with ID token claims
+			userInfo = &OIDCUserInfo{
+				Subject:       idTokenClaims.Subject,
+				Email:         idTokenClaims.Email,
+				EmailVerified: idTokenClaims.EmailVerified,
+				Name:          idTokenClaims.Name,
+				GivenName:     idTokenClaims.GivenName,
+				FamilyName:    idTokenClaims.FamilyName,
+				Picture:       idTokenClaims.Picture,
+				Locale:        idTokenClaims.Locale,
+				Groups:        idTokenClaims.Groups,
+				Roles:         idTokenClaims.Roles,
+			}
+		}
+	} else {
+		// Use ID token claims as user info
+		userInfo = &OIDCUserInfo{
+			Subject:       idTokenClaims.Subject,
+			Email:         idTokenClaims.Email,
+			EmailVerified: idTokenClaims.EmailVerified,
+			Name:          idTokenClaims.Name,
+			GivenName:     idTokenClaims.GivenName,
+			FamilyName:    idTokenClaims.FamilyName,
+			Picture:       idTokenClaims.Picture,
+			Locale:        idTokenClaims.Locale,
+			Groups:        idTokenClaims.Groups,
+			Roles:         idTokenClaims.Roles,
+		}
+	}
+
+	// Check if user exists by email
+	existingUser, err := s.userRepo.GetUserByEmail(ctx, userInfo.Email)
+	if err != nil && !isNotFoundError(err) {
+		return nil, fmt.Errorf("failed to check existing user: %w", err)
+	}
+
+	var result *OIDCResult
+	if existingUser != nil {
+		// User exists, update user attributes from OIDC if needed
+		if err := s.syncUserAttributesFromOIDC(ctx, existingUser, userInfo); err != nil {
+			return nil, fmt.Errorf("failed to sync user attributes: %w", err)
+		}
+
+		// Decrypt user names for response
+		firstName, lastName, err := s.decryptUserNames(existingUser)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decrypt user names: %w", err)
+		}
+
+		result = &OIDCResult{
+			UserID:       existingUser.ID,
+			Email:        existingUser.Email,
+			Name:         firstName + " " + lastName,
+			Subject:      userInfo.Subject,
+			Provider:     provider,
+			IsNewUser:    false,
+			AccessToken:  tokenResp.AccessToken,
+			RefreshToken: tokenResp.RefreshToken,
+			IDToken:      tokenResp.IDToken,
+			ExpiresAt:    time.Now().Add(time.Duration(tokenResp.ExpiresIn) * time.Second).Unix(),
+			Claims:       s.extractClaimsFromOIDC(userInfo, idTokenClaims),
+		}
+	} else {
+		// Create new user from OIDC claims
+		newUser, err := s.createUserFromOIDC(ctx, userInfo)
+		if err != nil {
+			return nil, NewUserCreationFailedError(err)
+		}
+
+		// Parse name for response
+		firstName, lastName := s.parseNameFromOIDC(userInfo)
+
+		result = &OIDCResult{
+			UserID:       newUser.ID,
+			Email:        newUser.Email,
+			Name:         firstName + " " + lastName,
+			Subject:      userInfo.Subject,
+			Provider:     provider,
+			IsNewUser:    true,
+			AccessToken:  tokenResp.AccessToken,
+			RefreshToken: tokenResp.RefreshToken,
+			IDToken:      tokenResp.IDToken,
+			ExpiresAt:    time.Now().Add(time.Duration(tokenResp.ExpiresIn) * time.Second).Unix(),
+			Claims:       s.extractClaimsFromOIDC(userInfo, idTokenClaims),
+		}
+	}
+
+	return result, nil
+}
+
+// ValidateOIDCIDToken validates an OIDC ID token
+func (s *ssoService) ValidateOIDCIDToken(ctx context.Context, provider, idToken string) (*OIDCIDTokenClaims, error) {
+	// Validate provider
+	oidcProvider, exists := s.oidcProviders[provider]
+	if !exists {
+		return nil, NewProviderNotSupportedError(provider)
+	}
+
+	// Validate ID token
+	claims, err := oidcProvider.ValidateIDToken(ctx, idToken)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate ID token: %w", err)
+	}
+
+	return claims, nil
+}
+
+// RefreshOIDCToken refreshes an OIDC access token
+func (s *ssoService) RefreshOIDCToken(ctx context.Context, provider, refreshToken string) (*OIDCTokenResponse, error) {
+	// Validate provider
+	oidcProvider, exists := s.oidcProviders[provider]
+	if !exists {
+		return nil, NewProviderNotSupportedError(provider)
+	}
+
+	// Refresh token
+	tokenResp, err := oidcProvider.RefreshToken(ctx, refreshToken)
+	if err != nil {
+		return nil, fmt.Errorf("failed to refresh OIDC token: %w", err)
+	}
+
+	return tokenResp, nil
+}
+
+// createUserFromOIDC creates a new user from OIDC user information
+func (s *ssoService) createUserFromOIDC(ctx context.Context, userInfo *OIDCUserInfo) (*UserData, error) {
+	// Parse name from OIDC claims
+	firstName, lastName := s.parseNameFromOIDC(userInfo)
+
+	// Create user data
+	createUserData := &CreateUserData{
+		Email:         userInfo.Email,
+		Username:      userInfo.PreferredUsername, // Use preferred username if available
+		PasswordHash:  "",                         // No password for OIDC users initially
+		HashAlgorithm: s.config.Security.PasswordHash.Algorithm,
+		FirstName:     firstName,
+		LastName:      lastName,
+		Phone:         "",
+		EmailVerified: userInfo.EmailVerified,
+		PhoneVerified: false,
+	}
+
+	// Create user
+	newUser, err := s.userRepo.CreateUser(ctx, createUserData)
+	if err != nil {
+		return nil, err
+	}
+
+	return newUser, nil
+}
+
+// syncUserAttributesFromOIDC synchronizes user attributes from OIDC
+func (s *ssoService) syncUserAttributesFromOIDC(ctx context.Context, user *UserData, userInfo *OIDCUserInfo) error {
+	// Parse name from OIDC claims
+	firstName, lastName := s.parseNameFromOIDC(userInfo)
+
+	// Check if we need to update user attributes
+	needsUpdate := false
+	updateData := &UpdateUserData{
+		ID: user.ID,
+	}
+
+	// Decrypt current names to compare
+	currentFirstName, currentLastName, err := s.decryptUserNames(user)
+	if err != nil {
+		return fmt.Errorf("failed to decrypt current user names: %w", err)
+	}
+
+	if currentFirstName != firstName {
+		updateData.FirstName = firstName
+		needsUpdate = true
+	}
+
+	if currentLastName != lastName {
+		updateData.LastName = lastName
+		needsUpdate = true
+	}
+
+	// Update username if available and different
+	if userInfo.PreferredUsername != "" && user.Username != userInfo.PreferredUsername {
+		updateData.Username = userInfo.PreferredUsername
+		needsUpdate = true
+	}
+
+	// Update user if needed
+	if needsUpdate {
+		if err := s.userRepo.UpdateUser(ctx, updateData); err != nil {
+			return fmt.Errorf("failed to update user attributes: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// parseNameFromOIDC parses name from OIDC user information
+func (s *ssoService) parseNameFromOIDC(userInfo *OIDCUserInfo) (string, string) {
+	// Try to get first and last name from specific claims
+	if userInfo.GivenName != "" && userInfo.FamilyName != "" {
+		return userInfo.GivenName, userInfo.FamilyName
+	}
+
+	// Try to parse full name
+	if userInfo.Name != "" {
+		return s.parseName(userInfo.Name)
+	}
+
+	return "", ""
+}
+
+// extractClaimsFromOIDC extracts relevant claims from OIDC user info and ID token
+func (s *ssoService) extractClaimsFromOIDC(userInfo *OIDCUserInfo, idTokenClaims *OIDCIDTokenClaims) map[string]string {
+	claims := make(map[string]string)
+
+	if userInfo.Subject != "" {
+		claims["sub"] = userInfo.Subject
+	}
+	if userInfo.Email != "" {
+		claims["email"] = userInfo.Email
+	}
+	if userInfo.Name != "" {
+		claims["name"] = userInfo.Name
+	}
+	if userInfo.GivenName != "" {
+		claims["given_name"] = userInfo.GivenName
+	}
+	if userInfo.FamilyName != "" {
+		claims["family_name"] = userInfo.FamilyName
+	}
+	if userInfo.Picture != "" {
+		claims["picture"] = userInfo.Picture
+	}
+	if userInfo.Locale != "" {
+		claims["locale"] = userInfo.Locale
+	}
+	if userInfo.PreferredUsername != "" {
+		claims["preferred_username"] = userInfo.PreferredUsername
+	}
+
+	// Add groups and roles if available
+	if len(userInfo.Groups) > 0 {
+		claims["groups"] = strings.Join(userInfo.Groups, ",")
+	}
+	if len(userInfo.Roles) > 0 {
+		claims["roles"] = strings.Join(userInfo.Roles, ",")
+	}
+
+	// Add custom claims from ID token
+	if idTokenClaims.CustomClaims != nil {
+		for key, value := range idTokenClaims.CustomClaims {
+			if strValue, ok := value.(string); ok {
+				claims[key] = strValue
+			}
+		}
+	}
+
+	return claims
 }
