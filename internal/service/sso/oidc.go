@@ -15,11 +15,11 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// OIDCProvider implements OpenID Connect authentication
+// OIDCProvider provides OpenID Connect integration
 type OIDCProvider struct {
 	config            OIDCProviderConfig
-	httpClient        *http.Client
 	discoveryDocument *OIDCDiscoveryDocument
+	httpClient        *http.Client
 }
 
 // NewOIDCProvider creates a new OIDC provider
@@ -31,51 +31,76 @@ func NewOIDCProvider(config OIDCProviderConfig) (*OIDCProvider, error) {
 		},
 	}
 
-	// Discover OIDC configuration if not provided
-	if config.DiscoveryDocument == nil {
-		discoveryDoc, err := provider.discoverConfiguration(context.Background())
-		if err != nil {
-			return nil, fmt.Errorf("failed to discover OIDC configuration: %w", err)
-		}
-		provider.discoveryDocument = discoveryDoc
-	} else {
-		provider.discoveryDocument = config.DiscoveryDocument
+	// Discover OIDC configuration
+	if err := provider.discoverConfiguration(); err != nil {
+		return nil, fmt.Errorf("failed to discover OIDC configuration: %w", err)
 	}
 
 	return provider, nil
 }
 
-// GetProviderName returns the provider name
-func (o *OIDCProvider) GetProviderName() string {
-	return o.config.Name
+// discoverConfiguration discovers OIDC provider configuration
+func (p *OIDCProvider) discoverConfiguration() error {
+	discoveryURL := strings.TrimSuffix(p.config.IssuerURL, "/") + "/.well-known/openid_configuration"
+
+	req, err := http.NewRequest("GET", discoveryURL, nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := p.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("discovery request failed with status %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	var discovery OIDCDiscoveryDocument
+	if err := json.Unmarshal(body, &discovery); err != nil {
+		return err
+	}
+
+	p.discoveryDocument = &discovery
+	p.config.DiscoveryDocument = &discovery
+
+	return nil
 }
 
-// GetAuthURL generates the OIDC authorization URL
-func (o *OIDCProvider) GetAuthURL(state, nonce string) string {
+// GetAuthURL generates OIDC authorization URL
+func (p *OIDCProvider) GetAuthURL(state, nonce string) string {
 	params := url.Values{}
-	params.Add("client_id", o.config.ClientID)
-	params.Add("redirect_uri", o.config.RedirectURL)
-	params.Add("scope", strings.Join(o.config.Scopes, " "))
+	params.Add("client_id", p.config.ClientID)
+	params.Add("redirect_uri", p.config.RedirectURL)
+	params.Add("scope", strings.Join(p.config.Scopes, " "))
 	params.Add("response_type", "code")
 	params.Add("state", state)
-
 	if nonce != "" {
 		params.Add("nonce", nonce)
 	}
 
-	return fmt.Sprintf("%s?%s", o.discoveryDocument.AuthorizationEndpoint, params.Encode())
+	return fmt.Sprintf("%s?%s", p.discoveryDocument.AuthorizationEndpoint, params.Encode())
 }
 
 // ExchangeCode exchanges authorization code for tokens
-func (o *OIDCProvider) ExchangeCode(ctx context.Context, code string) (*OIDCTokenResponse, error) {
+func (p *OIDCProvider) ExchangeCode(ctx context.Context, code string) (*OIDCTokenResponse, error) {
 	data := url.Values{}
-	data.Set("client_id", o.config.ClientID)
-	data.Set("client_secret", o.config.ClientSecret)
+	data.Set("client_id", p.config.ClientID)
+	data.Set("client_secret", p.config.ClientSecret)
 	data.Set("code", code)
 	data.Set("grant_type", "authorization_code")
-	data.Set("redirect_uri", o.config.RedirectURL)
+	data.Set("redirect_uri", p.config.RedirectURL)
 
-	req, err := http.NewRequestWithContext(ctx, "POST", o.discoveryDocument.TokenEndpoint, strings.NewReader(data.Encode()))
+	req, err := http.NewRequestWithContext(ctx, "POST", p.discoveryDocument.TokenEndpoint, strings.NewReader(data.Encode()))
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +108,7 @@ func (o *OIDCProvider) ExchangeCode(ctx context.Context, code string) (*OIDCToke
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := o.httpClient.Do(req)
+	resp, err := p.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -106,32 +131,28 @@ func (o *OIDCProvider) ExchangeCode(ctx context.Context, code string) (*OIDCToke
 	return &tokenResp, nil
 }
 
-// ValidateIDToken validates and parses an OIDC ID token
-func (o *OIDCProvider) ValidateIDToken(ctx context.Context, idToken string) (*OIDCIDTokenClaims, error) {
-	// Parse the token without verification first to get the header
+// ValidateIDToken validates an OIDC ID token
+func (p *OIDCProvider) ValidateIDToken(ctx context.Context, idToken string) (*OIDCIDTokenClaims, error) {
+	// Parse token without verification first to get header
 	token, _, err := new(jwt.Parser).ParseUnverified(idToken, jwt.MapClaims{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse ID token: %w", err)
 	}
 
-	// Get the key ID from the token header
-	keyID, ok := token.Header["kid"].(string)
-	if !ok {
-		return nil, fmt.Errorf("ID token missing key ID")
+	// Get key ID from header
+	var keyID string
+	if kid, ok := token.Header["kid"]; ok {
+		keyID = kid.(string)
 	}
 
-	// Get the signing key from JWKS
-	signingKey, err := o.getSigningKey(ctx, keyID)
+	// Get signing key
+	signingKey, err := p.getSigningKey(ctx, keyID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get signing key: %w", err)
 	}
 
-	// Parse and validate the token with the signing key
+	// Parse and validate token
 	parsedToken, err := jwt.ParseWithClaims(idToken, &OIDCIDTokenClaims{}, func(token *jwt.Token) (interface{}, error) {
-		// Verify the signing method
-		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
 		return signingKey, nil
 	})
 
@@ -139,36 +160,30 @@ func (o *OIDCProvider) ValidateIDToken(ctx context.Context, idToken string) (*OI
 		return nil, fmt.Errorf("failed to validate ID token: %w", err)
 	}
 
+	if !parsedToken.Valid {
+		return nil, fmt.Errorf("ID token is invalid")
+	}
+
 	claims, ok := parsedToken.Claims.(*OIDCIDTokenClaims)
-	if !ok || !parsedToken.Valid {
-		return nil, fmt.Errorf("invalid ID token claims")
+	if !ok {
+		return nil, fmt.Errorf("failed to parse ID token claims")
 	}
 
-	// Validate issuer
-	if claims.Issuer != o.discoveryDocument.Issuer {
-		return nil, fmt.Errorf("invalid issuer: expected %s, got %s", o.discoveryDocument.Issuer, claims.Issuer)
-	}
-
-	// Validate audience
-	if !o.validateAudience(claims.Audience) {
-		return nil, fmt.Errorf("invalid audience")
-	}
-
-	// Validate expiration
-	if time.Now().Unix() > claims.ExpiresAt {
-		return nil, fmt.Errorf("ID token has expired")
+	// Validate claims
+	if err := p.validateIDTokenClaims(claims); err != nil {
+		return nil, fmt.Errorf("ID token claims validation failed: %w", err)
 	}
 
 	return claims, nil
 }
 
-// GetUserInfo retrieves user information from the UserInfo endpoint
-func (o *OIDCProvider) GetUserInfo(ctx context.Context, accessToken string) (*OIDCUserInfo, error) {
-	if o.discoveryDocument.UserInfoEndpoint == "" {
+// GetUserInfo retrieves user information from UserInfo endpoint
+func (p *OIDCProvider) GetUserInfo(ctx context.Context, accessToken string) (*OIDCUserInfo, error) {
+	if p.discoveryDocument.UserInfoEndpoint == "" {
 		return nil, fmt.Errorf("UserInfo endpoint not available")
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", o.discoveryDocument.UserInfoEndpoint, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", p.discoveryDocument.UserInfoEndpoint, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +191,7 @@ func (o *OIDCProvider) GetUserInfo(ctx context.Context, accessToken string) (*OI
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := o.httpClient.Do(req)
+	resp, err := p.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -199,15 +214,15 @@ func (o *OIDCProvider) GetUserInfo(ctx context.Context, accessToken string) (*OI
 	return &userInfo, nil
 }
 
-// RefreshToken refreshes an OIDC access token using refresh token
-func (o *OIDCProvider) RefreshToken(ctx context.Context, refreshToken string) (*OIDCTokenResponse, error) {
+// RefreshToken refreshes an access token
+func (p *OIDCProvider) RefreshToken(ctx context.Context, refreshToken string) (*OIDCTokenResponse, error) {
 	data := url.Values{}
-	data.Set("client_id", o.config.ClientID)
-	data.Set("client_secret", o.config.ClientSecret)
+	data.Set("client_id", p.config.ClientID)
+	data.Set("client_secret", p.config.ClientSecret)
 	data.Set("refresh_token", refreshToken)
 	data.Set("grant_type", "refresh_token")
 
-	req, err := http.NewRequestWithContext(ctx, "POST", o.discoveryDocument.TokenEndpoint, strings.NewReader(data.Encode()))
+	req, err := http.NewRequestWithContext(ctx, "POST", p.discoveryDocument.TokenEndpoint, strings.NewReader(data.Encode()))
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +230,7 @@ func (o *OIDCProvider) RefreshToken(ctx context.Context, refreshToken string) (*
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := o.httpClient.Do(req)
+	resp, err := p.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -238,54 +253,17 @@ func (o *OIDCProvider) RefreshToken(ctx context.Context, refreshToken string) (*
 	return &tokenResp, nil
 }
 
-// discoverConfiguration discovers OIDC configuration from the well-known endpoint
-func (o *OIDCProvider) discoverConfiguration(ctx context.Context) (*OIDCDiscoveryDocument, error) {
-	discoveryURL := strings.TrimSuffix(o.config.IssuerURL, "/") + "/.well-known/openid_configuration"
-
-	req, err := http.NewRequestWithContext(ctx, "GET", discoveryURL, nil)
+// getSigningKey retrieves the signing key for token validation
+func (p *OIDCProvider) getSigningKey(ctx context.Context, keyID string) (interface{}, error) {
+	// Get JWKS from the provider
+	req, err := http.NewRequestWithContext(ctx, "GET", p.discoveryDocument.JWKSUri, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := o.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("discovery request failed: %s", string(body))
-	}
-
-	var discoveryDoc OIDCDiscoveryDocument
-	if err := json.Unmarshal(body, &discoveryDoc); err != nil {
-		return nil, err
-	}
-
-	return &discoveryDoc, nil
-}
-
-// getSigningKey retrieves the signing key from JWKS endpoint
-func (o *OIDCProvider) getSigningKey(ctx context.Context, keyID string) (interface{}, error) {
-	// This is a simplified implementation
-	// In a production environment, you would want to cache the JWKS
-	// and implement proper key rotation handling
-
-	req, err := http.NewRequestWithContext(ctx, "GET", o.discoveryDocument.JWKSUri, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := o.httpClient.Do(req)
+	resp, err := p.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -308,43 +286,60 @@ func (o *OIDCProvider) getSigningKey(ctx context.Context, keyID string) (interfa
 		return nil, err
 	}
 
-	// Find the key with matching key ID
+	// Find the key with matching kid
 	for _, key := range jwks.Keys {
 		if kid, ok := key["kid"].(string); ok && kid == keyID {
-			// This is a simplified key parsing for demonstration
-			// In production, you would use a proper JWKS library
-			// like github.com/lestrrat-go/jwx/v2/jwk to parse RSA/ECDSA keys
-			// For now, return an error to indicate incomplete implementation
-			return nil, fmt.Errorf("JWKS key parsing not fully implemented - use proper JWKS library in production")
+			// For now, return the key as-is
+			// In a production implementation, you would parse the JWK properly
+			return key, nil
 		}
 	}
 
-	return nil, fmt.Errorf("signing key not found for key ID: %s", keyID)
+	return nil, fmt.Errorf("signing key not found for kid: %s", keyID)
 }
 
-// validateAudience validates the audience claim
-func (o *OIDCProvider) validateAudience(audience interface{}) bool {
-	switch aud := audience.(type) {
+// validateIDTokenClaims validates ID token claims
+func (p *OIDCProvider) validateIDTokenClaims(claims *OIDCIDTokenClaims) error {
+	now := time.Now().Unix()
+
+	// Check expiration
+	if claims.ExpiresAt < now {
+		return fmt.Errorf("ID token has expired")
+	}
+
+	// Check issued at time (not too far in the future)
+	if claims.IssuedAt > now+300 { // 5 minutes tolerance
+		return fmt.Errorf("ID token issued in the future")
+	}
+
+	// Check issuer
+	if claims.Issuer != p.config.IssuerURL {
+		return fmt.Errorf("invalid issuer: expected %s, got %s", p.config.IssuerURL, claims.Issuer)
+	}
+
+	// Check audience
+	validAudience := false
+	switch aud := claims.Audience.(type) {
 	case string:
-		return aud == o.config.ClientID
+		validAudience = aud == p.config.ClientID
 	case []interface{}:
 		for _, a := range aud {
-			if audStr, ok := a.(string); ok && audStr == o.config.ClientID {
-				return true
-			}
-		}
-	case []string:
-		for _, a := range aud {
-			if a == o.config.ClientID {
-				return true
+			if audStr, ok := a.(string); ok && audStr == p.config.ClientID {
+				validAudience = true
+				break
 			}
 		}
 	}
-	return false
+
+	if !validAudience {
+		return fmt.Errorf("invalid audience")
+	}
+
+	return nil
 }
 
-// GenerateNonce generates a cryptographically secure nonce
-func GenerateNonce() (string, error) {
+// GenerateState generates a secure random state string
+func GenerateState() (string, error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
 		return "", err

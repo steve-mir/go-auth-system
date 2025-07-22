@@ -26,6 +26,7 @@ type ssoService struct {
 	hashService       hash.HashService
 	encryptor         crypto.Encryptor
 	samlService       *SAMLService
+	ldapClient        *LDAPClient
 }
 
 // StateStore defines the interface for storing OAuth states
@@ -65,6 +66,18 @@ func NewSSOService(
 	if cfg.Features.EnterpriseSSO.SAML.Enabled {
 		samlConfig := service.buildSAMLConfig(cfg)
 		service.samlService = NewSAMLService(samlConfig, stateStore)
+	}
+
+	// Initialize LDAP client if enabled
+	if cfg.Features.EnterpriseSSO.LDAP.Enabled {
+		ldapConfig := service.buildLDAPConfig(cfg)
+		ldapClient, err := NewLDAPClient(ldapConfig)
+		if err != nil {
+			// Log error but don't fail service initialization
+			fmt.Printf("Failed to initialize LDAP client: %v\n", err)
+		} else {
+			service.ldapClient = ldapClient
+		}
 	}
 
 	return service
@@ -1066,4 +1079,407 @@ func (s *ssoService) extractClaimsFromOIDC(userInfo *OIDCUserInfo, idTokenClaims
 	}
 
 	return claims
+}
+
+// buildLDAPConfig builds LDAP configuration from application config
+func (s *ssoService) buildLDAPConfig(cfg *config.Config) *LDAPConfig {
+	ldapCfg := cfg.Features.EnterpriseSSO.LDAP
+
+	// Build LDAP configuration
+	config := &LDAPConfig{
+		Host:         ldapCfg.Host,
+		Port:         ldapCfg.Port,
+		BaseDN:       ldapCfg.BaseDN,
+		BindDN:       ldapCfg.BindDN,
+		BindPassword: ldapCfg.BindPassword,
+		UserFilter:   ldapCfg.UserFilter,
+		GroupFilter:  ldapCfg.GroupFilter,
+		TLS:          ldapCfg.TLS,
+		Attributes: LDAPAttributeMapping{
+			Username:    "sAMAccountName", // Active Directory default
+			Email:       "mail",
+			FirstName:   "givenName",
+			LastName:    "sn",
+			DisplayName: "displayName",
+			Groups:      "memberOf",
+			Enabled:     "userAccountControl",
+		},
+		GroupSync: LDAPGroupSyncConfig{
+			Enabled:       true,
+			SyncInterval:  3600, // 1 hour
+			GroupBaseDN:   ldapCfg.BaseDN,
+			GroupFilter:   "(objectClass=group)",
+			MemberAttr:    "member",
+			GroupNameAttr: "cn",
+			AutoCreate:    false,
+			RolePrefix:    "LDAP_",
+		},
+		Connection: LDAPConnectionConfig{
+			Timeout:        30,
+			ReadTimeout:    30,
+			WriteTimeout:   30,
+			MaxConnections: 10,
+			IdleTimeout:    300,
+			SkipTLSVerify:  false,
+			StartTLS:       false,
+		},
+	}
+
+	// Set default port if not specified
+	if config.Port == 0 {
+		if config.TLS {
+			config.Port = 636 // LDAPS
+		} else {
+			config.Port = 389 // LDAP
+		}
+	}
+
+	return config
+}
+
+// LDAP/Active Directory methods
+
+// AuthenticateLDAP authenticates a user against LDAP directory
+func (s *ssoService) AuthenticateLDAP(ctx context.Context, username, password string) (*LDAPResult, error) {
+	if s.ldapClient == nil {
+		return nil, fmt.Errorf("LDAP service not enabled")
+	}
+
+	// Authenticate user
+	result, err := s.ldapClient.Authenticate(ctx, username, password)
+	if err != nil {
+		return nil, fmt.Errorf("LDAP authentication failed: %w", err)
+	}
+
+	// Check if user exists in our system
+	existingUser, err := s.userRepo.GetUserByEmail(ctx, result.Email)
+	if err != nil && !isNotFoundError(err) {
+		return nil, fmt.Errorf("failed to check existing user: %w", err)
+	}
+
+	if existingUser != nil {
+		// User exists, update result with user ID
+		result.UserID = existingUser.ID
+		result.IsNewUser = false
+
+		// Sync user attributes from LDAP if needed
+		if err := s.syncUserAttributesFromLDAP(ctx, existingUser, result); err != nil {
+			return nil, fmt.Errorf("failed to sync user attributes: %w", err)
+		}
+	} else {
+		// Create new user from LDAP attributes
+		newUser, err := s.createUserFromLDAP(ctx, result)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create user from LDAP: %w", err)
+		}
+
+		result.UserID = newUser.ID
+		result.IsNewUser = true
+	}
+
+	return result, nil
+}
+
+// SearchLDAPUser searches for a user in LDAP directory
+func (s *ssoService) SearchLDAPUser(ctx context.Context, username string) (*LDAPUser, error) {
+	if s.ldapClient == nil {
+		return nil, fmt.Errorf("LDAP service not enabled")
+	}
+
+	user, err := s.ldapClient.SearchUser(ctx, username)
+	if err != nil {
+		return nil, fmt.Errorf("LDAP user search failed: %w", err)
+	}
+
+	return user, nil
+}
+
+// GetLDAPUserGroups retrieves groups for a user from LDAP
+func (s *ssoService) GetLDAPUserGroups(ctx context.Context, username string) ([]string, error) {
+	if s.ldapClient == nil {
+		return nil, fmt.Errorf("LDAP service not enabled")
+	}
+
+	// First search for the user to get their DN
+	user, err := s.ldapClient.SearchUser(ctx, username)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search LDAP user: %w", err)
+	}
+
+	if user == nil {
+		return nil, NewLDAPUserNotFoundError(username)
+	}
+
+	// Get user groups
+	groups, err := s.ldapClient.GetUserGroups(ctx, user.DN)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get LDAP user groups: %w", err)
+	}
+
+	return groups, nil
+}
+
+// SyncLDAPUser synchronizes user information from LDAP
+func (s *ssoService) SyncLDAPUser(ctx context.Context, username string) (*LDAPSyncResult, error) {
+	if s.ldapClient == nil {
+		return nil, fmt.Errorf("LDAP service not enabled")
+	}
+
+	// Sync user from LDAP
+	result, err := s.ldapClient.SyncUser(ctx, username)
+	if err != nil {
+		return nil, fmt.Errorf("LDAP user sync failed: %w", err)
+	}
+
+	// Check if user exists in our system
+	existingUser, err := s.userRepo.GetUserByEmail(ctx, result.Email)
+	if err != nil && !isNotFoundError(err) {
+		return nil, fmt.Errorf("failed to check existing user: %w", err)
+	}
+
+	if existingUser != nil {
+		// User exists, update attributes
+		result.UserID = existingUser.ID
+
+		// Create LDAP result for sync
+		ldapResult := &LDAPResult{
+			Username:   result.Username,
+			Email:      result.Email,
+			Name:       result.Name,
+			FirstName:  extractFirstName(result.Name),
+			LastName:   extractLastName(result.Name),
+			Groups:     result.Groups,
+			Attributes: result.Attributes,
+		}
+
+		if err := s.syncUserAttributesFromLDAP(ctx, existingUser, ldapResult); err != nil {
+			return nil, fmt.Errorf("failed to sync user attributes: %w", err)
+		}
+	} else {
+		// User doesn't exist, create new user
+		ldapResult := &LDAPResult{
+			Username:   result.Username,
+			Email:      result.Email,
+			Name:       result.Name,
+			FirstName:  extractFirstName(result.Name),
+			LastName:   extractLastName(result.Name),
+			Groups:     result.Groups,
+			Attributes: result.Attributes,
+		}
+
+		newUser, err := s.createUserFromLDAP(ctx, ldapResult)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create user from LDAP: %w", err)
+		}
+
+		result.UserID = newUser.ID
+	}
+
+	return result, nil
+}
+
+// createUserFromLDAP creates a new user from LDAP authentication result
+func (s *ssoService) createUserFromLDAP(ctx context.Context, ldapResult *LDAPResult) (*UserData, error) {
+	// Create user data
+	createUserData := &CreateUserData{
+		Email:         ldapResult.Email,
+		Username:      ldapResult.Username,
+		PasswordHash:  "", // No password for LDAP users initially
+		HashAlgorithm: s.config.Security.PasswordHash.Algorithm,
+		FirstName:     ldapResult.FirstName,
+		LastName:      ldapResult.LastName,
+		Phone:         "",
+		EmailVerified: true, // LDAP users are considered verified
+		PhoneVerified: false,
+	}
+
+	// Create user
+	newUser, err := s.userRepo.CreateUser(ctx, createUserData)
+	if err != nil {
+		return nil, err
+	}
+
+	return newUser, nil
+}
+
+// syncUserAttributesFromLDAP synchronizes user attributes from LDAP
+func (s *ssoService) syncUserAttributesFromLDAP(ctx context.Context, user *UserData, ldapResult *LDAPResult) error {
+	// Check if we need to update user attributes
+	needsUpdate := false
+	updateData := &UpdateUserData{
+		ID: user.ID,
+	}
+
+	// Decrypt current names to compare
+	currentFirstName, currentLastName, err := s.decryptUserNames(user)
+	if err != nil {
+		return fmt.Errorf("failed to decrypt current user names: %w", err)
+	}
+
+	if currentFirstName != ldapResult.FirstName {
+		updateData.FirstName = ldapResult.FirstName
+		needsUpdate = true
+	}
+
+	if currentLastName != ldapResult.LastName {
+		updateData.LastName = ldapResult.LastName
+		needsUpdate = true
+	}
+
+	// Update username if different
+	if user.Username != ldapResult.Username {
+		updateData.Username = ldapResult.Username
+		needsUpdate = true
+	}
+
+	// Update user if needed
+	if needsUpdate {
+		if err := s.userRepo.UpdateUser(ctx, updateData); err != nil {
+			return fmt.Errorf("failed to update user attributes: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// Helper functions for name parsing
+func extractFirstName(fullName string) string {
+	if fullName == "" {
+		return ""
+	}
+	parts := strings.Fields(fullName)
+	if len(parts) > 0 {
+		return parts[0]
+	}
+	return ""
+}
+
+func extractLastName(fullName string) string {
+	if fullName == "" {
+		return ""
+	}
+	parts := strings.Fields(fullName)
+	if len(parts) > 1 {
+		return strings.Join(parts[1:], " ")
+	}
+	return ""
+}
+
+// syncUserAttributesFromOIDC synchronizes user attributes from OIDC
+func (s *ssoService) syncUserAttributesFromOIDC(ctx context.Context, user *UserData, userInfo *OIDCUserInfo) error {
+	// Parse name from OIDC claims
+	firstName, lastName := s.parseNameFromOIDC(userInfo)
+
+	// Check if we need to update user attributes
+	needsUpdate := false
+	updateData := &UpdateUserData{
+		ID: user.ID,
+	}
+
+	// Decrypt current names to compare
+	currentFirstName, currentLastName, err := s.decryptUserNames(user)
+	if err != nil {
+		return fmt.Errorf("failed to decrypt current user names: %w", err)
+	}
+
+	if currentFirstName != firstName {
+		updateData.FirstName = firstName
+		needsUpdate = true
+	}
+
+	if currentLastName != lastName {
+		updateData.LastName = lastName
+		needsUpdate = true
+	}
+
+	// Update username if different and available
+	if userInfo.PreferredUsername != "" && user.Username != userInfo.PreferredUsername {
+		updateData.Username = userInfo.PreferredUsername
+		needsUpdate = true
+	}
+
+	// Update user if needed
+	if needsUpdate {
+		if err := s.userRepo.UpdateUser(ctx, updateData); err != nil {
+			return fmt.Errorf("failed to update user attributes: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// parseNameFromOIDC parses name from OIDC user information
+func (s *ssoService) parseNameFromOIDC(userInfo *OIDCUserInfo) (string, string) {
+	// Try to get first and last name from separate fields
+	if userInfo.GivenName != "" && userInfo.FamilyName != "" {
+		return userInfo.GivenName, userInfo.FamilyName
+	}
+
+	// Try to parse full name
+	if userInfo.Name != "" {
+		return s.parseName(userInfo.Name)
+	}
+
+	return "", ""
+}
+
+// extractClaimsFromOIDC extracts claims from OIDC user info and ID token
+func (s *ssoService) extractClaimsFromOIDC(userInfo *OIDCUserInfo, idTokenClaims *OIDCIDTokenClaims) map[string]string {
+	claims := make(map[string]string)
+
+	// Add user info claims
+	if userInfo.Subject != "" {
+		claims["sub"] = userInfo.Subject
+	}
+	if userInfo.Email != "" {
+		claims["email"] = userInfo.Email
+	}
+	if userInfo.Name != "" {
+		claims["name"] = userInfo.Name
+	}
+	if userInfo.GivenName != "" {
+		claims["given_name"] = userInfo.GivenName
+	}
+	if userInfo.FamilyName != "" {
+		claims["family_name"] = userInfo.FamilyName
+	}
+	if userInfo.Picture != "" {
+		claims["picture"] = userInfo.Picture
+	}
+	if userInfo.Locale != "" {
+		claims["locale"] = userInfo.Locale
+	}
+	if userInfo.PreferredUsername != "" {
+		claims["preferred_username"] = userInfo.PreferredUsername
+	}
+
+	// Add groups and roles
+	if len(userInfo.Groups) > 0 {
+		claims["groups"] = strings.Join(userInfo.Groups, ",")
+	}
+	if len(userInfo.Roles) > 0 {
+		claims["roles"] = strings.Join(userInfo.Roles, ",")
+	}
+
+	// Add ID token specific claims
+	if idTokenClaims.Issuer != "" {
+		claims["iss"] = idTokenClaims.Issuer
+	}
+	if idTokenClaims.AuthTime > 0 {
+		claims["auth_time"] = fmt.Sprintf("%d", idTokenClaims.AuthTime)
+	}
+	if idTokenClaims.Nonce != "" {
+		claims["nonce"] = idTokenClaims.Nonce
+	}
+
+	return claims
+}
+
+// GenerateNonce generates a secure random nonce for OIDC
+func GenerateNonce() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.URLEncoding.EncodeToString(b), nil
 }

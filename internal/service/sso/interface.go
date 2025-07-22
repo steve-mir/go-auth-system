@@ -26,6 +26,12 @@ type SSOService interface {
 	HandleOIDCCallback(ctx context.Context, provider, code, state string) (*OIDCResult, error)
 	ValidateOIDCIDToken(ctx context.Context, provider, idToken string) (*OIDCIDTokenClaims, error)
 	RefreshOIDCToken(ctx context.Context, provider, refreshToken string) (*OIDCTokenResponse, error)
+
+	// LDAP/Active Directory
+	AuthenticateLDAP(ctx context.Context, username, password string) (*LDAPResult, error)
+	SearchLDAPUser(ctx context.Context, username string) (*LDAPUser, error)
+	GetLDAPUserGroups(ctx context.Context, username string) ([]string, error)
+	SyncLDAPUser(ctx context.Context, username string) (*LDAPSyncResult, error)
 }
 
 // OAuthResult represents the result of OAuth authentication

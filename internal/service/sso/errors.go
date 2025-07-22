@@ -19,6 +19,16 @@ const (
 	ErrCodeInvalidProvider       = "SSO_INVALID_PROVIDER"
 	ErrCodeUserCreationFailed    = "SSO_USER_CREATION_FAILED"
 	ErrCodeAccountLinkingFailed  = "SSO_ACCOUNT_LINKING_FAILED"
+
+	// LDAP-specific error codes
+	ErrCodeLDAPConnectionFailed     = "LDAP_CONNECTION_FAILED"
+	ErrCodeLDAPBindFailed           = "LDAP_BIND_FAILED"
+	ErrCodeLDAPUserNotFound         = "LDAP_USER_NOT_FOUND"
+	ErrCodeLDAPUserDisabled         = "LDAP_USER_DISABLED"
+	ErrCodeLDAPAuthenticationFailed = "LDAP_AUTHENTICATION_FAILED"
+	ErrCodeLDAPSearchFailed         = "LDAP_SEARCH_FAILED"
+	ErrCodeLDAPGroupSyncFailed      = "LDAP_GROUP_SYNC_FAILED"
+	ErrCodeLDAPConfigInvalid        = "LDAP_CONFIG_INVALID"
 )
 
 // NewProviderNotSupportedError creates a new provider not supported error
@@ -118,4 +128,87 @@ func NewAccountLinkingFailedError(err error) *errors.AppError {
 		ErrCodeAccountLinkingFailed,
 		fmt.Sprintf("Failed to link social account: %v", err),
 	)
+}
+
+// LDAP-specific error functions
+
+// NewLDAPConnectionFailedError creates a new LDAP connection failed error
+func NewLDAPConnectionFailedError(host string, err error) *errors.AppError {
+	return errors.New(
+		errors.ErrorTypeExternal,
+		ErrCodeLDAPConnectionFailed,
+		fmt.Sprintf("Failed to connect to LDAP server %s: %v", host, err),
+	)
+}
+
+// NewLDAPBindFailedError creates a new LDAP bind failed error
+func NewLDAPBindFailedError(err error) *errors.AppError {
+	return errors.New(
+		errors.ErrorTypeAuthentication,
+		ErrCodeLDAPBindFailed,
+		fmt.Sprintf("LDAP bind failed: %v", err),
+	)
+}
+
+// NewLDAPUserNotFoundError creates a new LDAP user not found error
+func NewLDAPUserNotFoundError(username string) *errors.AppError {
+	return errors.New(
+		errors.ErrorTypeNotFound,
+		ErrCodeLDAPUserNotFound,
+		fmt.Sprintf("LDAP user '%s' not found", username),
+	)
+}
+
+// NewLDAPUserDisabledError creates a new LDAP user disabled error
+func NewLDAPUserDisabledError(username string) *errors.AppError {
+	return errors.New(
+		errors.ErrorTypeAuthentication,
+		ErrCodeLDAPUserDisabled,
+		fmt.Sprintf("LDAP user '%s' is disabled", username),
+	)
+}
+
+// NewLDAPAuthenticationFailedError creates a new LDAP authentication failed error
+func NewLDAPAuthenticationFailedError(username string, err error) *errors.AppError {
+	return errors.New(
+		errors.ErrorTypeAuthentication,
+		ErrCodeLDAPAuthenticationFailed,
+		fmt.Sprintf("LDAP authentication failed for user '%s': %v", username, err),
+	)
+}
+
+// NewLDAPSearchFailedError creates a new LDAP search failed error
+func NewLDAPSearchFailedError(err error) *errors.AppError {
+	return errors.New(
+		errors.ErrorTypeExternal,
+		ErrCodeLDAPSearchFailed,
+		fmt.Sprintf("LDAP search failed: %v", err),
+	)
+}
+
+// NewLDAPGroupSyncFailedError creates a new LDAP group sync failed error
+func NewLDAPGroupSyncFailedError(username string, err error) *errors.AppError {
+	return errors.New(
+		errors.ErrorTypeExternal,
+		ErrCodeLDAPGroupSyncFailed,
+		fmt.Sprintf("LDAP group synchronization failed for user '%s': %v", username, err),
+	)
+}
+
+// NewLDAPConfigInvalidError creates a new LDAP config invalid error
+func NewLDAPConfigInvalidError(message string) *errors.AppError {
+	return errors.New(
+		errors.ErrorTypeValidation,
+		ErrCodeLDAPConfigInvalid,
+		fmt.Sprintf("LDAP configuration invalid: %s", message),
+	)
+}
+
+// Helper function to create LDAP error types for use in other files
+type LDAPAuthenticationFailedError struct {
+	*errors.AppError
+}
+
+func (e *LDAPAuthenticationFailedError) Error() string {
+	return e.AppError.Message
 }

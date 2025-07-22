@@ -334,3 +334,116 @@ type OIDCClaimsMapping struct {
 	Roles     string `json:"roles"`
 	Username  string `json:"username"`
 }
+
+// LDAP/Active Directory related types
+
+// LDAPResult represents the result of LDAP authentication
+type LDAPResult struct {
+	UserID     string            `json:"user_id"`
+	Username   string            `json:"username"`
+	Email      string            `json:"email"`
+	Name       string            `json:"name"`
+	FirstName  string            `json:"first_name"`
+	LastName   string            `json:"last_name"`
+	Groups     []string          `json:"groups"`
+	Attributes map[string]string `json:"attributes"`
+	IsNewUser  bool              `json:"is_new_user"`
+	DN         string            `json:"dn"`
+	LastSync   int64             `json:"last_sync"`
+}
+
+// LDAPUser represents a user from LDAP directory
+type LDAPUser struct {
+	DN          string            `json:"dn"`
+	Username    string            `json:"username"`
+	Email       string            `json:"email"`
+	FirstName   string            `json:"first_name"`
+	LastName    string            `json:"last_name"`
+	DisplayName string            `json:"display_name"`
+	Groups      []string          `json:"groups"`
+	Attributes  map[string]string `json:"attributes"`
+	Enabled     bool              `json:"enabled"`
+	LastLogon   int64             `json:"last_logon"`
+}
+
+// LDAPSyncResult represents the result of LDAP user synchronization
+type LDAPSyncResult struct {
+	UserID     string            `json:"user_id"`
+	Username   string            `json:"username"`
+	Email      string            `json:"email"`
+	Name       string            `json:"name"`
+	Groups     []string          `json:"groups"`
+	Attributes map[string]string `json:"attributes"`
+	Updated    bool              `json:"updated"`
+	Changes    []string          `json:"changes"`
+	SyncTime   int64             `json:"sync_time"`
+}
+
+// LDAPAuthRequest represents an LDAP authentication request
+type LDAPAuthRequest struct {
+	Username string `json:"username" validate:"required"`
+	Password string `json:"password" validate:"required"`
+}
+
+// LDAPSearchRequest represents an LDAP user search request
+type LDAPSearchRequest struct {
+	Username string `json:"username" validate:"required"`
+}
+
+// LDAPConfig represents LDAP configuration for the service
+type LDAPConfig struct {
+	Host         string               `json:"host"`
+	Port         int                  `json:"port"`
+	BaseDN       string               `json:"base_dn"`
+	BindDN       string               `json:"bind_dn"`
+	BindPassword string               `json:"bind_password"`
+	UserFilter   string               `json:"user_filter"`
+	GroupFilter  string               `json:"group_filter"`
+	TLS          bool                 `json:"tls"`
+	Attributes   LDAPAttributeMapping `json:"attributes"`
+	GroupSync    LDAPGroupSyncConfig  `json:"group_sync"`
+	Connection   LDAPConnectionConfig `json:"connection"`
+}
+
+// LDAPAttributeMapping defines how LDAP attributes map to user fields
+type LDAPAttributeMapping struct {
+	Username    string `json:"username"`     // sAMAccountName, uid
+	Email       string `json:"email"`        // mail, userPrincipalName
+	FirstName   string `json:"first_name"`   // givenName
+	LastName    string `json:"last_name"`    // sn
+	DisplayName string `json:"display_name"` // displayName, cn
+	Groups      string `json:"groups"`       // memberOf
+	Enabled     string `json:"enabled"`      // userAccountControl
+}
+
+// LDAPGroupSyncConfig defines group synchronization settings
+type LDAPGroupSyncConfig struct {
+	Enabled       bool   `json:"enabled"`
+	SyncInterval  int64  `json:"sync_interval"` // seconds
+	GroupBaseDN   string `json:"group_base_dn"`
+	GroupFilter   string `json:"group_filter"`
+	MemberAttr    string `json:"member_attr"`     // member, memberUid
+	GroupNameAttr string `json:"group_name_attr"` // cn, name
+	AutoCreate    bool   `json:"auto_create"`     // Auto-create roles from groups
+	RolePrefix    string `json:"role_prefix"`     // Prefix for auto-created roles
+}
+
+// LDAPConnectionConfig defines connection settings
+type LDAPConnectionConfig struct {
+	Timeout        int  `json:"timeout"`         // Connection timeout in seconds
+	ReadTimeout    int  `json:"read_timeout"`    // Read timeout in seconds
+	WriteTimeout   int  `json:"write_timeout"`   // Write timeout in seconds
+	MaxConnections int  `json:"max_connections"` // Connection pool size
+	IdleTimeout    int  `json:"idle_timeout"`    // Idle connection timeout
+	SkipTLSVerify  bool `json:"skip_tls_verify"` // Skip TLS certificate verification
+	StartTLS       bool `json:"start_tls"`       // Use StartTLS instead of LDAPS
+}
+
+// LDAPGroup represents an LDAP group
+type LDAPGroup struct {
+	DN          string            `json:"dn"`
+	Name        string            `json:"name"`
+	Description string            `json:"description"`
+	Members     []string          `json:"members"`
+	Attributes  map[string]string `json:"attributes"`
+}

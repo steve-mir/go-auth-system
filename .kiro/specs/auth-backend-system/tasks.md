@@ -142,7 +142,7 @@
   - Write integration tests for OIDC authentication
   - _Requirements: 7.2, 7.4_
 
-- [ ] 19. Create LDAP/Active Directory integration
+- [x] 19. Create LDAP/Active Directory integration
   - Implement LDAP client for directory authentication
   - Create Active Directory integration with proper binding
   - Implement user search and attribute retrieval
