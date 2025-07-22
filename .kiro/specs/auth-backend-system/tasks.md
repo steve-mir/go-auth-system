@@ -68,6 +68,7 @@
   - Write unit tests for security middleware components
   - _Requirements: 10.1, 10.2_
 
+<!-- TODO: checkout. -->
 - [ ] 10. Build data encryption service
   - Implement AES-256-GCM encryption for sensitive data
   - Create key management integration for external key stores
