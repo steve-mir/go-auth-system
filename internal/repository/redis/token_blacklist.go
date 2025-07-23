@@ -347,3 +347,180 @@ func (tb *TokenBlacklist) GetStats(ctx context.Context) (map[string]interface{},
 
 	return stats, nil
 }
+
+// package redis
+
+// import (
+// 	"context"
+// 	"fmt"
+// 	"strconv"
+// 	"time"
+// )
+
+// // TokenBlacklistRepository implements token blacklisting using Redis
+// type TokenBlacklistRepository struct {
+// 	client *Client
+// }
+
+// // NewTokenBlacklistRepository creates a new token blacklist repository
+// func NewTokenBlacklistRepository(client *Client) *TokenBlacklistRepository {
+// 	return &TokenBlacklistRepository{
+// 		client: client,
+// 	}
+// }
+
+// // BlacklistToken adds a token to the blacklist with expiration
+// func (r *TokenBlacklistRepository) BlacklistToken(ctx context.Context, tokenHash string, expiresAt int64, reason string) error {
+// 	key := r.getTokenKey(tokenHash)
+
+// 	// Calculate TTL based on expiration time
+// 	now := time.Now().Unix()
+// 	ttl := time.Duration(expiresAt-now) * time.Second
+
+// 	// Don't blacklist already expired tokens
+// 	if ttl <= 0 {
+// 		return nil
+// 	}
+
+// 	// Store blacklist entry with metadata
+// 	value := map[string]interface{}{
+// 		"reason":         reason,
+// 		"blacklisted_at": now,
+// 		"expires_at":     expiresAt,
+// 	}
+
+// 	err := r.client.HSet(ctx, key, value).Err()
+// 	if err != nil {
+// 		return fmt.Errorf("failed to blacklist token: %w", err)
+// 	}
+
+// 	// Set expiration on the key
+// 	err = r.client.Expire(ctx, key, ttl).Err()
+// 	if err != nil {
+// 		return fmt.Errorf("failed to set token blacklist expiration: %w", err)
+// 	}
+
+// 	return nil
+// }
+
+// // IsTokenBlacklisted checks if a token is blacklisted
+// func (r *TokenBlacklistRepository) IsTokenBlacklisted(ctx context.Context, tokenHash string) (bool, error) {
+// 	key := r.getTokenKey(tokenHash)
+
+// 	exists, err := r.client.Exists(ctx, key).Result()
+// 	if err != nil {
+// 		return false, fmt.Errorf("failed to check token blacklist: %w", err)
+// 	}
+
+// 	return exists > 0, nil
+// }
+
+// // BlacklistUserTokens blacklists all tokens for a user
+// func (r *TokenBlacklistRepository) BlacklistUserTokens(ctx context.Context, userID string, reason string) error {
+// 	// Get all user tokens from session store
+// 	sessionPattern := r.getUserSessionPattern(userID)
+
+// 	keys, err := r.client.Keys(ctx, sessionPattern).Result()
+// 	if err != nil {
+// 		return fmt.Errorf("failed to get user sessions: %w", err)
+// 	}
+
+// 	// Blacklist each token found in sessions
+// 	for _, sessionKey := range keys {
+// 		// Get session data to extract token hashes
+// 		sessionData, err := r.client.HGetAll(ctx, sessionKey).Result()
+// 		if err != nil {
+// 			continue // Skip failed sessions
+// 		}
+
+// 		// Extract and blacklist access token
+// 		if accessTokenHash, exists := sessionData["access_token_hash"]; exists {
+// 			if expiresAtStr, exists := sessionData["access_expires_at"]; exists {
+// 				if expiresAt, err := strconv.ParseInt(expiresAtStr, 10, 64); err == nil {
+// 					r.BlacklistToken(ctx, accessTokenHash, expiresAt, reason)
+// 				}
+// 			}
+// 		}
+
+// 		// Extract and blacklist refresh token
+// 		if refreshTokenHash, exists := sessionData["refresh_token_hash"]; exists {
+// 			if expiresAtStr, exists := sessionData["refresh_expires_at"]; exists {
+// 				if expiresAt, err := strconv.ParseInt(expiresAtStr, 10, 64); err == nil {
+// 					r.BlacklistToken(ctx, refreshTokenHash, expiresAt, reason)
+// 				}
+// 			}
+// 		}
+// 	}
+
+// 	return nil
+// }
+
+// // GetBlacklistInfo retrieves blacklist information for a token
+// func (r *TokenBlacklistRepository) GetBlacklistInfo(ctx context.Context, tokenHash string) (*BlacklistInfo, error) {
+// 	key := r.getTokenKey(tokenHash)
+
+// 	data, err := r.client.HGetAll(ctx, key).Result()
+// 	if err != nil {
+// 		return nil, fmt.Errorf("failed to get blacklist info: %w", err)
+// 	}
+
+// 	if len(data) == 0 {
+// 		return nil, nil // Token not blacklisted
+// 	}
+
+// 	info := &BlacklistInfo{}
+
+// 	if reason, exists := data["reason"]; exists {
+// 		info.Reason = reason
+// 	}
+
+// 	if blacklistedAtStr, exists := data["blacklisted_at"]; exists {
+// 		if blacklistedAt, err := strconv.ParseInt(blacklistedAtStr, 10, 64); err == nil {
+// 			info.BlacklistedAt = blacklistedAt
+// 		}
+// 	}
+
+// 	if expiresAtStr, exists := data["expires_at"]; exists {
+// 		if expiresAt, err := strconv.ParseInt(expiresAtStr, 10, 64); err == nil {
+// 			info.ExpiresAt = expiresAt
+// 		}
+// 	}
+
+// 	return info, nil
+// }
+
+// // CleanupExpiredTokens removes expired blacklist entries (called periodically)
+// func (r *TokenBlacklistRepository) CleanupExpiredTokens(ctx context.Context) error {
+// 	// Redis automatically expires keys, so this is mainly for metrics
+// 	pattern := r.getTokenKey("*")
+
+// 	keys, err := r.client.Keys(ctx, pattern).Result()
+// 	if err != nil {
+// 		return fmt.Errorf("failed to get blacklist keys: %w", err)
+// 	}
+
+// 	// Count active blacklisted tokens for metrics
+// 	activeCount := len(keys)
+
+// 	// Log cleanup metrics (in production, send to monitoring system)
+// 	fmt.Printf("Token blacklist cleanup: %d active entries\n", activeCount)
+
+// 	return nil
+// }
+
+// // getTokenKey generates Redis key for token blacklist
+// func (r *TokenBlacklistRepository) getTokenKey(tokenHash string) string {
+// 	return fmt.Sprintf("blacklist:token:%s", tokenHash)
+// }
+
+// // getUserSessionPattern generates Redis key pattern for user sessions
+// func (r *TokenBlacklistRepository) getUserSessionPattern(userID string) string {
+// 	return fmt.Sprintf("session:user:%s:*", userID)
+// }
+
+// // BlacklistInfo contains information about a blacklisted token
+// type BlacklistInfo struct {
+// 	Reason        string
+// 	BlacklistedAt int64
+// 	ExpiresAt     int64
+// }

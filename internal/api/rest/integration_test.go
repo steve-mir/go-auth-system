@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/steve-mir/go-auth-system/internal/config"
+	"github.com/steve-mir/go-auth-system/internal/health"
 	"github.com/steve-mir/go-auth-system/internal/middleware"
 	"github.com/steve-mir/go-auth-system/internal/service/auth"
 	"github.com/steve-mir/go-auth-system/internal/service/role"
@@ -225,7 +226,7 @@ func (suite *RestAPITestSuite) SetupSuite() {
 
 	// Create middleware manager with default config
 	middlewareManager := middleware.NewMiddlewareManager(middleware.DefaultConfig(), nil)
-
+	healthService := health.NewService()
 	// Create server
 	suite.server = NewServer(
 		cfg,
@@ -233,6 +234,8 @@ func (suite *RestAPITestSuite) SetupSuite() {
 		suite.authService,
 		suite.userService,
 		suite.roleService,
+		suite.server.adminService,
+		healthService,
 	)
 }
 

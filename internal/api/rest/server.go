@@ -139,7 +139,7 @@ func NewServer(
 	roleService role.Service,
 	adminService admin.AdminService,
 	healthService HealthService,
-	ssoService SSOService,
+	// ssoService SSOService,
 ) *Server {
 	// Set Gin mode based on environment
 	if cfg.Environment == "production" {
@@ -166,7 +166,7 @@ func NewServer(
 		roleService:   roleService,
 		adminService:  adminService,
 		healthService: healthService,
-		ssoService:    ssoService,
+		// ssoService:    ssoService,
 	}
 
 	s.setupMiddleware()
