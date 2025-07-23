@@ -82,6 +82,39 @@ docker-down:
 docker-logs:
 	docker-compose logs -f
 
+# Deployment commands
+.PHONY: deploy-docker
+deploy-docker: docker-build
+	bash scripts/deploy.sh docker
+
+.PHONY: deploy-compose
+deploy-compose:
+	bash scripts/deploy.sh compose --wait
+
+.PHONY: deploy-k8s
+deploy-k8s:
+	bash scripts/deploy.sh k8s --wait
+
+.PHONY: deploy-helm
+deploy-helm:
+	bash scripts/deploy.sh helm --wait
+
+.PHONY: clean-deployments
+clean-deployments:
+	bash scripts/deploy.sh clean all
+
+.PHONY: test-deployment
+test-deployment:
+	go test -v ./test/deployment
+
+.PHONY: validate-k8s
+validate-k8s:
+	kubectl apply --dry-run=client -f k8s/
+
+.PHONY: validate-helm
+validate-helm:
+	helm template go-auth-system ./helm/go-auth-system > /dev/null
+
 # Development helpers
 .PHONY: postgres
 postgres:
@@ -124,6 +157,14 @@ help:
 	@echo "  docker-build   - Build Docker image"
 	@echo "  docker-up      - Start with Docker Compose"
 	@echo "  docker-down    - Stop Docker Compose"
+	@echo "  deploy-docker  - Deploy with Docker"
+	@echo "  deploy-compose - Deploy with Docker Compose"
+	@echo "  deploy-k8s     - Deploy to Kubernetes"
+	@echo "  deploy-helm    - Deploy with Helm"
+	@echo "  clean-deployments - Clean all deployments"
+	@echo "  test-deployment - Run deployment tests"
+	@echo "  validate-k8s   - Validate Kubernetes manifests"
+	@echo "  validate-helm  - Validate Helm chart"
 	@echo "  postgres       - Start PostgreSQL container"
 	@echo "  redis          - Start Redis container"
 	@echo "  health-check   - Test health endpoints"

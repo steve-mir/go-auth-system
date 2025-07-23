@@ -1,0 +1,15 @@
+{{- if .Values.app.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "go-auth-system.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "go-auth-system.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  minAvailable: {{ .Values.app.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "go-auth-system.selectorLabels" . | nindent 6 }}
+{{- end }}

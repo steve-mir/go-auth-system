@@ -1,0 +1,387 @@
+# Default values for go-auth-system
+# This is a YAML-formatted file.
+
+# Global configuration
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: ""
+
+# Application image configuration
+image:
+  registry: docker.io
+  repository: go-auth-system
+  tag: "latest"
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+# Application configuration
+app:
+  name: go-auth-system
+  version: "1.0.0"
+  environment: production
+  
+  # Replica configuration
+  replicaCount: 3
+  
+  # Resource configuration
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  
+  # Security context
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1001
+    runAsGroup: 1001
+    fsGroup: 1001
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  
+  # Pod disruption budget
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 2
+  
+  # Horizontal Pod Autoscaler
+  autoscaling:
+    enabled: false
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+# Service configuration
+service:
+  type: ClusterIP
+  ports:
+    http: 8080
+    grpc: 9090
+    metrics: 8081
+  annotations: {}
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  
+  hosts:
+    - host: auth.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          port: http
+    - host: api.auth.example.com
+      paths:
+        - path: /api
+          pathType: Prefix
+          port: http
+        - path: /health
+          pathType: Prefix
+          port: http
+  
+  tls:
+    - secretName: go-auth-system-tls
+      hosts:
+        - auth.example.com
+        - api.auth.example.com
+  
+  # gRPC ingress
+  grpc:
+    enabled: false
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
+      nginx.ingress.kubernetes.io/grpc-backend: "true"
+    hosts:
+      - host: grpc.auth.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+            port: grpc
+    tls:
+      - secretName: go-auth-system-grpc-tls
+        hosts:
+          - grpc.auth.example.com
+
+# Health checks configuration
+healthChecks:
+  liveness:
+    enabled: true
+    path: /health/live
+    port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  
+  readiness:
+    enabled: true
+    path: /health/ready
+    port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+  
+  startup:
+    enabled: true
+    path: /health/live
+    port: http
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 30
+
+# Application configuration
+config:
+  # Server configuration
+  server:
+    rest:
+      port: 8080
+      host: "0.0.0.0"
+      timeout: 30s
+      cors:
+        enabled: true
+        allowed_origins: ["*"]
+        allowed_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+        allowed_headers: ["*"]
+    grpc:
+      port: 9090
+      host: "0.0.0.0"
+      timeout: 30s
+    metrics:
+      port: 8081
+      host: "0.0.0.0"
+      path: "/metrics"
+  
+  # Security configuration
+  security:
+    password_hash:
+      algorithm: argon2
+      argon2:
+        memory: 65536
+        iterations: 3
+        parallelism: 2
+        salt_length: 16
+        key_length: 32
+      bcrypt:
+        cost: 12
+    
+    token:
+      type: jwt
+      access_ttl: 15m
+      refresh_ttl: 168h
+    
+    rate_limit:
+      enabled: true
+      requests_per_minute: 60
+      burst_size: 10
+      cleanup_interval: 60s
+    
+    encryption:
+      algorithm: aes-256-gcm
+  
+  # Feature flags
+  features:
+    admin_dashboard: true
+    monitoring: true
+    audit_logging: true
+    mfa:
+      enabled: true
+      totp: true
+      sms: false
+      email: true
+      webauthn: true
+    sso:
+      saml: true
+      oidc: true
+      ldap: true
+      oauth:
+        google: true
+        facebook: true
+        github: true
+  
+  # Monitoring configuration
+  monitoring:
+    prometheus:
+      enabled: true
+      path: "/metrics"
+    logging:
+      level: info
+      format: json
+    health_checks:
+      enabled: true
+      interval: 30s
+  
+  # External services
+  external:
+    smtp:
+      host: ""
+      port: 587
+      username: ""
+      use_tls: true
+    sms:
+      provider: ""
+      api_key: ""
+
+# Secrets configuration
+secrets:
+  # Database credentials
+  database:
+    user: postgres
+    password: postgres
+  
+  # JWT configuration
+  jwt:
+    signing_key: "development-signing-key-change-in-production"
+    encryption_key: "development-encryption-key-32-chars"
+  
+  # Encryption
+  encryption:
+    master_key: "development-encryption-key-32-chars"
+  
+  # External service credentials
+  external:
+    smtp_password: ""
+    sms_api_key: ""
+    oauth:
+      google_client_secret: ""
+      facebook_client_secret: ""
+      github_client_secret: ""
+    saml:
+      private_key: ""
+    ldap:
+      bind_password: ""
+
+# PostgreSQL configuration (using Bitnami chart)
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: postgres
+    username: postgres
+    password: postgres
+    database: auth_system
+  primary:
+    persistence:
+      enabled: true
+      size: 10Gi
+    resources:
+      requests:
+        memory: 256Mi
+        cpu: 250m
+      limits:
+        memory: 512Mi
+        cpu: 500m
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+# Redis configuration (using Bitnami chart)
+redis:
+  enabled: true
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: true
+      size: 5Gi
+    resources:
+      requests:
+        memory: 128Mi
+        cpu: 100m
+      limits:
+        memory: 256Mi
+        cpu: 200m
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+# Monitoring configuration
+monitoring:
+  prometheus:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+      scrapeTimeout: 10s
+  
+  grafana:
+    enabled: false
+    dashboards:
+      enabled: true
+  
+  alerts:
+    enabled: true
+    rules:
+      - name: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
+        duration: 5m
+        severity: warning
+      - name: HighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 0.5
+        duration: 5m
+        severity: warning
+      - name: DatabaseDown
+        expr: up{job="postgresql"} == 0
+        duration: 1m
+        severity: critical
+      - name: RedisDown
+        expr: up{job="redis"} == 0
+        duration: 1m
+        severity: critical
+
+# Node affinity and tolerations
+nodeSelector: {}
+tolerations: []
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - go-auth-system
+          topologyKey: kubernetes.io/hostname
+
+# Service account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Pod annotations
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8081"
+  prometheus.io/path: "/metrics"
+
+# Additional labels
+labels: {}
+
+# Additional environment variables
+extraEnvVars: []
+
+# Additional volumes
+extraVolumes: []
+
+# Additional volume mounts
+extraVolumeMounts: []

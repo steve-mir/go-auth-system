@@ -1,0 +1,198 @@
+{{- include "go-auth-system.validateValues" . -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "go-auth-system.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "go-auth-system.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  replicas: {{ .Values.app.replicaCount }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      {{- include "go-auth-system.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "go-auth-system.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: api
+      annotations:
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "go-auth-system.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.app.securityContext | nindent 8 }}
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: {{ .Chart.Name }}
+        image: {{ include "go-auth-system.image" . }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.config.server.rest.port }}
+          protocol: TCP
+        - name: grpc
+          containerPort: {{ .Values.config.server.grpc.port }}
+          protocol: TCP
+        - name: metrics
+          containerPort: {{ .Values.config.server.metrics.port }}
+          protocol: TCP
+        env:
+        # Database configuration
+        - name: DB_HOST
+          value: {{ include "go-auth-system.databaseHost" . }}
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_NAME
+          value: {{ .Values.postgresql.auth.database | default "auth_system" }}
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "go-auth-system.secretName" . }}
+              key: DB_USER
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "go-auth-system.secretName" . }}
+              key: DB_PASSWORD
+        - name: DB_SSL_MODE
+          value: disable
+        
+        # Redis configuration
+        - name: REDIS_HOST
+          value: {{ include "go-auth-system.redisHost" . }}
+        - name: REDIS_PORT
+          value: "6379"
+        - name: REDIS_DB
+          value: "0"
+        
+        # Security configuration
+        - name: JWT_SIGNING_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "go-auth-system.secretName" . }}
+              key: JWT_SIGNING_KEY
+        - name: JWT_ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "go-auth-system.secretName" . }}
+              key: JWT_ENCRYPTION_KEY
+        - name: ENCRYPTION_MASTER_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "go-auth-system.secretName" . }}
+              key: ENCRYPTION_MASTER_KEY
+        
+        # Application configuration
+        - name: ENVIRONMENT
+          value: {{ .Values.app.environment }}
+        - name: LOG_LEVEL
+          value: {{ .Values.config.monitoring.logging.level }}
+        - name: LOG_FORMAT
+          value: {{ .Values.config.monitoring.logging.format }}
+        
+        # Feature flags
+        - name: ADMIN_DASHBOARD_ENABLED
+          value: {{ .Values.config.features.admin_dashboard | quote }}
+        - name: MONITORING_ENABLED
+          value: {{ .Values.config.features.monitoring | quote }}
+        - name: AUDIT_LOGGING_ENABLED
+          value: {{ .Values.config.features.audit_logging | quote }}
+        
+        {{- with .Values.extraEnvVars }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        {{- with .Values.extraVolumeMounts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        
+        {{- if .Values.healthChecks.liveness.enabled }}
+        livenessProbe:
+          httpGet:
+            path: {{ .Values.healthChecks.liveness.path }}
+            port: {{ .Values.healthChecks.liveness.port }}
+            scheme: HTTP
+          initialDelaySeconds: {{ .Values.healthChecks.liveness.initialDelaySeconds }}
+          periodSeconds: {{ .Values.healthChecks.liveness.periodSeconds }}
+          timeoutSeconds: {{ .Values.healthChecks.liveness.timeoutSeconds }}
+          failureThreshold: {{ .Values.healthChecks.liveness.failureThreshold }}
+          successThreshold: 1
+        {{- end }}
+        
+        {{- if .Values.healthChecks.readiness.enabled }}
+        readinessProbe:
+          httpGet:
+            path: {{ .Values.healthChecks.readiness.path }}
+            port: {{ .Values.healthChecks.readiness.port }}
+            scheme: HTTP
+          initialDelaySeconds: {{ .Values.healthChecks.readiness.initialDelaySeconds }}
+          periodSeconds: {{ .Values.healthChecks.readiness.periodSeconds }}
+          timeoutSeconds: {{ .Values.healthChecks.readiness.timeoutSeconds }}
+          failureThreshold: {{ .Values.healthChecks.readiness.failureThreshold }}
+          successThreshold: 1
+        {{- end }}
+        
+        {{- if .Values.healthChecks.startup.enabled }}
+        startupProbe:
+          httpGet:
+            path: {{ .Values.healthChecks.startup.path }}
+            port: {{ .Values.healthChecks.startup.port }}
+            scheme: HTTP
+          initialDelaySeconds: {{ .Values.healthChecks.startup.initialDelaySeconds }}
+          periodSeconds: {{ .Values.healthChecks.startup.periodSeconds }}
+          timeoutSeconds: {{ .Values.healthChecks.startup.timeoutSeconds }}
+          failureThreshold: {{ .Values.healthChecks.startup.failureThreshold }}
+          successThreshold: 1
+        {{- end }}
+        
+        resources:
+          {{- toYaml .Values.app.resources | nindent 10 }}
+        
+        securityContext:
+          {{- toYaml .Values.app.securityContext | nindent 10 }}
+      
+      volumes:
+      - name: config
+        configMap:
+          name: {{ include "go-auth-system.configMapName" . }}
+      - name: tmp
+        emptyDir: {}
+      {{- with .Values.extraVolumes }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+      
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

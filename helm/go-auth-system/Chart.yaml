@@ -1,0 +1,31 @@
+apiVersion: v2
+name: go-auth-system
+description: A comprehensive authentication backend system built in Go
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+home: https://github.com/steve-mir/go-auth-system
+sources:
+  - https://github.com/steve-mir/go-auth-system
+maintainers:
+  - name: Steve Mir
+    email: steve@example.com
+keywords:
+  - authentication
+  - authorization
+  - jwt
+  - oauth
+  - saml
+  - mfa
+  - rbac
+dependencies:
+  - name: postgresql
+    version: "12.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+  - name: redis
+    version: "17.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+annotations:
+  category: Authentication

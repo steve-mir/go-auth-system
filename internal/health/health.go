@@ -133,6 +133,62 @@ func (s *Service) Handler() http.HandlerFunc {
 	}
 }
 
+// LivenessHandler returns a simple liveness probe handler for Kubernetes
+func (s *Service) LivenessHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Simple liveness check - if we can respond, we're alive
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+
+		response := map[string]interface{}{
+			"status":    "alive",
+			"timestamp": time.Now(),
+		}
+
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
+// ReadinessHandler returns a readiness probe handler for Kubernetes
+func (s *Service) ReadinessHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+
+		// Check critical dependencies for readiness
+		health := s.Check(ctx)
+
+		w.Header().Set("Content-Type", "application/json")
+
+		// For readiness, we need all critical components to be healthy
+		ready := true
+		criticalComponents := []string{"database", "redis"}
+
+		for _, component := range criticalComponents {
+			if componentHealth, exists := health.Components[component]; exists {
+				if componentHealth.Status == StatusUnhealthy {
+					ready = false
+					break
+				}
+			}
+		}
+
+		if ready {
+			w.WriteHeader(http.StatusOK)
+		} else {
+			w.WriteHeader(http.StatusServiceUnavailable)
+		}
+
+		response := map[string]interface{}{
+			"status":     map[bool]string{true: "ready", false: "not_ready"}[ready],
+			"timestamp":  time.Now(),
+			"components": health.Components,
+		}
+
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
 // DatabaseChecker implements health checking for PostgreSQL database
 type DatabaseChecker struct {
 	db *postgres.DB

@@ -1,0 +1,240 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: go-auth-system
+  namespace: go-auth-system
+  labels:
+    app.kubernetes.io/name: go-auth-system
+    app.kubernetes.io/component: api
+    app.kubernetes.io/version: "1.0.0"
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: go-auth-system
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: go-auth-system
+        app.kubernetes.io/component: api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8081"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: go-auth-system
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+      containers:
+      - name: go-auth-system
+        image: go-auth-system:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        - containerPort: 9090
+          name: grpc
+          protocol: TCP
+        - containerPort: 8081
+          name: metrics
+          protocol: TCP
+        env:
+        # Database configuration
+        - name: DB_HOST
+          value: postgres-service
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_NAME
+          value: auth_system
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: go-auth-system-secrets
+              key: DB_USER
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: go-auth-system-secrets
+              key: DB_PASSWORD
+        - name: DB_SSL_MODE
+          value: disable
+        
+        # Redis configuration
+        - name: REDIS_HOST
+          value: redis-service
+        - name: REDIS_PORT
+          value: "6379"
+        - name: REDIS_DB
+          value: "0"
+        
+        # Security configuration
+        - name: JWT_SIGNING_KEY
+          valueFrom:
+            secretKeyRef:
+              name: go-auth-system-secrets
+              key: JWT_SIGNING_KEY
+        - name: JWT_ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: go-auth-system-secrets
+              key: JWT_ENCRYPTION_KEY
+        - name: ENCRYPTION_MASTER_KEY
+          valueFrom:
+            secretKeyRef:
+              name: go-auth-system-secrets
+              key: ENCRYPTION_MASTER_KEY
+        
+        # Application configuration
+        - name: ENVIRONMENT
+          value: production
+        - name: LOG_LEVEL
+          value: info
+        - name: LOG_FORMAT
+          value: json
+        
+        # Feature flags
+        - name: ADMIN_DASHBOARD_ENABLED
+          value: "true"
+        - name: MONITORING_ENABLED
+          value: "true"
+        - name: AUDIT_LOGGING_ENABLED
+          value: "true"
+        
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+          successThreshold: 1
+        
+        startupProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 30
+          successThreshold: 1
+        
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1001
+          capabilities:
+            drop:
+            - ALL
+      
+      volumes:
+      - name: config
+        configMap:
+          name: go-auth-system-config
+      - name: tmp
+        emptyDir: {}
+      
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      
+      # Pod disruption budget for high availability
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                  - go-auth-system
+              topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: go-auth-system-service
+  namespace: go-auth-system
+  labels:
+    app.kubernetes.io/name: go-auth-system
+    app.kubernetes.io/component: api
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+    name: grpc
+  - port: 8081
+    targetPort: 8081
+    protocol: TCP
+    name: metrics
+  selector:
+    app.kubernetes.io/name: go-auth-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: go-auth-system
+  namespace: go-auth-system
+  labels:
+    app.kubernetes.io/name: go-auth-system
+    app.kubernetes.io/component: api
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: go-auth-system-pdb
+  namespace: go-auth-system
+  labels:
+    app.kubernetes.io/name: go-auth-system
+    app.kubernetes.io/component: api
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: go-auth-system

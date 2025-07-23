@@ -23,10 +23,18 @@ type Server struct {
 	middleware *middleware.MiddlewareManager
 
 	// Service dependencies
-	adminService admin.AdminService
-	authService  auth.AuthService
-	userService  user.UserService
-	roleService  role.Service
+	adminService  admin.AdminService
+	authService   auth.AuthService
+	userService   user.UserService
+	roleService   role.Service
+	healthService HealthService
+}
+
+// HealthService interface for health checks
+type HealthService interface {
+	Handler() http.HandlerFunc
+	LivenessHandler() http.HandlerFunc
+	ReadinessHandler() http.HandlerFunc
 }
 
 // NewServer creates a new REST API server
@@ -37,6 +45,7 @@ func NewServer(
 	userService user.UserService,
 	roleService role.Service,
 	adminService admin.AdminService,
+	healthService HealthService,
 ) *Server {
 	// Set Gin mode based on environment
 	if cfg.Environment == "production" {
@@ -54,14 +63,15 @@ func NewServer(
 	}
 
 	s := &Server{
-		router:       router,
-		server:       server,
-		config:       cfg,
-		middleware:   middlewareManager,
-		authService:  authService,
-		userService:  userService,
-		roleService:  roleService,
-		adminService: adminService,
+		router:        router,
+		server:        server,
+		config:        cfg,
+		middleware:    middlewareManager,
+		authService:   authService,
+		userService:   userService,
+		roleService:   roleService,
+		adminService:  adminService,
+		healthService: healthService,
 	}
 
 	s.setupMiddleware()
@@ -180,6 +190,12 @@ func (s *Server) rootHandler(c *gin.Context) {
 
 // healthHandler handles health check requests
 func (s *Server) healthHandler(c *gin.Context) {
+	if s.healthService != nil {
+		s.healthService.Handler()(c.Writer, c.Request)
+		return
+	}
+
+	// Fallback if health service is not available
 	c.JSON(http.StatusOK, gin.H{
 		"status":    "healthy",
 		"timestamp": time.Now().Format(time.RFC3339),
@@ -189,6 +205,12 @@ func (s *Server) healthHandler(c *gin.Context) {
 
 // livenessHandler handles liveness probe requests
 func (s *Server) livenessHandler(c *gin.Context) {
+	if s.healthService != nil {
+		s.healthService.LivenessHandler()(c.Writer, c.Request)
+		return
+	}
+
+	// Fallback if health service is not available
 	c.JSON(http.StatusOK, gin.H{
 		"status":    "alive",
 		"timestamp": time.Now().Format(time.RFC3339),
@@ -197,8 +219,12 @@ func (s *Server) livenessHandler(c *gin.Context) {
 
 // readinessHandler handles readiness probe requests
 func (s *Server) readinessHandler(c *gin.Context) {
-	// TODO: Check if all critical components are ready
-	// For now, we'll assume ready if the server is running
+	if s.healthService != nil {
+		s.healthService.ReadinessHandler()(c.Writer, c.Request)
+		return
+	}
+
+	// Fallback if health service is not available
 	c.JSON(http.StatusOK, gin.H{
 		"status":    "ready",
 		"timestamp": time.Now().Format(time.RFC3339),

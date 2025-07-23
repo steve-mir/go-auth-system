@@ -1,0 +1,83 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: go-auth-system-ingress
+  namespace: go-auth-system
+  labels:
+    app.kubernetes.io/name: go-auth-system
+    app.kubernetes.io/component: ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - auth.example.com
+    - api.auth.example.com
+    secretName: go-auth-system-tls
+  rules:
+  - host: auth.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: go-auth-system-service
+            port:
+              number: 8080
+  - host: api.auth.example.com
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: go-auth-system-service
+            port:
+              number: 8080
+      - path: /health
+        pathType: Prefix
+        backend:
+          service:
+            name: go-auth-system-service
+            port:
+              number: 8080
+---
+# gRPC Ingress (if using gRPC-Web or similar)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: go-auth-system-grpc-ingress
+  namespace: go-auth-system
+  labels:
+    app.kubernetes.io/name: go-auth-system
+    app.kubernetes.io/component: grpc-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
+    nginx.ingress.kubernetes.io/grpc-backend: "true"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - grpc.auth.example.com
+    secretName: go-auth-system-grpc-tls
+  rules:
+  - host: grpc.auth.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: go-auth-system-service
+            port:
+              number: 9090
