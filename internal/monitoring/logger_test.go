@@ -1,7 +1,6 @@
 package monitoring
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -119,7 +118,7 @@ func TestLogger_WithError(t *testing.T) {
 }
 
 func TestLogger_AuthEvent(t *testing.T) {
-	var buf bytes.Buffer
+	// var buf bytes.Buffer
 	config := LoggerConfig{
 		Level:  LogLevelInfo,
 		Format: LogFormatJSON,

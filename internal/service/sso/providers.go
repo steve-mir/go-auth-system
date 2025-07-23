@@ -2,8 +2,6 @@ package sso
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -483,11 +481,11 @@ func (gh *GitHubProvider) getPrimaryEmail(ctx context.Context, token *OAuthToken
 	return "", false
 }
 
-// GenerateState generates a secure random state string
-func GenerateState() (string, error) {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return base64.URLEncoding.EncodeToString(b), nil
-}
+// // GenerateState generates a secure random state string
+// func GenerateState() (string, error) {
+// 	b := make([]byte, 32)
+// 	if _, err := rand.Read(b); err != nil {
+// 		return "", err
+// 	}
+// 	return base64.URLEncoding.EncodeToString(b), nil
+// }

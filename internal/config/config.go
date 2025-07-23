@@ -190,7 +190,7 @@ type WebAuthnConfig struct {
 	RPDisplayName  string   `yaml:"rp_display_name"`
 	RPID           string   `yaml:"rp_id"`
 	RPName         string   `yaml:"rp_name"`
-	RPOrigin       string   `yaml:"rp_origin"`
+	RPOrigin       []string `yaml:"rp_origin"`
 	AllowedOrigins []string `yaml:"allowed_origins"`
 }
 

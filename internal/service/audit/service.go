@@ -25,6 +25,19 @@ func NewService(repo AuditRepository, logger *slog.Logger) AuditService {
 }
 
 // LogEvent logs an audit event with structured logging and database persistence
+func convertAuditEventToCreateAuditLogParams(event AuditEvent) CreateAuditLogParams {
+	return CreateAuditLogParams{
+		UserID:       event.UserID,
+		Action:       event.Action,
+		ResourceType: event.ResourceType,
+		ResourceID:   event.ResourceID,
+		IPAddress:    event.IPAddress,
+		UserAgent:    event.UserAgent,
+		Metadata:     event.Metadata,
+	}
+}
+
+// LogEvent logs an audit event with structured logging and database persistence
 func (s *service) LogEvent(ctx context.Context, event AuditEvent) error {
 	// Convert metadata to JSON
 	metadataJSON, err := event.ToJSON()
@@ -36,16 +49,14 @@ func (s *service) LogEvent(ctx context.Context, event AuditEvent) error {
 		return fmt.Errorf("failed to marshal metadata: %w", err)
 	}
 
+	// Example usage
+	s.logger.Info("Audit event metadata",
+		"metadata", metadataJSON,
+		"user_id", event.UserID,
+		"action", event.Action)
+
 	// Create audit log parameters
-	params := CreateAuditLogParams{
-		UserID:       event.UserID,
-		Action:       event.Action,
-		ResourceType: event.ResourceType,
-		ResourceID:   event.ResourceID,
-		IPAddress:    event.IPAddress,
-		UserAgent:    event.UserAgent,
-		Metadata:     event.Metadata,
-	}
+	params := convertAuditEventToCreateAuditLogParams(event)
 
 	// Persist to database
 	auditLog, err := s.repo.CreateAuditLog(ctx, params)

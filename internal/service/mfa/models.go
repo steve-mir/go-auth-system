@@ -416,4 +416,3 @@ const (
 	WebAuthnTimeout         = 60000 // 60 seconds in milliseconds
 	WebAuthnChallengeLength = 32    // 32 bytes for challenge
 )
-)

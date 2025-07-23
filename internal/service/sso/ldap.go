@@ -348,39 +348,39 @@ func (c *LDAPClient) buildUserAttributes() []string {
 	return attributes
 }
 
-// entryToLDAPUser converts LDAP entry to LDAPUser
-func (c *LDAPUser) entryToLDAPUser(entry *ldap.Entry) *LDAPUser {
-	user := &LDAPUser{
-		DN:         entry.DN,
-		Attributes: make(map[string]string),
-	}
+// // entryToLDAPUser converts LDAP entry to LDAPUser
+// func (c *LDAPUser) entryToLDAPUser(entry *ldap.Entry) *LDAPUser {
+// 	user := &LDAPUser{
+// 		DN:         entry.DN,
+// 		Attributes: make(map[string]string),
+// 	}
 
-	// Extract configured attributes
-	user.Username = c.getAttributeValue(entry, c.config.Attributes.Username, "sAMAccountName")
-	user.Email = c.getAttributeValue(entry, c.config.Attributes.Email, "mail")
-	user.FirstName = c.getAttributeValue(entry, c.config.Attributes.FirstName, "givenName")
-	user.LastName = c.getAttributeValue(entry, c.config.Attributes.LastName, "sn")
-	user.DisplayName = c.getAttributeValue(entry, c.config.Attributes.DisplayName, "displayName")
+// 	// Extract configured attributes
+// 	user.Username = c.getAttributeValue(entry, c.config.Attributes.Username, "sAMAccountName")
+// 	user.Email = c.getAttributeValue(entry, c.config.Attributes.Email, "mail")
+// 	user.FirstName = c.getAttributeValue(entry, c.config.Attributes.FirstName, "givenName")
+// 	user.LastName = c.getAttributeValue(entry, c.config.Attributes.LastName, "sn")
+// 	user.DisplayName = c.getAttributeValue(entry, c.config.Attributes.DisplayName, "displayName")
 
-	// Check if user is enabled (Active Directory specific)
-	if c.config.Attributes.Enabled != "" {
-		enabledValue := c.getAttributeValue(entry, c.config.Attributes.Enabled, "")
-		user.Enabled = c.isUserEnabled(enabledValue)
-	} else {
-		// Check userAccountControl for Active Directory
-		uacValue := c.getAttributeValue(entry, "userAccountControl", "")
-		user.Enabled = c.isUserEnabledFromUAC(uacValue)
-	}
+// 	// Check if user is enabled (Active Directory specific)
+// 	if c.config.Attributes.Enabled != "" {
+// 		enabledValue := c.getAttributeValue(entry, c.config.Attributes.Enabled, "")
+// 		user.Enabled = c.isUserEnabled(enabledValue)
+// 	} else {
+// 		// Check userAccountControl for Active Directory
+// 		uacValue := c.getAttributeValue(entry, "userAccountControl", "")
+// 		user.Enabled = c.isUserEnabledFromUAC(uacValue)
+// 	}
 
-	// Store all attributes
-	for _, attr := range entry.Attributes {
-		if len(attr.Values) > 0 {
-			user.Attributes[attr.Name] = attr.Values[0]
-		}
-	}
+// 	// Store all attributes
+// 	for _, attr := range entry.Attributes {
+// 		if len(attr.Values) > 0 {
+// 			user.Attributes[attr.Name] = attr.Values[0]
+// 		}
+// 	}
 
-	return user
-}
+// 	return user
+// }
 
 // getAttributeValue gets attribute value with fallback
 func (c *LDAPClient) getAttributeValue(entry *ldap.Entry, primary, fallback string) string {

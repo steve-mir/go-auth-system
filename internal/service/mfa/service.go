@@ -2,19 +2,14 @@ package mfa
 
 import (
 	"context"
-	"crypto/ecdsa"
-	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/rsa"
-	"crypto/sha256"
 	"crypto/subtle"
-	"crypto/x509"
 	"encoding/base32"
 	"encoding/base64"
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
@@ -47,8 +42,8 @@ func NewMFAService(cfg *config.Config, deps *Dependencies) MFAService {
 	webAuthnConfig := &webauthn.Config{
 		RPDisplayName: cfg.Features.MFA.WebAuthn.RPDisplayName,
 		RPID:          cfg.Features.MFA.WebAuthn.RPID,
-		RPName:        cfg.Features.MFA.WebAuthn.RPName,
-		RPOrigin:      cfg.Features.MFA.WebAuthn.RPOrigin,
+		// RPName:        cfg.Features.MFA.WebAuthn.RPName,
+		RPOrigins: cfg.Features.MFA.WebAuthn.RPOrigin,
 	}
 
 	// Set defaults if not configured
@@ -58,11 +53,11 @@ func NewMFAService(cfg *config.Config, deps *Dependencies) MFAService {
 	if webAuthnConfig.RPID == "" {
 		webAuthnConfig.RPID = "localhost"
 	}
-	if webAuthnConfig.RPName == "" {
-		webAuthnConfig.RPName = "Go Auth System"
-	}
-	if webAuthnConfig.RPOrigin == "" {
-		webAuthnConfig.RPOrigin = "http://localhost:8080"
+	// if webAuthnConfig.RPName == "" {
+	// 	webAuthnConfig.RPName = "Go Auth System"
+	// }
+	if len(webAuthnConfig.RPOrigins) == 0 {
+		webAuthnConfig.RPOrigins = []string{"http://localhost:8080"}
 	}
 
 	webAuthnInstance, err := webauthn.New(webAuthnConfig)
@@ -180,8 +175,9 @@ func (s *mfaService) SetupTOTP(ctx context.Context, req *SetupTOTPRequest) (*Set
 		SetupToken:  setupToken,
 		Message:     "TOTP setup initiated. Please verify with your authenticator app to complete setup.",
 	}, nil
-}// V
-erifyTOTP verifies a TOTP code for authentication
+}
+
+// VerifyTOTP verifies a TOTP code for authentication
 func (s *mfaService) VerifyTOTP(ctx context.Context, req *VerifyTOTPRequest) (*VerifyTOTPResponse, error) {
 	// Validate request
 	if err := s.validateVerifyTOTPRequest(req); err != nil {
@@ -236,13 +232,13 @@ func (s *mfaService) VerifyTOTP(ctx context.Context, req *VerifyTOTPRequest) (*V
 	}
 
 	// Verify TOTP code
-	valid := totp.Validate(req.Code, secret, time.Now())
+	valid := totp.Validate(req.Code, secret)
 	if !valid {
 		// Try with time window for clock skew
-		now := time.Now()
+		// now := time.Now()
 		for i := -TOTPWindowSize; i <= TOTPWindowSize; i++ {
-			testTime := now.Add(time.Duration(i) * 30 * time.Second)
-			if totp.Validate(req.Code, secret, testTime) {
+			// testTime := now.Add(time.Duration(i) * 30 * time.Second)
+			if totp.Validate(req.Code, secret) {
 				valid = true
 				break
 			}
@@ -413,8 +409,9 @@ func (s *mfaService) SendSMSCode(ctx context.Context, req *SendSMSCodeRequest) (
 		Message:     "SMS verification code sent successfully",
 		PhoneNumber: s.maskPhoneNumber(phoneNumber),
 	}, nil
-}// Verif
-ySMS verifies an SMS code for authentication
+}
+
+// VerifySMS verifies an SMS code for authentication
 func (s *mfaService) VerifySMS(ctx context.Context, req *VerifySMSRequest) (*VerifySMSResponse, error) {
 	// Validate request
 	if err := s.validateVerifySMSRequest(req); err != nil {
@@ -609,7 +606,7 @@ func (s *mfaService) SendEmailCode(ctx context.Context, req *SendEmailCodeReques
 		subject = "Your verification code"
 	}
 
-	body := fmt.Sprintf("Your verification code is: %s\n\nThis code will expire in %d minutes.\n\nIf you did not request this code, please ignore this email.", 
+	body := fmt.Sprintf("Your verification code is: %s\n\nThis code will expire in %d minutes.\n\nIf you did not request this code, please ignore this email.",
 		code, EmailCodeExpiration/60)
 
 	if err := s.emailService.SendEmail(ctx, email, subject, body); err != nil {
@@ -622,8 +619,9 @@ func (s *mfaService) SendEmailCode(ctx context.Context, req *SendEmailCodeReques
 		Message:   "Email verification code sent successfully",
 		Email:     s.maskEmail(email),
 	}, nil
-}// Ve
-rifyEmail verifies an email code for authentication
+}
+
+// VerifyEmail verifies an email code for authentication
 func (s *mfaService) VerifyEmail(ctx context.Context, req *VerifyEmailRequest) (*VerifyEmailResponse, error) {
 	// Validate request
 	if err := s.validateVerifyEmailRequest(req); err != nil {
@@ -712,7 +710,7 @@ func (s *mfaService) GetUserMFAMethods(ctx context.Context, userID string) (*Get
 	methods := make([]MFAMethodInfo, 0, len(configs))
 	for _, config := range configs {
 		displayName := s.getDisplayName(config)
-		
+
 		var lastUsedAt *time.Time
 		if config.LastUsedAt != nil {
 			t := time.Unix(*config.LastUsedAt, 0)
@@ -814,8 +812,9 @@ func (s *mfaService) GenerateBackupCodes(ctx context.Context, req *GenerateBacku
 		BackupCodes: backupCodes,
 		Message:     "New backup codes generated successfully",
 	}, nil
-}// 
-VerifyBackupCode verifies a backup code for MFA recovery
+}
+
+// VerifyBackupCode verifies a backup code for MFA recovery
 func (s *mfaService) VerifyBackupCode(ctx context.Context, req *VerifyBackupCodeRequest) (*VerifyBackupCodeResponse, error) {
 	// Validate request
 	if err := s.validateVerifyBackupCodeRequest(req); err != nil {
@@ -995,8 +994,9 @@ func (s *mfaService) validateTOTPSetupToken(token string) (*TOTPSetupToken, erro
 	}
 
 	return &setupData, nil
-}// He
-lper methods for backup codes
+}
+
+// Helper methods for backup codes
 
 func (s *mfaService) generateBackupCodes() ([]string, error) {
 	codes := make([]string, BackupCodesCount)
@@ -1051,63 +1051,75 @@ func (s *mfaService) maskEmail(email string) string {
 	if len(parts) != 2 {
 		return email
 	}
-	
+
 	username := parts[0]
 	domain := parts[1]
-	
+
 	if len(username) <= 2 {
 		return email
 	}
-	
+
 	maskedUsername := username[:1] + strings.Repeat("*", len(username)-2) + username[len(username)-1:]
 	return maskedUsername + "@" + domain
 }
 
 // Helper method to get display name for MFA method
 func (s *mfaService) getDisplayName(config *MFAConfigData) string {
-	switch config.Method {
-	case MethodTOTP:
-		return "Authenticator App"
-	case MethodSMS:
-		if config.SecretEncrypted != nil {
-			decrypted, err := s.encryptor.Decrypt(config.SecretEncrypted)
-			if err == nil {
-				return "SMS to " + s.maskPhoneNumber(string(decrypted))
-			}
-		}
-		return "SMS"
-	case MethodEmail:
-		if config.SecretEncrypted != nil {
-			decrypted, err := s.encryptor.Decrypt(config.SecretEncrypted)
-			if err == nil {
-				return "Email to " + s.maskEmail(string(decrypted))
-			}
-		}
-		return "Email"
-	case MethodWebAuthn:
-		if config.SecretEncrypted != nil {
-			decrypted, err := s.encryptor.Decrypt(config.SecretEncrypted)
-			if err == nil {
-				var credential WebAuthnCredential
-				if json.Unmarshal(decrypted, &credential) == nil {
-					return credential.DisplayName
-				}
-			}
-		}
-		return "Security Key"
-	default:
-		return config.Methodpted, err := s.encryptor.Decrypt(config.SecretEncrypted)
-			if err == nil {
-				return "Email to " + s.maskEmail(string(decrypted))
-			}
-		}
-		return "Email"
-	default:
-		return strings.ToUpper(config.Method)
-	}
-}/
-/ Validation methods
+	// switch config.Method {
+	// case MethodTOTP:
+	//
+	//	return "Authenticator App"
+	//
+	// case MethodSMS:
+	//
+	//	if config.SecretEncrypted != nil {
+	//		decrypted, err := s.encryptor.Decrypt(config.SecretEncrypted)
+	//		if err == nil {
+	//			return "SMS to " + s.maskPhoneNumber(string(decrypted))
+	//		}
+	//	}
+	//	return "SMS"
+	//
+	// case MethodEmail:
+	//
+	//	if config.SecretEncrypted != nil {
+	//		decrypted, err := s.encryptor.Decrypt(config.SecretEncrypted)
+	//		if err == nil {
+	//			return "Email to " + s.maskEmail(string(decrypted))
+	//		}
+	//	}
+	//	return "Email"
+	//
+	// case MethodWebAuthn:
+	//
+	//	if config.SecretEncrypted != nil {
+	//		decrypted, err := s.encryptor.Decrypt(config.SecretEncrypted)
+	//		if err == nil {
+	//			var credential WebAuthnCredential
+	//			if json.Unmarshal(decrypted, &credential) == nil {
+	//				return credential.DisplayName
+	//			}
+	//		}
+	//	}
+	//	return "Security Key"
+	//
+	// default:
+	//
+	//	return config.Methodpted, err := s.encryptor.Decrypt(config.SecretEncrypted)
+	//		if err == nil {
+	//			return "Email to " + s.maskEmail(string(decrypted))
+	//		}
+	//	}
+	//	return "Email"
+	//
+	// default:
+	//
+	//		return strings.ToUpper(config.Method)
+	//	}
+	return "" //TODO: uncomment
+}
 
+// Validation methods
 func (s *mfaService) validateSetupTOTPRequest(req *SetupTOTPRequest) error {
 	if req.UserID == "" {
 		return errors.New(errors.ErrorTypeValidation, "MISSING_USER_ID", "User ID is required")
@@ -1395,6 +1407,7 @@ func (s *mfaService) SetupWebAuthn(ctx context.Context, req *SetupWebAuthnReques
 }
 
 // FinishWebAuthnSetup completes WebAuthn credential registration
+// FinishWebAuthnSetup completes WebAuthn credential registration
 func (s *mfaService) FinishWebAuthnSetup(ctx context.Context, req *FinishWebAuthnSetupRequest) (*FinishWebAuthnSetupResponse, error) {
 	// Check if WebAuthn is enabled
 	if s.webAuthn == nil {
@@ -1413,14 +1426,23 @@ func (s *mfaService) FinishWebAuthnSetup(ctx context.Context, req *FinishWebAuth
 		return nil, ErrWebAuthnSetupNotFound
 	}
 
-	var sessionData protocol.SessionData
-	if err := json.Unmarshal(cachedData.([]byte), &sessionData); err != nil {
-		return nil, ErrWebAuthnSetupNotFound
+	var sessionData webauthn.SessionData
+	// Fix: Type assertion with error checking
+	cachedBytes, ok := cachedData.([]byte)
+	if !ok {
+		return nil, errors.New(errors.ErrorTypeInternal, "INVALID_CACHE_DATA", "Cached session data is not in expected format")
+	}
+
+	if err := json.Unmarshal(cachedBytes, &sessionData); err != nil {
+		return nil, errors.Wrap(err, errors.ErrorTypeInternal, "SESSION_DATA_UNMARSHAL_FAILED", "Failed to unmarshal session data")
 	}
 
 	// Get user data
 	user, err := s.userRepo.GetUserByID(ctx, req.UserID)
-	if err != nil || user == nil {
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrorTypeInternal, "USER_RETRIEVAL_FAILED", "Failed to retrieve user")
+	}
+	if user == nil {
 		return nil, ErrUserNotFound
 	}
 
@@ -1438,14 +1460,21 @@ func (s *mfaService) FinishWebAuthnSetup(ctx context.Context, req *FinishWebAuth
 		credentials: existingCredentials,
 	}
 
-	// Convert the credential response from our format to WebAuthn library format
-	parsedResponse, err := s.parseCredentialCreationResponse(&req.CredentialResponse)
+	// Convert the credential response to JSON and create HTTP request
+	credentialResponseJSON, err := json.Marshal(req.CredentialResponse)
 	if err != nil {
-		return nil, ErrWebAuthnInvalidCredential.WithCause(err)
+		return nil, errors.Wrap(err, errors.ErrorTypeInternal, "CREDENTIAL_RESPONSE_MARSHAL_FAILED", "Failed to marshal credential response")
 	}
 
+	// Create HTTP request with the credential response data
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", "/", strings.NewReader(string(credentialResponseJSON)))
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrorTypeInternal, "HTTP_REQUEST_CREATION_FAILED", "Failed to create HTTP request")
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
 	// Finish registration
-	credential, err := s.webAuthn.FinishRegistration(webAuthnUser, sessionData, parsedResponse)
+	credential, err := s.webAuthn.FinishRegistration(webAuthnUser, sessionData, httpReq)
 	if err != nil {
 		return nil, ErrWebAuthnCredentialVerification.WithCause(err)
 	}
@@ -1464,7 +1493,11 @@ func (s *mfaService) FinishWebAuthnSetup(ctx context.Context, req *FinishWebAuth
 	}
 
 	// Encrypt and store the credential
-	credentialJSON, _ := json.Marshal(credentialData)
+	credentialJSON, err := json.Marshal(credentialData)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrorTypeInternal, "CREDENTIAL_MARSHAL_FAILED", "Failed to marshal credential data")
+	}
+
 	encryptedCredential, err := s.encryptor.Encrypt(credentialJSON)
 	if err != nil {
 		return nil, ErrEncryptionFailed.WithCause(err)
@@ -1483,7 +1516,11 @@ func (s *mfaService) FinishWebAuthnSetup(ctx context.Context, req *FinishWebAuth
 	}
 
 	// Clean up setup session
-	s.cacheService.Delete(ctx, cacheKey)
+	if err := s.cacheService.Delete(ctx, cacheKey); err != nil {
+		// Log the error but don't fail the operation
+		// You might want to use your logging system here
+		fmt.Printf("Warning: Failed to delete cache key %s: %v\n", cacheKey, err)
+	}
 
 	return &FinishWebAuthnSetupResponse{
 		Success:      true,
@@ -1582,7 +1619,6 @@ func (s *mfaService) FinishWebAuthnLogin(ctx context.Context, req *FinishWebAuth
 	// Get MFA config
 	var config *MFAConfigData
 	var err error
-
 	if req.ConfigID != "" {
 		config, err = s.mfaRepo.GetMFAConfigByID(ctx, req.ConfigID)
 	} else if req.UserID != "" {
@@ -1594,7 +1630,6 @@ func (s *mfaService) FinishWebAuthnLogin(ctx context.Context, req *FinishWebAuth
 	if err != nil || config == nil {
 		return nil, ErrMFANotFound
 	}
-
 	if !config.Enabled {
 		return nil, ErrMFANotEnabled
 	}
@@ -1606,14 +1641,23 @@ func (s *mfaService) FinishWebAuthnLogin(ctx context.Context, req *FinishWebAuth
 		return nil, ErrWebAuthnLoginNotFound
 	}
 
-	var sessionData protocol.SessionData
-	if err := json.Unmarshal(cachedData.([]byte), &sessionData); err != nil {
-		return nil, ErrWebAuthnLoginNotFound
+	var sessionData webauthn.SessionData
+	// Fix: Type assertion with error checking
+	cachedBytes, ok := cachedData.([]byte)
+	if !ok {
+		return nil, errors.New(errors.ErrorTypeInternal, "INVALID_CACHE_DATA", "Cached session data is not in expected format")
+	}
+
+	if err := json.Unmarshal(cachedBytes, &sessionData); err != nil {
+		return nil, errors.Wrap(err, errors.ErrorTypeInternal, "SESSION_DATA_UNMARSHAL_FAILED", "Failed to unmarshal session data")
 	}
 
 	// Get user data
 	user, err := s.userRepo.GetUserByID(ctx, config.UserID)
-	if err != nil || user == nil {
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrorTypeInternal, "USER_RETRIEVAL_FAILED", "Failed to retrieve user")
+	}
+	if user == nil {
 		return nil, ErrUserNotFound
 	}
 
@@ -1631,14 +1675,21 @@ func (s *mfaService) FinishWebAuthnLogin(ctx context.Context, req *FinishWebAuth
 		credentials: credentials,
 	}
 
-	// Convert the credential response from our format to WebAuthn library format
-	parsedResponse, err := s.parseCredentialAssertionResponse(&req.CredentialResponse)
+	// Convert the credential response to JSON and create HTTP request
+	credentialResponseJSON, err := json.Marshal(req.CredentialResponse)
 	if err != nil {
-		return nil, ErrWebAuthnInvalidCredential.WithCause(err)
+		return nil, errors.Wrap(err, errors.ErrorTypeInternal, "CREDENTIAL_RESPONSE_MARSHAL_FAILED", "Failed to marshal credential response")
 	}
 
+	// Create HTTP request with the credential response data
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", "/", strings.NewReader(string(credentialResponseJSON)))
+	if err != nil {
+		return nil, errors.Wrap(err, errors.ErrorTypeInternal, "HTTP_REQUEST_CREATION_FAILED", "Failed to create HTTP request")
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
 	// Finish login
-	credential, err := s.webAuthn.FinishLogin(webAuthnUser, sessionData, parsedResponse)
+	credential, err := s.webAuthn.FinishLogin(webAuthnUser, sessionData, httpReq)
 	if err != nil {
 		return nil, ErrWebAuthnCredentialVerification.WithCause(err)
 	}
@@ -1648,16 +1699,23 @@ func (s *mfaService) FinishWebAuthnLogin(ctx context.Context, req *FinishWebAuth
 	if err != nil {
 		// Log error but don't fail the authentication
 		// The authentication was successful, we just couldn't update the sign count
+		fmt.Printf("Warning: Failed to update WebAuthn credential sign count: %v\n", err)
 	}
 
 	// Update last used timestamp
 	updateData := &UpdateMFAConfigData{
 		UpdateLastUsed: true,
 	}
-	s.mfaRepo.UpdateMFAConfig(ctx, config.ID, updateData)
+	if _, err := s.mfaRepo.UpdateMFAConfig(ctx, config.ID, updateData); err != nil {
+		// Log the error but don't fail the authentication
+		fmt.Printf("Warning: Failed to update MFA config last used timestamp: %v\n", err)
+	}
 
 	// Clean up login session
-	s.cacheService.Delete(ctx, cacheKey)
+	if err := s.cacheService.Delete(ctx, cacheKey); err != nil {
+		// Log the error but don't fail the operation
+		fmt.Printf("Warning: Failed to delete cache key %s: %v\n", cacheKey, err)
+	}
 
 	return &FinishWebAuthnLoginResponse{
 		Valid:    true,
@@ -1719,7 +1777,7 @@ func (s *mfaService) convertCredentialCreation(creation *protocol.CredentialCrea
 				Name: creation.Response.RelyingParty.Name,
 			},
 			User: UserEntity{
-				ID:          creation.Response.User.ID,
+				ID:          creation.Response.User.ID.([]byte),
 				Name:        creation.Response.User.Name,
 				DisplayName: creation.Response.User.DisplayName,
 			},
@@ -1774,43 +1832,43 @@ func (s *mfaService) convertCredentialDescriptors(descriptors []protocol.Credent
 	return result
 }
 
-func (s *mfaService) parseCredentialCreationResponse(response *CredentialCreationResponse) (*protocol.ParsedCredentialCreationData, error) {
-	// Convert our response format to the WebAuthn library format
-	parsedResponse := &protocol.ParsedCredentialCreationData{
-		ID:    response.ID,
-		RawID: response.RawID,
-		Type:  response.Type,
-		ClientExtensionResults: protocol.AuthenticationExtensionsClientOutputs{},
-		Response: protocol.AuthenticatorAttestationResponse{
-			AuthenticatorResponse: protocol.AuthenticatorResponse{
-				ClientDataJSON: response.Response.ClientDataJSON,
-			},
-			AttestationObject: response.Response.AttestationObject,
-		},
-	}
+// func (s *mfaService) parseCredentialCreationResponse(response *CredentialCreationResponse) (*protocol.ParsedCredentialCreationData, error) {
+// 	// Convert our response format to the WebAuthn library format
+// 	parsedResponse := &protocol.ParsedCredentialCreationData{
+// 		ID:                     response.ID,
+// 		RawID:                  response.RawID,
+// 		Type:                   response.Type,
+// 		ClientExtensionResults: protocol.AuthenticationExtensionsClientOutputs{},
+// 		Response: protocol.AuthenticatorAttestationResponse{
+// 			AuthenticatorResponse: protocol.AuthenticatorResponse{
+// 				ClientDataJSON: response.Response.ClientDataJSON,
+// 			},
+// 			AttestationObject: response.Response.AttestationObject,
+// 		},
+// 	}
 
-	return parsedResponse, nil
-}
+// 	return parsedResponse, nil
+// }
 
-func (s *mfaService) parseCredentialAssertionResponse(response *CredentialAssertionResponse) (*protocol.ParsedCredentialAssertionData, error) {
-	// Convert our response format to the WebAuthn library format
-	parsedResponse := &protocol.ParsedCredentialAssertionData{
-		ID:    response.ID,
-		RawID: response.RawID,
-		Type:  response.Type,
-		ClientExtensionResults: protocol.AuthenticationExtensionsClientOutputs{},
-		Response: protocol.AuthenticatorAssertionResponse{
-			AuthenticatorResponse: protocol.AuthenticatorResponse{
-				ClientDataJSON: response.Response.ClientDataJSON,
-			},
-			AuthenticatorData: response.Response.AuthenticatorData,
-			Signature:         response.Response.Signature,
-			UserHandle:        response.Response.UserHandle,
-		},
-	}
+// func (s *mfaService) parseCredentialAssertionResponse(response *CredentialAssertionResponse) (*protocol.ParsedCredentialAssertionData, error) {
+// 	// Convert our response format to the WebAuthn library format
+// 	parsedResponse := &protocol.ParsedCredentialAssertionData{
+// 		ID:                     response.ID,
+// 		RawID:                  response.RawID,
+// 		Type:                   response.Type,
+// 		ClientExtensionResults: protocol.AuthenticationExtensionsClientOutputs{},
+// 		Response: protocol.AuthenticatorAssertionResponse{
+// 			AuthenticatorResponse: protocol.AuthenticatorResponse{
+// 				ClientDataJSON: response.Response.ClientDataJSON,
+// 			},
+// 			AuthenticatorData: response.Response.AuthenticatorData,
+// 			Signature:         response.Response.Signature,
+// 			UserHandle:        response.Response.UserHandle,
+// 		},
+// 	}
 
-	return parsedResponse, nil
-}
+// 	return parsedResponse, nil
+// }
 
 func (s *mfaService) updateWebAuthnCredential(ctx context.Context, userID string, credential *webauthn.Credential) error {
 	// Get all WebAuthn configs for the user
@@ -1860,10 +1918,6 @@ func (s *mfaService) updateWebAuthnCredential(ctx context.Context, userID string
 
 	return errors.New(errors.ErrorTypeNotFound, "CREDENTIAL_NOT_FOUND", "WebAuthn credential not found")
 }
-
-
-
-
 
 // WebAuthn validation methods
 

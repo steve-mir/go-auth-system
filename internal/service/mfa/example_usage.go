@@ -40,7 +40,7 @@ func ExampleMFAUsage() {
 					RPDisplayName: "My App",
 					RPID:          "localhost",
 					RPName:        "My App",
-					RPOrigin:      "http://localhost:8080",
+					RPOrigin:      []string{"http://localhost:8080"},
 				},
 			},
 		},

@@ -2,6 +2,8 @@ package sso
 
 import (
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 // SocialAccount represents a social account linked to a user
@@ -246,6 +248,7 @@ type OIDCTokenResponse struct {
 
 // OIDCIDTokenClaims represents the claims in an OIDC ID token
 type OIDCIDTokenClaims struct {
+	jwt.Claims
 	Issuer            string                 `json:"iss"`
 	Subject           string                 `json:"sub"`
 	Audience          interface{}            `json:"aud"` // Can be string or []string

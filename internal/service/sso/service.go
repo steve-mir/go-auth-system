@@ -1032,10 +1032,11 @@ func (s *ssoService) parseNameFromOIDC(userInfo *OIDCUserInfo) (string, string) 
 	return "", ""
 }
 
-// extractClaimsFromOIDC extracts relevant claims from OIDC user info and ID token
+// extractClaimsFromOIDC extracts claims from OIDC user info and ID token
 func (s *ssoService) extractClaimsFromOIDC(userInfo *OIDCUserInfo, idTokenClaims *OIDCIDTokenClaims) map[string]string {
 	claims := make(map[string]string)
 
+	// Add user info claims
 	if userInfo.Subject != "" {
 		claims["sub"] = userInfo.Subject
 	}
@@ -1061,7 +1062,7 @@ func (s *ssoService) extractClaimsFromOIDC(userInfo *OIDCUserInfo, idTokenClaims
 		claims["preferred_username"] = userInfo.PreferredUsername
 	}
 
-	// Add groups and roles if available
+	// Add groups and roles
 	if len(userInfo.Groups) > 0 {
 		claims["groups"] = strings.Join(userInfo.Groups, ",")
 	}
@@ -1069,13 +1070,15 @@ func (s *ssoService) extractClaimsFromOIDC(userInfo *OIDCUserInfo, idTokenClaims
 		claims["roles"] = strings.Join(userInfo.Roles, ",")
 	}
 
-	// Add custom claims from ID token
-	if idTokenClaims.CustomClaims != nil {
-		for key, value := range idTokenClaims.CustomClaims {
-			if strValue, ok := value.(string); ok {
-				claims[key] = strValue
-			}
-		}
+	// Add ID token specific claims
+	if idTokenClaims.Issuer != "" {
+		claims["iss"] = idTokenClaims.Issuer
+	}
+	if idTokenClaims.AuthTime > 0 {
+		claims["auth_time"] = fmt.Sprintf("%d", idTokenClaims.AuthTime)
+	}
+	if idTokenClaims.Nonce != "" {
+		claims["nonce"] = idTokenClaims.Nonce
 	}
 
 	return claims
@@ -1363,116 +1366,6 @@ func extractLastName(fullName string) string {
 		return strings.Join(parts[1:], " ")
 	}
 	return ""
-}
-
-// syncUserAttributesFromOIDC synchronizes user attributes from OIDC
-func (s *ssoService) syncUserAttributesFromOIDC(ctx context.Context, user *UserData, userInfo *OIDCUserInfo) error {
-	// Parse name from OIDC claims
-	firstName, lastName := s.parseNameFromOIDC(userInfo)
-
-	// Check if we need to update user attributes
-	needsUpdate := false
-	updateData := &UpdateUserData{
-		ID: user.ID,
-	}
-
-	// Decrypt current names to compare
-	currentFirstName, currentLastName, err := s.decryptUserNames(user)
-	if err != nil {
-		return fmt.Errorf("failed to decrypt current user names: %w", err)
-	}
-
-	if currentFirstName != firstName {
-		updateData.FirstName = firstName
-		needsUpdate = true
-	}
-
-	if currentLastName != lastName {
-		updateData.LastName = lastName
-		needsUpdate = true
-	}
-
-	// Update username if different and available
-	if userInfo.PreferredUsername != "" && user.Username != userInfo.PreferredUsername {
-		updateData.Username = userInfo.PreferredUsername
-		needsUpdate = true
-	}
-
-	// Update user if needed
-	if needsUpdate {
-		if err := s.userRepo.UpdateUser(ctx, updateData); err != nil {
-			return fmt.Errorf("failed to update user attributes: %w", err)
-		}
-	}
-
-	return nil
-}
-
-// parseNameFromOIDC parses name from OIDC user information
-func (s *ssoService) parseNameFromOIDC(userInfo *OIDCUserInfo) (string, string) {
-	// Try to get first and last name from separate fields
-	if userInfo.GivenName != "" && userInfo.FamilyName != "" {
-		return userInfo.GivenName, userInfo.FamilyName
-	}
-
-	// Try to parse full name
-	if userInfo.Name != "" {
-		return s.parseName(userInfo.Name)
-	}
-
-	return "", ""
-}
-
-// extractClaimsFromOIDC extracts claims from OIDC user info and ID token
-func (s *ssoService) extractClaimsFromOIDC(userInfo *OIDCUserInfo, idTokenClaims *OIDCIDTokenClaims) map[string]string {
-	claims := make(map[string]string)
-
-	// Add user info claims
-	if userInfo.Subject != "" {
-		claims["sub"] = userInfo.Subject
-	}
-	if userInfo.Email != "" {
-		claims["email"] = userInfo.Email
-	}
-	if userInfo.Name != "" {
-		claims["name"] = userInfo.Name
-	}
-	if userInfo.GivenName != "" {
-		claims["given_name"] = userInfo.GivenName
-	}
-	if userInfo.FamilyName != "" {
-		claims["family_name"] = userInfo.FamilyName
-	}
-	if userInfo.Picture != "" {
-		claims["picture"] = userInfo.Picture
-	}
-	if userInfo.Locale != "" {
-		claims["locale"] = userInfo.Locale
-	}
-	if userInfo.PreferredUsername != "" {
-		claims["preferred_username"] = userInfo.PreferredUsername
-	}
-
-	// Add groups and roles
-	if len(userInfo.Groups) > 0 {
-		claims["groups"] = strings.Join(userInfo.Groups, ",")
-	}
-	if len(userInfo.Roles) > 0 {
-		claims["roles"] = strings.Join(userInfo.Roles, ",")
-	}
-
-	// Add ID token specific claims
-	if idTokenClaims.Issuer != "" {
-		claims["iss"] = idTokenClaims.Issuer
-	}
-	if idTokenClaims.AuthTime > 0 {
-		claims["auth_time"] = fmt.Sprintf("%d", idTokenClaims.AuthTime)
-	}
-	if idTokenClaims.Nonce != "" {
-		claims["nonce"] = idTokenClaims.Nonce
-	}
-
-	return claims
 }
 
 // GenerateNonce generates a secure random nonce for OIDC

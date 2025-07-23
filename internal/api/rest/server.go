@@ -3,6 +3,7 @@ package rest
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"time"
 
@@ -28,6 +29,7 @@ type Server struct {
 	userService   user.UserService
 	roleService   role.Service
 	healthService HealthService
+	ssoService    SSOService
 }
 
 // HealthService interface for health checks
@@ -35,6 +37,97 @@ type HealthService interface {
 	Handler() http.HandlerFunc
 	LivenessHandler() http.HandlerFunc
 	ReadinessHandler() http.HandlerFunc
+}
+
+// SSOService interface for single sign-on operations
+type SSOService interface {
+	GetOAuthURL(ctx context.Context, provider string, state string) (string, error)
+	HandleOAuthCallback(ctx context.Context, provider, code, state string) (*OAuthResult, error)
+	UnlinkSocialAccount(ctx context.Context, userID string, provider string) error
+	GetLinkedAccounts(ctx context.Context, userID string) ([]LinkedAccount, error)
+	GetSAMLMetadata(ctx context.Context) ([]byte, error)
+	InitiateSAMLLogin(ctx context.Context, idpEntityID string, relayState string) (*SAMLAuthRequest, error)
+	HandleSAMLResponse(ctx context.Context, samlResponse string, relayState string) (*SAMLResult, error)
+	GetOIDCAuthURL(ctx context.Context, provider string, state string, nonce string) (string, error)
+	HandleOIDCCallback(ctx context.Context, provider, code, state string) (*OIDCResult, error)
+	ValidateOIDCIDToken(ctx context.Context, provider, idToken string) (*OIDCIDTokenClaims, error)
+	RefreshOIDCToken(ctx context.Context, provider, refreshToken string) (*OIDCTokenResponse, error)
+}
+
+// OAuthResult represents OAuth authentication result
+type OAuthResult struct {
+	UserID       string            `json:"user_id"`
+	Email        string            `json:"email"`
+	Name         string            `json:"name"`
+	Provider     string            `json:"provider"`
+	IsNewUser    bool              `json:"is_new_user"`
+	AccessToken  string            `json:"access_token"`
+	RefreshToken string            `json:"refresh_token"`
+	ExpiresAt    int64             `json:"expires_at"`
+	Metadata     map[string]string `json:"metadata"`
+}
+
+// LinkedAccount represents a linked social account
+type LinkedAccount struct {
+	Provider string `json:"provider"`
+	SocialID string `json:"social_id"`
+	Email    string `json:"email"`
+	Name     string `json:"name"`
+	LinkedAt int64  `json:"linked_at"`
+}
+
+// SAMLAuthRequest represents a SAML authentication request
+type SAMLAuthRequest struct {
+	ID          string `json:"id"`
+	URL         string `json:"url"`
+	RelayState  string `json:"relay_state"`
+	IDPEntityID string `json:"idp_entity_id"`
+	CreatedAt   int64  `json:"created_at"`
+}
+
+// SAMLResult represents SAML authentication result
+type SAMLResult struct {
+	UserID       string                 `json:"user_id"`
+	Email        string                 `json:"email"`
+	Name         string                 `json:"name"`
+	NameID       string                 `json:"name_id"`
+	SessionIndex string                 `json:"session_index"`
+	IDPEntityID  string                 `json:"idp_entity_id"`
+	IsNewUser    bool                   `json:"is_new_user"`
+	Attributes   map[string]interface{} `json:"attributes"`
+	ExpiresAt    int64                  `json:"expires_at"`
+}
+
+// OIDCResult represents OIDC authentication result
+type OIDCResult struct {
+	UserID       string                 `json:"user_id"`
+	Email        string                 `json:"email"`
+	Name         string                 `json:"name"`
+	Subject      string                 `json:"subject"`
+	Provider     string                 `json:"provider"`
+	IsNewUser    bool                   `json:"is_new_user"`
+	AccessToken  string                 `json:"access_token"`
+	RefreshToken string                 `json:"refresh_token"`
+	IDToken      string                 `json:"id_token"`
+	ExpiresAt    int64                  `json:"expires_at"`
+	Claims       map[string]interface{} `json:"claims"`
+}
+
+// OIDCIDTokenClaims represents OIDC ID token claims
+type OIDCIDTokenClaims struct {
+	Subject   string `json:"subject"`
+	Email     string `json:"email"`
+	ExpiresAt int64  `json:"expires_at"`
+}
+
+// OIDCTokenResponse represents OIDC token response
+type OIDCTokenResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	IDToken      string `json:"id_token"`
+	TokenType    string `json:"token_type"`
+	ExpiresIn    int64  `json:"expires_in"`
+	Scope        string `json:"scope"`
 }
 
 // NewServer creates a new REST API server
@@ -46,6 +139,7 @@ func NewServer(
 	roleService role.Service,
 	adminService admin.AdminService,
 	healthService HealthService,
+	ssoService SSOService,
 ) *Server {
 	// Set Gin mode based on environment
 	if cfg.Environment == "production" {
@@ -72,6 +166,7 @@ func NewServer(
 		roleService:   roleService,
 		adminService:  adminService,
 		healthService: healthService,
+		ssoService:    ssoService,
 	}
 
 	s.setupMiddleware()
@@ -83,23 +178,41 @@ func NewServer(
 // setupMiddleware configures global middleware
 func (s *Server) setupMiddleware() {
 	// Recovery middleware (should be first)
-	s.router.Use(middleware.RecoveryMiddleware())
+	s.router.Use(gin.Recovery())
 
 	// Request ID middleware
-	s.router.Use(middleware.RequestIDMiddleware())
+	s.router.Use(func(c *gin.Context) {
+		requestID := c.GetHeader("X-Request-ID")
+		if requestID == "" {
+			requestID = generateRequestID()
+		}
+		c.Header("X-Request-ID", requestID)
+		c.Set("request_id", requestID)
+		c.Next()
+	})
 
 	// Logging middleware
-	s.router.Use(middleware.LoggingMiddleware())
+	s.router.Use(gin.Logger())
 
 	// CORS middleware
-	s.router.Use(middleware.CORSMiddleware())
+	s.router.Use(func(c *gin.Context) {
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization")
 
-	// Health check middleware (early exit for health checks)
-	s.router.Use(middleware.HealthCheckMiddleware())
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
 
-	// Metrics middleware
-	metricsMiddleware := middleware.NewMetricsMiddleware()
-	s.router.Use(metricsMiddleware.Handler())
+		c.Next()
+	})
+
+	// Apply middleware manager if available
+	if s.middleware != nil {
+		// Apply rate limiting and security middleware to API routes only
+		// This will be applied in setupRoutes for specific route groups
+	}
 }
 
 // setupRoutes configures all API routes
@@ -229,4 +342,14 @@ func (s *Server) readinessHandler(c *gin.Context) {
 		"status":    "ready",
 		"timestamp": time.Now().Format(time.RFC3339),
 	})
+}
+
+// requireAuth returns a middleware that requires authentication
+func (s *Server) requireAuth() gin.HandlerFunc {
+	return s.authenticationMiddleware()
+}
+
+func generateRequestID() string {
+	rand.Seed(time.Now().UnixNano())
+	return fmt.Sprintf("%d", rand.Int63())
 }

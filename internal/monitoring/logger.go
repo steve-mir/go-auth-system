@@ -140,9 +140,10 @@ func (l *Logger) WithContext(ctx context.Context) *Logger {
 
 	if len(attrs) > 0 {
 		// Convert slog.Attr to any for With method
-		args := make([]any, len(attrs))
+		args := make([]any, len(attrs)*2)
 		for i, attr := range attrs {
-			args[i] = attr
+			args[i*2] = attr.Key
+			args[i*2+1] = attr.Value.Any()
 		}
 		return &Logger{
 			Logger: l.Logger.With(args...),
@@ -184,8 +185,15 @@ func (l *Logger) WithError(err error) *Logger {
 		attrs = append(attrs, slog.String("stack_trace", getStackTrace()))
 	}
 
+	// Convert slog.Attr to any for With method
+	args := make([]any, len(attrs)*2)
+	for i, attr := range attrs {
+		args[i*2] = attr.Key
+		args[i*2+1] = attr.Value.Any()
+	}
+
 	return &Logger{
-		Logger: l.Logger.With(attrs...),
+		Logger: l.Logger.With(args...),
 		level:  l.level,
 		format: l.format,
 	}

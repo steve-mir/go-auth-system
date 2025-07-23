@@ -305,11 +305,13 @@ func validateMFA(mfa *MFAConfig) error {
 		if mfa.WebAuthn.RPID == "" {
 			return ErrMissingWebAuthnRPID
 		}
-		if mfa.WebAuthn.RPOrigin == "" {
+		if len(mfa.WebAuthn.RPOrigin) == 0 {
 			return ErrMissingWebAuthnRPOrigin
 		}
-		if _, err := url.Parse(mfa.WebAuthn.RPOrigin); err != nil {
-			return ErrInvalidWebAuthnRPOrigin
+		for _, origin := range mfa.WebAuthn.RPOrigin {
+			if _, err := url.Parse(origin); err != nil {
+				return ErrInvalidWebAuthnRPOrigin
+			}
 		}
 	}
 

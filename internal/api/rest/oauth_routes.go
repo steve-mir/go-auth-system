@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -119,6 +120,7 @@ func (s *Server) linkSocialAccountHandler(c *gin.Context) {
 		s.errorResponse(c, http.StatusInternalServerError, "INVALID_USER_ID", "Invalid user ID format", nil)
 		return
 	}
+	log.Println("UserIDStr", userIDStr)
 
 	// Validate provider
 	if !isValidProvider(provider) {

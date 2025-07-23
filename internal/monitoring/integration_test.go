@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -326,7 +325,7 @@ func TestDisabledMonitoring(t *testing.T) {
 
 func TestCustomRegistry(t *testing.T) {
 	// Create custom registry
-	registry := prometheus.NewRegistry()
+	// registry := prometheus.NewRegistry()
 
 	// Create monitoring service
 	config := Config{

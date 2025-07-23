@@ -95,7 +95,7 @@ features:
       enabled: false
       rp_display_name: "Go Auth System"
       rp_id: ""
-      rp_origin: ""
+      rp_origin: [""]
   
   social_auth:
     google:

@@ -85,7 +85,7 @@ func (s *Server) adminAuthorizationMiddleware() gin.HandlerFunc {
 		// Check if user has admin role
 		hasAdminRole := false
 		for _, role := range userRoles {
-			if role == "admin" || role == "administrator" {
+			if role == "admin" || role == "administrator" || role == "super_admin" {
 				hasAdminRole = true
 				break
 			}

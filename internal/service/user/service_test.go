@@ -150,7 +150,7 @@ func setupUserService() (*Service, *MockUserRepository, *MockSessionRepository, 
 		SessionRepo: sessionRepo,
 		AuditRepo:   auditRepo,
 		HashService: hashService,
-		Encryptor:   encryptor,
+		// Encryptor:   encryptor,
 	}
 
 	service := NewService(deps)

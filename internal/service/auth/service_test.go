@@ -233,7 +233,7 @@ func setupAuthService(t *testing.T) (*authService, *mockUserRepository, *mockSes
 		BlacklistRepo: blacklistRepo,
 		TokenService:  tokenService,
 		HashService:   hashService,
-		Encryptor:     encryptor,
+		// Encryptor:     encryptor,
 	}
 
 	service := NewAuthService(cfg, deps).(*authService)

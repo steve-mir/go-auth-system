@@ -222,7 +222,7 @@ func (c *DatabaseChecker) Check(ctx context.Context) ComponentHealth {
 	stats := c.db.Stats()
 
 	// Check if we have available connections
-	if stats.AcquiredConns() >= stats.MaxConns() {
+	if stats.Primary.AcquireCount() >= int64(stats.Primary.MaxConns()) {
 		return ComponentHealth{
 			Status:    StatusDegraded,
 			Message:   "Database connection pool exhausted",
@@ -233,7 +233,7 @@ func (c *DatabaseChecker) Check(ctx context.Context) ComponentHealth {
 
 	return ComponentHealth{
 		Status:    StatusHealthy,
-		Message:   fmt.Sprintf("Connected (pool: %d/%d)", stats.AcquiredConns(), stats.MaxConns()),
+		Message:   fmt.Sprintf("Connected (pool: %d/%d)", stats.Primary.AcquiredConns, stats.Primary.MaxConns),
 		Timestamp: start,
 		Duration:  time.Since(start),
 	}

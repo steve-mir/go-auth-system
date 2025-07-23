@@ -2,6 +2,7 @@ package monitoring
 
 import (
 	"context"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -235,13 +236,17 @@ func normalizeEndpoint(path string) string {
 	}
 
 	normalized := path
-	for _, p := range patterns {
-		// In a real implementation, you'd use regex.ReplaceAllString
-		// For simplicity, we'll do basic string replacement
-		if strings.Contains(normalized, "?") {
-			parts := strings.Split(normalized, "?")
-			normalized = parts[0]
-		}
+
+	// For simplicity, we'll do basic string replacement
+	if strings.Contains(normalized, "?") {
+		parts := strings.Split(normalized, "?")
+		normalized = parts[0]
+	}
+
+	// Apply regex patterns for more advanced replacements
+	for _, pat := range patterns {
+		re := regexp.MustCompile(pat.pattern)
+		normalized = re.ReplaceAllString(normalized, pat.replacement)
 	}
 
 	return normalized
