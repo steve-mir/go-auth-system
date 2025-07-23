@@ -118,7 +118,7 @@
   - _Requirements: 5.4_
 
 <!-- TODO: Incomplete. Not implemented in server -->
-- [-] 16. Create OAuth social authentication integration
+- [x] 16. Create OAuth social authentication integration
   - Implement OAuth2 client for Google authentication
   - Create Facebook OAuth integration with proper scopes
   - Implement GitHub OAuth authentication flow

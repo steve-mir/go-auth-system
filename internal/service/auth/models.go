@@ -112,3 +112,13 @@ type SessionInfo struct {
 	LastUsed  time.Time `json:"last_used"`
 	ExpiresAt time.Time `json:"expires_at"`
 }
+
+// UpdateUserData represents data for updating an existing user
+type UpdateUserData struct {
+	ID                 string
+	Email              string
+	Username           string
+	FirstNameEncrypted []byte
+	LastNameEncrypted  []byte
+	PhoneEncrypted     []byte
+}

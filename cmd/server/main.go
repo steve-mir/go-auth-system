@@ -27,6 +27,7 @@ import (
 	"github.com/steve-mir/go-auth-system/internal/service/admin"
 	"github.com/steve-mir/go-auth-system/internal/service/auth"
 	"github.com/steve-mir/go-auth-system/internal/service/role"
+	"github.com/steve-mir/go-auth-system/internal/service/sso"
 	"github.com/steve-mir/go-auth-system/internal/service/user"
 )
 
@@ -286,6 +287,27 @@ func runServer(ctx context.Context, cfg *config.Config) error {
 		// NotificationRepo  NotificationRepository
 	})
 
+	// Initialize SSO service
+	log.Printf("Initializing SSO service...")
+	socialAccountRepo := postgres.NewSocialAccountRepository(store)
+	stateStore := sso.NewRedisStateStore(redisClient)
+
+	// Create SSO user repository adapter
+	ssoUserRepo := &SSOUserRepositoryAdapter{
+		authRepo:  authUserRepo,
+		encryptor: encryptorSvc.GetEncryptor(),
+	}
+
+	ssoService := sso.NewSSOService(
+		cfg,
+		ssoUserRepo,
+		socialAccountRepo,
+		stateStore,
+		hashSvc,
+		encryptorSvc.GetEncryptor(),
+	)
+	log.Printf("SSO service initialized")
+
 	log.Printf("Business services initialized")
 
 	// roleService := role.NewRol
@@ -298,7 +320,7 @@ func runServer(ctx context.Context, cfg *config.Config) error {
 		roleService,
 		adminService,
 		healthSvc,
-		// ssoService,
+		ssoService,
 	)
 	// httpServer := server.NewHTTPServer(&cfg.Server, healthSvc)
 
@@ -386,4 +408,132 @@ func runServer(ctx context.Context, cfg *config.Config) error {
 	log.Printf("All servers stopped gracefully")
 
 	return nil
+}
+
+// SSOUserRepositoryAdapter adapts auth.UserRepository to sso.UserRepository interface
+type SSOUserRepositoryAdapter struct {
+	authRepo  auth.UserRepository
+	encryptor crypto.Encryptor
+}
+
+func (a *SSOUserRepositoryAdapter) GetUserByEmail(ctx context.Context, email string) (*sso.UserData, error) {
+	authUser, err := a.authRepo.GetUserByEmail(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+
+	return &sso.UserData{
+		ID:                 authUser.ID,
+		Email:              authUser.Email,
+		Username:           authUser.Username,
+		PasswordHash:       authUser.PasswordHash,
+		HashAlgorithm:      authUser.HashAlgorithm,
+		FirstNameEncrypted: authUser.FirstNameEncrypted,
+		LastNameEncrypted:  authUser.LastNameEncrypted,
+		PhoneEncrypted:     authUser.PhoneEncrypted,
+		EmailVerified:      authUser.EmailVerified,
+		PhoneVerified:      authUser.PhoneVerified,
+		AccountLocked:      authUser.AccountLocked,
+		FailedAttempts:     authUser.FailedAttempts,
+		LastLoginAt:        authUser.LastLoginAt,
+		CreatedAt:          authUser.CreatedAt,
+		UpdatedAt:          authUser.UpdatedAt,
+	}, nil
+}
+
+func (a *SSOUserRepositoryAdapter) CreateUser(ctx context.Context, user *sso.CreateUserData) (*sso.UserData, error) {
+	// Encrypt sensitive data
+	var firstNameEncrypted, lastNameEncrypted, phoneEncrypted []byte
+	var err error
+
+	if user.FirstName != "" {
+		firstNameEncrypted, err = a.encryptor.Encrypt([]byte(user.FirstName))
+		if err != nil {
+			return nil, fmt.Errorf("failed to encrypt first name: %w", err)
+		}
+	}
+
+	if user.LastName != "" {
+		lastNameEncrypted, err = a.encryptor.Encrypt([]byte(user.LastName))
+		if err != nil {
+			return nil, fmt.Errorf("failed to encrypt last name: %w", err)
+		}
+	}
+
+	if user.Phone != "" {
+		phoneEncrypted, err = a.encryptor.Encrypt([]byte(user.Phone))
+		if err != nil {
+			return nil, fmt.Errorf("failed to encrypt phone: %w", err)
+		}
+	}
+
+	authUser := &auth.CreateUserData{
+		Email:              user.Email,
+		Username:           user.Username,
+		PasswordHash:       user.PasswordHash,
+		HashAlgorithm:      user.HashAlgorithm,
+		FirstNameEncrypted: firstNameEncrypted,
+		LastNameEncrypted:  lastNameEncrypted,
+		PhoneEncrypted:     phoneEncrypted,
+	}
+
+	createdUser, err := a.authRepo.CreateUser(ctx, authUser)
+	if err != nil {
+		return nil, err
+	}
+
+	return &sso.UserData{
+		ID:                 createdUser.ID,
+		Email:              createdUser.Email,
+		Username:           createdUser.Username,
+		PasswordHash:       createdUser.PasswordHash,
+		HashAlgorithm:      createdUser.HashAlgorithm,
+		FirstNameEncrypted: createdUser.FirstNameEncrypted,
+		LastNameEncrypted:  createdUser.LastNameEncrypted,
+		PhoneEncrypted:     createdUser.PhoneEncrypted,
+		EmailVerified:      createdUser.EmailVerified,
+		PhoneVerified:      createdUser.PhoneVerified,
+		AccountLocked:      createdUser.AccountLocked,
+		FailedAttempts:     createdUser.FailedAttempts,
+		LastLoginAt:        createdUser.LastLoginAt,
+		CreatedAt:          createdUser.CreatedAt,
+		UpdatedAt:          createdUser.UpdatedAt,
+	}, nil
+}
+
+func (a *SSOUserRepositoryAdapter) UpdateUser(ctx context.Context, user *sso.UpdateUserData) error {
+	// Encrypt sensitive data if provided
+	var firstNameEncrypted, lastNameEncrypted, phoneEncrypted []byte
+	var err error
+
+	if user.FirstName != "" {
+		firstNameEncrypted, err = a.encryptor.Encrypt([]byte(user.FirstName))
+		if err != nil {
+			return fmt.Errorf("failed to encrypt first name: %w", err)
+		}
+	}
+
+	if user.LastName != "" {
+		lastNameEncrypted, err = a.encryptor.Encrypt([]byte(user.LastName))
+		if err != nil {
+			return fmt.Errorf("failed to encrypt last name: %w", err)
+		}
+	}
+
+	if user.Phone != "" {
+		phoneEncrypted, err = a.encryptor.Encrypt([]byte(user.Phone))
+		if err != nil {
+			return fmt.Errorf("failed to encrypt phone: %w", err)
+		}
+	}
+
+	authUser := &auth.UpdateUserData{
+		ID:                 user.ID,
+		Username:           user.Username,
+		FirstNameEncrypted: firstNameEncrypted,
+		LastNameEncrypted:  lastNameEncrypted,
+		PhoneEncrypted:     phoneEncrypted,
+	}
+
+	return a.authRepo.UpdateUser(ctx, authUser)
 }

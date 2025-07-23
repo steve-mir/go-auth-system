@@ -52,6 +52,9 @@ type UserRepository interface {
 	// GetUserByID retrieves a user by ID
 	GetUserByID(ctx context.Context, userID string) (*UserData, error)
 
+	// UpdateUser updates user profile information
+	UpdateUser(ctx context.Context, user *UpdateUserData) error
+
 	// UpdateUserLoginInfo updates user login information
 	UpdateUserLoginInfo(ctx context.Context, userID string, info *LoginInfo) error
 

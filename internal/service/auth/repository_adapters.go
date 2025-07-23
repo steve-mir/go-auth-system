@@ -94,6 +94,37 @@ func (r *PostgresUserRepository) GetUserByID(ctx context.Context, userID string)
 	return r.convertDBUserToUserData(&dbUser), nil
 }
 
+func (r *PostgresUserRepository) UpdateUser(ctx context.Context, user *UpdateUserData) error {
+	id, err := uuid.Parse(user.ID)
+	if err != nil {
+		return errors.New(errors.ErrorTypeValidation, "INVALID_USER_ID", "Invalid user ID format")
+	}
+
+	params := db.UpdateUserParams{
+		ID: id,
+	}
+
+	// Set optional fields
+	if user.Email != "" {
+		params.Email = pgtype.Text{String: user.Email, Valid: true}
+	}
+	if user.Username != "" {
+		params.Username = pgtype.Text{String: user.Username, Valid: true}
+	}
+	if user.FirstNameEncrypted != nil {
+		params.FirstNameEncrypted = user.FirstNameEncrypted
+	}
+	if user.LastNameEncrypted != nil {
+		params.LastNameEncrypted = user.LastNameEncrypted
+	}
+	if user.PhoneEncrypted != nil {
+		params.PhoneEncrypted = user.PhoneEncrypted
+	}
+
+	_, err = r.store.UpdateUser(ctx, params)
+	return err
+}
+
 func (r *PostgresUserRepository) UpdateUserLoginInfo(ctx context.Context, userID string, info *LoginInfo) error {
 	id, err := uuid.Parse(userID)
 	if err != nil {

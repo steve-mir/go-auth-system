@@ -141,7 +141,7 @@ func NewServer(
 	roleService interfaces.RoleService,
 	adminService interfaces.AdminService,
 	healthService HealthService,
-	// ssoService SSOService,
+	ssoService SSOService,
 ) *Server {
 	// Set Gin mode based on environment
 	if cfg.Environment == "production" {
@@ -159,16 +159,16 @@ func NewServer(
 	}
 
 	s := &Server{
-		router:      router,
-		server:      server,
-		config:      cfg,
-		middleware:  middlewareManager,
-		authService: authService,
-		userService: userService,
-		roleService: roleService,
-		// adminService:  adminService,
+		router:        router,
+		server:        server,
+		config:        cfg,
+		middleware:    middlewareManager,
+		authService:   authService,
+		userService:   userService,
+		roleService:   roleService,
+		adminService:  adminService,
 		healthService: healthService,
-		// ssoService:    ssoService,
+		ssoService:    ssoService,
 	}
 
 	s.setupMiddleware()
@@ -236,6 +236,9 @@ func (s *Server) setupRoutes() {
 		// Authentication routes (public)
 		authGroup := v1.Group("/auth")
 		s.setupAuthRoutes(authGroup)
+
+		// OAuth/SSO routes (public)
+		s.setupOAuthRoutes(v1)
 
 		// Protected routes (require authentication)
 		protected := v1.Group("")
