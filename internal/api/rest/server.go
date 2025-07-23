@@ -13,8 +13,8 @@ import (
 
 	// "github.com/steve-mir/go-auth-system/internal/service/admin"
 	"github.com/steve-mir/go-auth-system/internal/service/auth"
-	role "github.com/steve-mir/go-auth-system/internal/service/role1"
-	user "github.com/steve-mir/go-auth-system/internal/service/user1"
+	"github.com/steve-mir/go-auth-system/internal/service/role"
+	"github.com/steve-mir/go-auth-system/internal/service/user"
 )
 
 // Server represents the REST API server

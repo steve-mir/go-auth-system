@@ -21,10 +21,10 @@ type PostgresUserRepository struct {
 }
 
 // NewPostgresUserRepository creates a new PostgreSQL user repository
-func NewPostgresUserRepository(queries *postgres.DB) UserRepository {
+func NewPostgresUserRepository(queries *postgres.DB, store *db.Store) UserRepository {
 	return &PostgresUserRepository{
 		queries: queries,
-		store:   db.NewStore(queries.Primary()),
+		store:   store,
 	}
 }
 

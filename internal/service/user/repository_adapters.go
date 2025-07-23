@@ -8,19 +8,22 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/steve-mir/go-auth-system/internal/errors"
+	"github.com/steve-mir/go-auth-system/internal/repository/postgres"
 	"github.com/steve-mir/go-auth-system/internal/repository/postgres/db"
 	"github.com/steve-mir/go-auth-system/internal/repository/redis"
 )
 
 // PostgresUserRepository adapts SQLC queries to UserRepository interface
 type PostgresUserRepository struct {
-	queries *db.Queries
+	queries *postgres.DB
+	store   *db.Store
 }
 
 // NewPostgresUserRepository creates a new PostgreSQL user repository
-func NewPostgresUserRepository(queries *db.Queries) UserRepository {
+func NewPostgresUserRepository(queries *postgres.DB, store *db.Store) UserRepository {
 	return &PostgresUserRepository{
 		queries: queries,
+		store:   store,
 	}
 }
 
@@ -30,7 +33,7 @@ func (r *PostgresUserRepository) GetUserByID(ctx context.Context, userID string)
 		return nil, errors.New(errors.ErrorTypeValidation, "INVALID_USER_ID", "Invalid user ID format")
 	}
 
-	dbUser, err := r.queries.GetUserByID(ctx, id)
+	dbUser, err := r.store.GetUserByID(ctx, id)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, sql.ErrNoRows
@@ -42,7 +45,7 @@ func (r *PostgresUserRepository) GetUserByID(ctx context.Context, userID string)
 }
 
 func (r *PostgresUserRepository) GetUserByEmail(ctx context.Context, email string) (*UserData, error) {
-	dbUser, err := r.queries.GetUserByEmail(ctx, email)
+	dbUser, err := r.store.GetUserByEmail(ctx, email)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, sql.ErrNoRows
@@ -54,7 +57,7 @@ func (r *PostgresUserRepository) GetUserByEmail(ctx context.Context, email strin
 }
 
 func (r *PostgresUserRepository) GetUserByUsername(ctx context.Context, username string) (*UserData, error) {
-	dbUser, err := r.queries.GetUserByUsername(ctx, pgtype.Text{String: username, Valid: true})
+	dbUser, err := r.store.GetUserByUsername(ctx, pgtype.Text{String: username, Valid: true})
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, sql.ErrNoRows
@@ -72,7 +75,7 @@ func (r *PostgresUserRepository) UpdateUser(ctx context.Context, userID string, 
 	}
 
 	// Get current user to preserve existing values
-	currentUser, err := r.queries.GetUserByID(ctx, id)
+	currentUser, err := r.store.GetUserByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current user: %w", err)
 	}
@@ -120,7 +123,7 @@ func (r *PostgresUserRepository) UpdateUser(ctx context.Context, userID string, 
 		params.PhoneVerified = pgtype.Bool{Bool: *data.PhoneVerified, Valid: true}
 	}
 
-	dbUser, err := r.queries.UpdateUser(ctx, params)
+	dbUser, err := r.store.UpdateUser(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update user: %w", err)
 	}
@@ -134,7 +137,7 @@ func (r *PostgresUserRepository) DeleteUser(ctx context.Context, userID string) 
 		return errors.New(errors.ErrorTypeValidation, "INVALID_USER_ID", "Invalid user ID format")
 	}
 
-	return r.queries.DeleteUser(ctx, id)
+	return r.store.DeleteUser(ctx, id)
 }
 
 func (r *PostgresUserRepository) ListUsers(ctx context.Context, limit, offset int32) ([]*UserData, error) {
@@ -143,7 +146,7 @@ func (r *PostgresUserRepository) ListUsers(ctx context.Context, limit, offset in
 		Offset: offset,
 	}
 
-	dbUsers, err := r.queries.ListUsers(ctx, params)
+	dbUsers, err := r.store.ListUsers(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list users: %w", err)
 	}
@@ -157,11 +160,11 @@ func (r *PostgresUserRepository) ListUsers(ctx context.Context, limit, offset in
 }
 
 func (r *PostgresUserRepository) CountUsers(ctx context.Context) (int64, error) {
-	return r.queries.CountUsers(ctx)
+	return r.store.CountUsers(ctx)
 }
 
 func (r *PostgresUserRepository) GetUsersByRole(ctx context.Context, roleName string) ([]*UserData, error) {
-	dbUsers, err := r.queries.GetUsersByRole(ctx, roleName)
+	dbUsers, err := r.store.GetUsersByRole(ctx, roleName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get users by role: %w", err)
 	}
@@ -180,7 +183,7 @@ func (r *PostgresUserRepository) GetUserRoles(ctx context.Context, userID string
 		return nil, errors.New(errors.ErrorTypeValidation, "INVALID_USER_ID", "Invalid user ID format")
 	}
 
-	roles, err := r.queries.GetUserRoles(ctx, id)
+	roles, err := r.store.GetUserRoles(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user roles: %w", err)
 	}

@@ -6,19 +6,21 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
-
+	"github.com/steve-mir/go-auth-system/internal/repository/postgres"
 	"github.com/steve-mir/go-auth-system/internal/repository/postgres/db"
 )
 
 // PostgresRepository implements the Repository interface using PostgreSQL
 type PostgresRepository struct {
-	queries *db.Queries
+	queries *postgres.DB
+	store   *db.Store
 }
 
 // NewPostgresRepository creates a new PostgreSQL repository
-func NewPostgresRepository(queries *db.Queries) Repository {
+func NewPostgresRepository(queries *postgres.DB, store *db.Store) Repository {
 	return &PostgresRepository{
 		queries: queries,
+		store:   store,
 	}
 }
 
@@ -29,7 +31,7 @@ func (r *PostgresRepository) CreateRole(ctx context.Context, role *Role) error {
 		return err
 	}
 
-	dbRole, err := r.queries.CreateRole(ctx, db.CreateRoleParams{
+	dbRole, err := r.store.CreateRole(ctx, db.CreateRoleParams{
 		Name:        role.Name,
 		Description: pgtype.Text{String: role.Description, Valid: role.Description != ""},
 		Permissions: permissionsJSON,
@@ -48,7 +50,7 @@ func (r *PostgresRepository) CreateRole(ctx context.Context, role *Role) error {
 
 // GetRoleByID retrieves a role by its ID
 func (r *PostgresRepository) GetRoleByID(ctx context.Context, roleID uuid.UUID) (*Role, error) {
-	dbRole, err := r.queries.GetRoleByID(ctx, roleID)
+	dbRole, err := r.store.GetRoleByID(ctx, roleID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, NewRoleNotFoundError(roleID.String())
@@ -61,7 +63,7 @@ func (r *PostgresRepository) GetRoleByID(ctx context.Context, roleID uuid.UUID) 
 
 // GetRoleByName retrieves a role by its name
 func (r *PostgresRepository) GetRoleByName(ctx context.Context, name string) (*Role, error) {
-	dbRole, err := r.queries.GetRoleByName(ctx, name)
+	dbRole, err := r.store.GetRoleByName(ctx, name)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, NewRoleNotFoundError(name)
@@ -79,7 +81,7 @@ func (r *PostgresRepository) UpdateRole(ctx context.Context, role *Role) error {
 		return err
 	}
 
-	dbRole, err := r.queries.UpdateRole(ctx, db.UpdateRoleParams{
+	dbRole, err := r.store.UpdateRole(ctx, db.UpdateRoleParams{
 		ID:          role.ID,
 		Name:        role.Name,
 		Description: pgtype.Text{String: role.Description, Valid: true},
@@ -100,7 +102,7 @@ func (r *PostgresRepository) UpdateRole(ctx context.Context, role *Role) error {
 
 // DeleteRole deletes a role by its ID
 func (r *PostgresRepository) DeleteRole(ctx context.Context, roleID uuid.UUID) error {
-	err := r.queries.DeleteRole(ctx, roleID)
+	err := r.store.DeleteRole(ctx, roleID)
 	if err != nil {
 		return err
 	}
@@ -109,7 +111,7 @@ func (r *PostgresRepository) DeleteRole(ctx context.Context, roleID uuid.UUID) e
 
 // ListRoles retrieves a paginated list of roles
 func (r *PostgresRepository) ListRoles(ctx context.Context, limit, offset int) ([]*Role, error) {
-	dbRoles, err := r.queries.ListRoles(ctx, db.ListRolesParams{
+	dbRoles, err := r.store.ListRoles(ctx, db.ListRolesParams{
 		Limit:  int32(limit),
 		Offset: int32(offset),
 	})
@@ -131,7 +133,7 @@ func (r *PostgresRepository) ListRoles(ctx context.Context, limit, offset int) (
 
 // CountRoles returns the total number of roles
 func (r *PostgresRepository) CountRoles(ctx context.Context) (int64, error) {
-	count, err := r.queries.CountRoles(ctx)
+	count, err := r.store.CountRoles(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -140,7 +142,7 @@ func (r *PostgresRepository) CountRoles(ctx context.Context) (int64, error) {
 
 // AssignRoleToUser assigns a role to a user
 func (r *PostgresRepository) AssignRoleToUser(ctx context.Context, userID, roleID, assignedBy uuid.UUID) error {
-	err := r.queries.AssignRoleToUser(ctx, db.AssignRoleToUserParams{
+	err := r.store.AssignRoleToUser(ctx, db.AssignRoleToUserParams{
 		UserID:     userID,
 		RoleID:     roleID,
 		AssignedBy: pgtype.UUID{Bytes: assignedBy, Valid: true},
@@ -150,7 +152,7 @@ func (r *PostgresRepository) AssignRoleToUser(ctx context.Context, userID, roleI
 
 // RemoveRoleFromUser removes a role from a user
 func (r *PostgresRepository) RemoveRoleFromUser(ctx context.Context, userID, roleID uuid.UUID) error {
-	err := r.queries.RemoveRoleFromUser(ctx, db.RemoveRoleFromUserParams{
+	err := r.store.RemoveRoleFromUser(ctx, db.RemoveRoleFromUserParams{
 		UserID: userID,
 		RoleID: roleID,
 	})
@@ -159,7 +161,7 @@ func (r *PostgresRepository) RemoveRoleFromUser(ctx context.Context, userID, rol
 
 // GetUserRoles retrieves all roles assigned to a user
 func (r *PostgresRepository) GetUserRoles(ctx context.Context, userID uuid.UUID) ([]*Role, error) {
-	dbRoles, err := r.queries.GetUserRoles(ctx, userID)
+	dbRoles, err := r.store.GetUserRoles(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +180,7 @@ func (r *PostgresRepository) GetUserRoles(ctx context.Context, userID uuid.UUID)
 
 // GetRoleUsers retrieves all users assigned to a role
 func (r *PostgresRepository) GetRoleUsers(ctx context.Context, roleID uuid.UUID) ([]*UserInfo, error) {
-	dbUsers, err := r.queries.GetRoleUsers(ctx, roleID)
+	dbUsers, err := r.store.GetRoleUsers(ctx, roleID)
 	if err != nil {
 		return nil, err
 	}

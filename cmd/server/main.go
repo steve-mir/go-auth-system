@@ -19,13 +19,14 @@ import (
 	"github.com/steve-mir/go-auth-system/internal/middleware"
 	"github.com/steve-mir/go-auth-system/internal/monitoring"
 	"github.com/steve-mir/go-auth-system/internal/repository/postgres"
+	sqlc "github.com/steve-mir/go-auth-system/internal/repository/postgres/db"
 	"github.com/steve-mir/go-auth-system/internal/repository/redis"
 	"github.com/steve-mir/go-auth-system/internal/security/crypto"
 	"github.com/steve-mir/go-auth-system/internal/security/hash"
 	"github.com/steve-mir/go-auth-system/internal/security/token"
 	"github.com/steve-mir/go-auth-system/internal/service/auth"
-	role "github.com/steve-mir/go-auth-system/internal/service/role1"
-	user "github.com/steve-mir/go-auth-system/internal/service/user1"
+	"github.com/steve-mir/go-auth-system/internal/service/role"
+	"github.com/steve-mir/go-auth-system/internal/service/user"
 )
 
 func main() {
@@ -234,15 +235,13 @@ func runServer(ctx context.Context, cfg *config.Config) error {
 	// Initialize repositories
 	log.Printf("Initializing repositories...")
 
-	authUserRepo := auth.NewPostgresUserRepository(db) // postgres.NewUserRepository(db) //
-	// roleRepo := postgres.NewRoleRepository(db)
-	roleRepo := role.NewPostgresRepository(db)
+	authUserRepo := auth.NewPostgresUserRepository(db, sqlc.NewStore(db.Primary()))
+	roleRepo := role.NewPostgresRepository(db, sqlc.NewStore(db.Primary()))
+	userRepo := user.NewPostgresUserRepository(db, sqlc.NewStore(db.Primary()))
 	redisStore := redis.NewSessionStore(redisClient)
 	sessionStore := auth.NewRedisSessionRepository(redisStore)
 	redisBlacklist := redis.NewTokenBlacklist(redisClient)
 	blacklistRepo := auth.NewRedisTokenBlacklistRepository(redisBlacklist)
-
-	userRepo := user.NewPostgresUserRepository(db) //postgres.NewUserRepository(db)
 
 	log.Printf("Repositories initialized")
 
