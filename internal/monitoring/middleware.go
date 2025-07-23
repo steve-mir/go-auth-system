@@ -2,6 +2,8 @@ package monitoring
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
@@ -370,4 +372,191 @@ func TraceIDMiddleware() gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+// CorrelationMiddleware creates correlation context for request tracking
+func (s *Service) CorrelationMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if s == nil || s.logger == nil {
+			c.Next()
+			return
+		}
+
+		// Get or generate correlation ID
+		correlationID := c.GetHeader("X-Correlation-ID")
+		if correlationID == "" {
+			correlationID = generateID()
+		}
+
+		// Get request ID
+		requestID := c.GetHeader("X-Request-ID")
+		if requestID == "" {
+			requestID = generateID()
+		}
+
+		// Get session ID from cookie or header
+		sessionID := c.GetHeader("X-Session-ID")
+		if sessionID == "" {
+			if cookie, err := c.Cookie("session_id"); err == nil {
+				sessionID = cookie
+			}
+		}
+
+		// Get user ID from context (if authenticated)
+		userID := ""
+		if user := c.GetHeader("X-User-ID"); user != "" {
+			userID = user
+		}
+
+		// Create correlation context
+		correlation := s.CreateCorrelation(
+			requestID,
+			sessionID,
+			userID,
+			c.ClientIP(),
+			c.Request.UserAgent(),
+		)
+
+		// Add correlation to context
+		ctx := s.WithCorrelation(c.Request.Context(), correlation)
+		c.Request = c.Request.WithContext(ctx)
+
+		// Add headers to response
+		c.Header("X-Correlation-ID", correlationID)
+		c.Header("X-Request-ID", requestID)
+
+		c.Next()
+	}
+}
+
+// TracingMiddleware creates distributed traces for requests
+func (s *Service) TracingMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if s == nil || s.logger == nil {
+			c.Next()
+			return
+		}
+
+		// Create operation name from method and path
+		operation := fmt.Sprintf("%s %s", c.Request.Method, normalizeEndpoint(c.Request.URL.Path))
+
+		// Start trace
+		trace, ctx := s.StartTrace(c.Request.Context(), operation)
+		c.Request = c.Request.WithContext(ctx)
+
+		// Add trace tags
+		s.AddTraceTag(ctx, "http.method", c.Request.Method)
+		s.AddTraceTag(ctx, "http.url", c.Request.URL.Path)
+		s.AddTraceTag(ctx, "http.user_agent", c.Request.UserAgent())
+		s.AddTraceTag(ctx, "client.ip", c.ClientIP())
+
+		// Process request
+		c.Next()
+
+		// Add response tags
+		s.AddTraceTag(ctx, "http.status_code", strconv.Itoa(c.Writer.Status()))
+
+		// Finish trace
+		var err error
+		if c.Writer.Status() >= 400 {
+			err = fmt.Errorf("HTTP %d", c.Writer.Status())
+		}
+		s.FinishTrace(ctx, trace, err)
+	}
+}
+
+// ErrorTrackingMiddleware tracks errors automatically
+func (s *Service) ErrorTrackingMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if s == nil || s.errorTracker == nil {
+			c.Next()
+			return
+		}
+
+		// Process request
+		c.Next()
+
+		// Check for errors
+		if len(c.Errors) > 0 {
+			for _, ginErr := range c.Errors {
+				category := CategorySystem
+				if c.Writer.Status() >= 400 && c.Writer.Status() < 500 {
+					category = CategoryValidation
+				} else if c.Writer.Status() >= 500 {
+					category = CategorySystem
+				}
+
+				operation := fmt.Sprintf("%s %s", c.Request.Method, c.Request.URL.Path)
+				s.TrackError(c.Request.Context(), ginErr.Err, category, operation, "http")
+			}
+		}
+
+		// Track HTTP errors based on status code
+		if c.Writer.Status() >= 500 {
+			err := fmt.Errorf("HTTP %d: %s", c.Writer.Status(), http.StatusText(c.Writer.Status()))
+			operation := fmt.Sprintf("%s %s", c.Request.Method, c.Request.URL.Path)
+			s.TrackError(c.Request.Context(), err, CategorySystem, operation, "http")
+		}
+	}
+}
+
+// LogAggregationMiddleware adds log entries to the aggregator
+func (s *Service) LogAggregationMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if s == nil || s.aggregator == nil {
+			c.Next()
+			return
+		}
+
+		start := time.Now()
+
+		// Process request
+		c.Next()
+
+		// Create log entry
+		duration := time.Since(start)
+		level := "info"
+		if c.Writer.Status() >= 500 {
+			level = "error"
+		} else if c.Writer.Status() >= 400 {
+			level = "warn"
+		}
+
+		entry := LogEntry{
+			Timestamp:     start,
+			Level:         level,
+			Message:       fmt.Sprintf("%s %s", c.Request.Method, c.Request.URL.Path),
+			EventType:     "http",
+			Component:     "api",
+			Operation:     fmt.Sprintf("%s %s", c.Request.Method, normalizeEndpoint(c.Request.URL.Path)),
+			Duration:      float64(duration.Nanoseconds()) / 1e6, // Convert to milliseconds
+			UserID:        getStringFromContext(c.Request.Context(), "user_id"),
+			RequestID:     getStringFromContext(c.Request.Context(), "request_id"),
+			TraceID:       getStringFromContext(c.Request.Context(), "trace_id"),
+			CorrelationID: getStringFromContext(c.Request.Context(), "correlation_id"),
+			ClientIP:      c.ClientIP(),
+			UserAgent:     c.Request.UserAgent(),
+			StatusCode:    c.Writer.Status(),
+			Fields: map[string]interface{}{
+				"method":        c.Request.Method,
+				"path":          c.Request.URL.Path,
+				"status_code":   c.Writer.Status(),
+				"duration_ms":   duration.Milliseconds(),
+				"request_size":  c.Request.ContentLength,
+				"response_size": c.Writer.Size(),
+			},
+		}
+
+		// Add error information if present
+		if len(c.Errors) > 0 {
+			entry.Error = c.Errors.String()
+		}
+
+		s.aggregator.AddLogEntry(entry)
+	}
+}
+
+// generateID generates a random ID (helper function)
+func generateID() string {
+	return strconv.FormatInt(time.Now().UnixNano(), 36)
 }

@@ -274,8 +274,41 @@ type ExternalConfig struct {
 
 // MonitoringConfig contains monitoring configuration
 type MonitoringConfig struct {
-	Enabled    bool             `yaml:"enabled"`
-	Prometheus PrometheusConfig `yaml:"prometheus"`
+	Enabled      bool                `yaml:"enabled"`
+	Prometheus   PrometheusConfig    `yaml:"prometheus"`
+	ErrorTracker ErrorTrackerConfig  `yaml:"error_tracker"`
+	Aggregator   LogAggregatorConfig `yaml:"log_aggregator"`
+	Tracing      TracingConfig       `yaml:"tracing"`
+}
+
+// ErrorTrackerConfig contains error tracking configuration
+type ErrorTrackerConfig struct {
+	Enabled          bool          `yaml:"enabled"`
+	MaxErrors        int           `yaml:"max_errors"`
+	RetentionPeriod  time.Duration `yaml:"retention_period"`
+	AlertingEnabled  bool          `yaml:"alerting_enabled"`
+	AlertBuffer      int           `yaml:"alert_buffer"`
+	DefaultSeverity  string        `yaml:"default_severity"`
+	EnableStackTrace bool          `yaml:"enable_stack_trace"`
+	EnableGrouping   bool          `yaml:"enable_grouping"`
+}
+
+// LogAggregatorConfig contains log aggregation configuration
+type LogAggregatorConfig struct {
+	Enabled           bool          `yaml:"enabled"`
+	MaxEntries        int           `yaml:"max_entries"`
+	RetentionPeriod   time.Duration `yaml:"retention_period"`
+	AggregationLevels []string      `yaml:"aggregation_levels"`
+	PatternDetection  bool          `yaml:"pattern_detection"`
+	MetricsEnabled    bool          `yaml:"metrics_enabled"`
+}
+
+// TracingConfig contains distributed tracing configuration
+type TracingConfig struct {
+	Enabled        bool    `yaml:"enabled"`
+	ServiceName    string  `yaml:"service_name"`
+	ServiceVersion string  `yaml:"service_version"`
+	SampleRate     float64 `yaml:"sample_rate"`
 }
 
 // PrometheusConfig contains Prometheus configuration

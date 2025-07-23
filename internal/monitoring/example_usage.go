@@ -1,323 +1,449 @@
 package monitoring
 
-// import (
-// 	"context"
-// 	"fmt"
-// 	"net/http"
-// 	"time"
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
 
-// 	"github.com/gin-gonic/gin"
-// 	"github.com/redis/go-redis/v9"
-// 	"github.com/steve-mir/go-auth-system/internal/config"
-// 	"github.com/steve-mir/go-auth-system/internal/health"
-// 	"github.com/steve-mir/go-auth-system/internal/repository/postgres"
-// )
+	"github.com/gin-gonic/gin"
+)
 
-// // ExampleUsage demonstrates how to set up and use the monitoring system
-// func ExampleUsage() {
-// 	// 1. Create monitoring configuration
-// 	monitoringConfig := Config{
-// 		Enabled: true,
-// 		Prometheus: PrometheusConfig{
-// 			Enabled: true,
-// 			Path:    "/metrics",
-// 			Port:    9090,
-// 		},
-// 		Logging: LoggerConfig{
-// 			Level:  LogLevelInfo,
-// 			Format: LogFormatJSON,
-// 			Output: "stdout",
-// 		},
-// 	}
+// ExampleUsage demonstrates how to use the enhanced monitoring system
+func ExampleUsage() {
+	// 1. Create monitoring service with full configuration
+	config := Config{
+		Enabled: true,
+		Prometheus: PrometheusConfig{
+			Enabled: true,
+			Path:    "/metrics",
+			Port:    9090,
+		},
+		Logging: LoggerConfig{
+			Level:             LogLevelInfo,
+			Format:            LogFormatJSON,
+			Output:            "stdout",
+			EnableTracing:     true,
+			EnableCorrelation: true,
+			ServiceName:       "auth-service",
+			ServiceVersion:    "1.0.0",
+		},
+		ErrorTracker: ErrorTrackerConfig{
+			Enabled:          true,
+			MaxErrors:        10000,
+			RetentionPeriod:  7 * 24 * time.Hour,
+			AlertingEnabled:  true,
+			AlertBuffer:      1000,
+			DefaultSeverity:  SeverityMedium,
+			EnableStackTrace: true,
+			EnableGrouping:   true,
+		},
+		Aggregator: LogAggregatorConfig{
+			Enabled:           true,
+			MaxEntries:        100000,
+			RetentionPeriod:   24 * time.Hour,
+			AggregationLevels: []string{"minute", "hour", "day"},
+			PatternDetection:  true,
+			MetricsEnabled:    true,
+		},
+		Tracing: TracingConfig{
+			Enabled:        true,
+			ServiceName:    "auth-service",
+			ServiceVersion: "1.0.0",
+			SampleRate:     0.1,
+		},
+	}
 
-// 	// 2. Initialize monitoring service
-// 	monitoringService, err := NewService(monitoringConfig)
-// 	if err != nil {
-// 		panic(fmt.Sprintf("Failed to create monitoring service: %v", err))
-// 	}
+	service, err := NewService(config)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to create monitoring service: %v", err))
+	}
 
-// 	// 3. Start metrics collection
-// 	ctx := context.Background()
-// 	monitoringService.StartCollection(ctx, 30*time.Second)
+	// 2. Set up HTTP server with monitoring middleware
+	router := gin.New()
 
-// 	// 4. Set up health checks with monitoring integration
-// 	healthService := health.NewService()
-// 	healthService.SetMonitoring(monitoringService)
+	// Add monitoring middleware in the correct order
+	router.Use(RequestIDMiddleware())
+	router.Use(TraceIDMiddleware())
+	router.Use(service.CorrelationMiddleware())
+	router.Use(service.TracingMiddleware())
+	router.Use(service.ErrorTrackingMiddleware())
+	router.Use(service.LogAggregationMiddleware())
+	router.Use(service.HTTPMiddleware())
 
-// 	// Add database health checker (example)
-// 	// db := postgres.NewDB(dbConfig) // Your database connection
-// 	// healthService.AddChecker(health.NewDatabaseChecker(db))
+	// 3. Example API endpoint with comprehensive monitoring
+	router.POST("/api/v1/auth/login", func(c *gin.Context) {
+		ctx := c.Request.Context()
 
-// 	// Add Redis health checker (example)
-// 	// redisClient := redis.NewClient(&redis.Options{...}) // Your Redis client
-// 	// healthService.AddChecker(health.NewRedisChecker(redisClient))
+		// Start a trace for the login operation
+		trace, ctx := service.StartTrace(ctx, "user_login")
+		defer func() {
+			service.FinishTrace(ctx, trace, nil)
+		}()
 
-// 	// Add liveness and readiness checkers
-// 	healthService.AddChecker(health.NewLivenessChecker())
-// 	// healthService.AddChecker(health.NewReadinessChecker(...))
+		// Add trace tags
+		service.AddTraceTag(ctx, "endpoint", "/api/v1/auth/login")
+		service.AddTraceTag(ctx, "method", "POST")
 
-// 	// 5. Set up HTTP server with monitoring middleware
-// 	gin.SetMode(gin.ReleaseMode)
-// 	router := gin.New()
+		// Simulate authentication logic with error tracking
+		err := authenticateUser(ctx, service, "user@example.com", "password123")
+		if err != nil {
+			// Track the error
+			errorID := service.TrackError(ctx, err, CategoryAuth, "authenticate_user", "auth_service")
 
-// 	// Add monitoring middleware
-// 	router.Use(RequestIDMiddleware())
-// 	router.Use(TraceIDMiddleware())
-// 	router.Use(monitoringService.HTTPMiddleware())
+			// Add additional context to the error
+			service.AddErrorContext(errorID, "email", "user@example.com")
+			service.AddErrorContext(errorID, "attempt_time", time.Now())
 
-// 	// Health check endpoints
-// 	router.GET("/health", func(c *gin.Context) {
-// 		health := healthService.Check(c.Request.Context())
-// 		status := http.StatusOK
-// 		if health.Status == "unhealthy" {
-// 			status = http.StatusServiceUnavailable
-// 		}
-// 		c.JSON(status, health)
-// 	})
+			c.JSON(401, gin.H{"error": "Authentication failed"})
+			return
+		}
 
-// 	router.GET("/health/live", func(c *gin.Context) {
-// 		c.JSON(http.StatusOK, gin.H{"status": "alive"})
-// 	})
+		// Record successful authentication
+		service.RecordAuthEvent(ctx, "login", "user-123", true, 150*time.Millisecond, map[string]interface{}{
+			"method": "password",
+			"ip":     c.ClientIP(),
+		})
 
-// 	router.GET("/health/ready", func(c *gin.Context) {
-// 		health := healthService.Check(c.Request.Context())
-// 		status := http.StatusOK
-// 		if health.Status != "healthy" {
-// 			status = http.StatusServiceUnavailable
-// 		}
-// 		c.JSON(status, gin.H{"status": "ready"})
-// 	})
+		c.JSON(200, gin.H{"message": "Login successful"})
+	})
 
-// 	// Metrics endpoint
-// 	router.GET("/metrics", gin.WrapH(monitoringService.MetricsHandler()))
+	// 4. Example database operation with monitoring
+	router.GET("/api/v1/users/:id", func(c *gin.Context) {
+		ctx := c.Request.Context()
+		userID := c.Param("id")
 
-// 	// Example API endpoints with monitoring
-// 	router.POST("/api/auth/login", func(c *gin.Context) {
-// 		start := time.Now()
+		// Start trace for database operation
+		trace, ctx := service.StartTrace(ctx, "get_user")
+		service.AddTraceTag(ctx, "user_id", userID)
 
-// 		// Simulate authentication logic
-// 		userID := "user123"
-// 		method := "password"
-// 		success := true // This would be determined by actual auth logic
+		// Simulate database query with monitoring
+		start := time.Now()
+		user, err := getUserFromDatabase(ctx, service, userID)
+		duration := time.Since(start)
 
-// 		// Record authentication event
-// 		details := map[string]interface{}{
-// 			"ip":         c.ClientIP(),
-// 			"user_agent": c.Request.UserAgent(),
-// 		}
+		// Record database metrics
+		service.RecordDatabaseEvent(ctx, "SELECT", "users", duration, err)
 
-// 		monitoringService.RecordAuthEvent(
-// 			c.Request.Context(),
-// 			method,
-// 			userID,
-// 			success,
-// 			time.Since(start),
-// 			details,
-// 		)
+		if err != nil {
+			// Track database error
+			errorID := service.TrackError(ctx, err, CategoryDatabase, "get_user", "postgres")
+			service.AddErrorContext(errorID, "user_id", userID)
+			service.AddErrorContext(errorID, "query_duration", duration)
 
-// 		if success {
-// 			c.JSON(http.StatusOK, gin.H{"message": "Login successful"})
-// 		} else {
-// 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Login failed"})
-// 		}
-// 	})
+			service.FinishTrace(ctx, trace, err)
+			c.JSON(500, gin.H{"error": "Database error"})
+			return
+		}
 
-// 	router.POST("/api/users", func(c *gin.Context) {
-// 		// Simulate user registration
-// 		userID := "user456"
-// 		details := map[string]interface{}{
-// 			"method": "direct",
-// 		}
+		service.FinishTrace(ctx, trace, nil)
+		c.JSON(200, user)
+	})
 
-// 		monitoringService.RecordUserEvent(
-// 			c.Request.Context(),
-// 			"register",
-// 			userID,
-// 			details,
-// 		)
+	// 5. Admin endpoints for monitoring data
+	adminGroup := router.Group("/admin")
+	{
+		// Get error statistics
+		adminGroup.GET("/errors", func(c *gin.Context) {
+			category := c.Query("category")
+			severity := c.Query("severity")
 
-// 		c.JSON(http.StatusCreated, gin.H{"message": "User created"})
-// 	})
+			var cat ErrorCategory
+			if category != "" {
+				cat = ErrorCategory(category)
+			}
 
-// 	// 6. Example of recording custom metrics
-// 	go func() {
-// 		ticker := time.NewTicker(10 * time.Second)
-// 		defer ticker.Stop()
+			var sev ErrorSeverity
+			if severity != "" {
+				sev = ErrorSeverity(severity)
+			}
 
-// 		for {
-// 			select {
-// 			case <-ctx.Done():
-// 				return
-// 			case <-ticker.C:
-// 				// Update system metrics
-// 				monitoringService.UpdateActiveSessions("web", 150)
-// 				monitoringService.UpdateActiveSessions("mobile", 75)
-// 				monitoringService.UpdateDatabaseConnections(8, 2, 10)
-// 			}
-// 		}
-// 	}()
+			errors := service.GetErrors(cat, sev, nil)
+			c.JSON(200, errors)
+		})
 
-// 	// 7. Start HTTP server
-// 	fmt.Println("Starting server with monitoring on :8080")
-// 	fmt.Println("Metrics available at http://localhost:8080/metrics")
-// 	fmt.Println("Health check at http://localhost:8080/health")
+		// Get log statistics
+		adminGroup.GET("/logs/stats", func(c *gin.Context) {
+			start := time.Now().Add(-24 * time.Hour)
+			end := time.Now()
 
-// 	// In a real application, you would start the server here
-// 	// router.Run(":8080")
-// }
+			stats := service.GetLogStatistics(start, end)
+			c.JSON(200, stats)
+		})
 
-// // ExampleDatabaseMonitoring shows how to monitor database operations
-// func ExampleDatabaseMonitoring(monitoringService *Service) {
-// 	// Example of using database middleware
-// 	dbMiddleware := monitoringService.DatabaseMiddleware()
+		// Search logs
+		adminGroup.GET("/logs/search", func(c *gin.Context) {
+			query := LogSearchQuery{
+				Level:     c.Query("level"),
+				EventType: c.Query("event_type"),
+				Component: c.Query("component"),
+				Message:   c.Query("message"),
+				UserID:    c.Query("user_id"),
+				Limit:     10,
+			}
 
-// 	// Wrap database operations
-// 	err := dbMiddleware("SELECT", "users", func() error {
-// 		// Your actual database query here
-// 		time.Sleep(50 * time.Millisecond) // Simulate query time
-// 		return nil
-// 	})
+			results := service.SearchLogs(query)
+			c.JSON(200, results)
+		})
 
-// 	if err != nil {
-// 		fmt.Printf("Database operation failed: %v\n", err)
-// 	}
-// }
+		// Get log patterns
+		adminGroup.GET("/logs/patterns", func(c *gin.Context) {
+			eventType := c.Query("event_type")
+			component := c.Query("component")
 
-// // ExampleCacheMonitoring shows how to monitor cache operations
-// func ExampleCacheMonitoring(monitoringService *Service) {
-// 	// Example of using cache middleware
-// 	cacheMiddleware := monitoringService.CacheMiddleware()
-// 	ctx := context.Background()
+			patterns := service.GetLogPatterns(eventType, component)
+			c.JSON(200, patterns)
+		})
 
-// 	// Wrap cache operations
-// 	hit, err := cacheMiddleware(ctx, "redis", "get", "user:123", func() (bool, error) {
-// 		// Your actual cache operation here
-// 		time.Sleep(5 * time.Millisecond) // Simulate cache lookup
-// 		return true, nil                 // Cache hit
-// 	})
+		// Get alerts
+		adminGroup.GET("/alerts", func(c *gin.Context) {
+			alerts := service.GetAlerts(nil)
+			c.JSON(200, alerts)
+		})
 
-// 	if err != nil {
-// 		fmt.Printf("Cache operation failed: %v\n", err)
-// 	} else if hit {
-// 		fmt.Println("Cache hit!")
-// 	} else {
-// 		fmt.Println("Cache miss!")
-// 	}
-// }
+		// Resolve error
+		adminGroup.POST("/errors/:id/resolve", func(c *gin.Context) {
+			errorID := c.Param("id")
+			resolvedBy := c.GetHeader("X-User-ID")
 
-// // ExampleAuthMonitoring shows how to monitor authentication operations
-// func ExampleAuthMonitoring(monitoringService *Service) {
-// 	// Example of using auth middleware
-// 	authMiddleware := monitoringService.AuthMiddleware()
-// 	ctx := context.Background()
+			service.ResolveError(errorID, resolvedBy)
+			c.JSON(200, gin.H{"message": "Error resolved"})
+		})
 
-// 	// Wrap authentication operations
-// 	err := authMiddleware(ctx, "password", "user123", func() error {
-// 		// Your actual authentication logic here
-// 		time.Sleep(100 * time.Millisecond) // Simulate auth time
-// 		return nil                         // Successful authentication
-// 	})
+		// Export metrics
+		adminGroup.GET("/metrics/export", func(c *gin.Context) {
+			format := c.DefaultQuery("format", "json")
 
-// 	if err != nil {
-// 		fmt.Printf("Authentication failed: %v\n", err)
-// 	} else {
-// 		fmt.Println("Authentication successful!")
-// 	}
-// }
+			data, err := service.ExportLogMetrics(format)
+			if err != nil {
+				c.JSON(400, gin.H{"error": err.Error()})
+				return
+			}
 
-// // ExampleCustomMetrics shows how to record custom metrics and events
-// func ExampleCustomMetrics(monitoringService *Service) {
-// 	ctx := context.Background()
+			c.Data(200, "application/json", data)
+		})
+	}
 
-// 	// Record various types of events
+	// 6. Start alert monitoring in background
+	go monitorAlerts(service)
 
-// 	// 1. Authentication events
-// 	monitoringService.RecordAuthEvent(ctx, "oauth", "user123", true, 150*time.Millisecond, map[string]interface{}{
-// 		"provider": "google",
-// 		"ip":       "192.168.1.1",
-// 	})
+	// 7. Start metrics collection
+	ctx := context.Background()
+	service.StartCollection(ctx, 30*time.Second)
 
-// 	// 2. Token events
-// 	monitoringService.RecordTokenEvent(ctx, "generate", "jwt", true, map[string]interface{}{
-// 		"user_id": "user123",
-// 	})
+	fmt.Println("Monitoring system initialized with full observability features")
+	fmt.Println("- Distributed tracing enabled")
+	fmt.Println("- Error tracking and alerting enabled")
+	fmt.Println("- Log aggregation and pattern detection enabled")
+	fmt.Println("- Prometheus metrics available at /metrics")
+	fmt.Println("- Admin monitoring endpoints available at /admin/*")
+}
 
-// 	// 3. MFA events
-// 	monitoringService.RecordMFAEvent(ctx, "totp", true, "", map[string]interface{}{
-// 		"user_id": "user123",
-// 	})
+// authenticateUser simulates user authentication with error scenarios
+func authenticateUser(ctx context.Context, service *Service, email, password string) error {
+	// Start a sub-trace for authentication
+	trace, ctx := service.StartTrace(ctx, "validate_credentials")
+	defer service.FinishTrace(ctx, trace, nil)
 
-// 	// 4. Security events
-// 	monitoringService.RecordSecurityEvent(ctx, "suspicious_login", "medium", map[string]interface{}{
-// 		"ip":           "192.168.1.100",
-// 		"failed_count": 5,
-// 	})
+	service.AddTraceTag(ctx, "email", email)
 
-// 	// 5. Audit events
-// 	monitoringService.RecordAuditEvent(ctx, "update_profile", "user", "user123", map[string]interface{}{
-// 		"field":     "email",
-// 		"old_value": "old@example.com",
-// 		"new_value": "new@example.com",
-// 	})
+	// Simulate different error scenarios
+	switch email {
+	case "blocked@example.com":
+		err := errors.New("account is blocked")
+		service.TrackError(ctx, err, CategorySecurity, "validate_credentials", "auth_service")
+		return err
+	case "notfound@example.com":
+		err := errors.New("user not found")
+		service.TrackError(ctx, err, CategoryAuth, "validate_credentials", "auth_service")
+		return err
+	case "invalid@example.com":
+		err := errors.New("invalid password")
+		service.TrackError(ctx, err, CategoryAuth, "validate_credentials", "auth_service")
+		return err
+	}
 
-// 	// 6. Rate limiting events
-// 	monitoringService.RecordRateLimitEvent(ctx, "ip", "192.168.1.1", false, map[string]interface{}{
-// 		"limit":  100,
-// 		"window": "1m",
-// 	})
-// }
+	// Simulate successful authentication
+	return nil
+}
 
-// // ExampleHealthCheckIntegration shows how to integrate health checks with monitoring
-// func ExampleHealthCheckIntegration(db *postgres.DB, redisClient *redis.Client) *health.Service {
-// 	// Create monitoring service
-// 	config := Config{
-// 		Enabled: true,
-// 		Logging: LoggerConfig{
-// 			Level:  LogLevelInfo,
-// 			Format: LogFormatJSON,
-// 			Output: "stdout",
-// 		},
-// 	}
+// getUserFromDatabase simulates database operations with error scenarios
+func getUserFromDatabase(ctx context.Context, service *Service, userID string) (map[string]interface{}, error) {
+	// Start a sub-trace for database operation
+	trace, ctx := service.StartTrace(ctx, "db_query_user")
+	defer func() {
+		service.FinishTrace(ctx, trace, nil)
+	}()
 
-// 	monitoringService, err := NewService(config)
-// 	if err != nil {
-// 		panic(err)
-// 	}
+	service.AddTraceTag(ctx, "table", "users")
+	service.AddTraceTag(ctx, "operation", "SELECT")
 
-// 	// Create health service
-// 	healthService := health.NewService()
-// 	healthService.SetMonitoring(monitoringService)
+	// Simulate different database scenarios
+	switch userID {
+	case "timeout":
+		err := errors.New("database connection timeout")
+		service.TrackError(ctx, err, CategoryDatabase, "db_query_user", "postgres")
+		return nil, err
+	case "deadlock":
+		err := errors.New("database deadlock detected")
+		service.TrackError(ctx, err, CategoryDatabase, "db_query_user", "postgres")
+		return nil, err
+	case "notfound":
+		err := errors.New("user not found")
+		return nil, err
+	}
 
-// 	// Add health checkers
-// 	healthService.AddChecker(health.NewLivenessChecker())
-// 	healthService.AddChecker(health.NewDatabaseChecker(db))
-// 	healthService.AddChecker(health.NewRedisChecker(redisClient))
+	// Simulate successful database query
+	user := map[string]interface{}{
+		"id":    userID,
+		"email": "user@example.com",
+		"name":  "John Doe",
+	}
 
-// 	// Create readiness checker that depends on database and Redis
-// 	readinessChecker := health.NewReadinessChecker(
-// 		health.NewDatabaseChecker(db),
-// 		health.NewRedisChecker(redisClient),
-// 	)
-// 	healthService.AddChecker(readinessChecker)
+	return user, nil
+}
 
-// 	return healthService
-// }
+// monitorAlerts demonstrates how to handle alerts in real-time
+func monitorAlerts(service *Service) {
+	alertChan := service.GetAlertChannel()
+	if alertChan == nil {
+		return
+	}
 
-// // ExampleConfigurationFromFile shows how to load monitoring configuration from file
-// func ExampleConfigurationFromFile() (*Service, error) {
-// 	// Load application configuration
-// 	appConfig, err := config.Load("config.yaml")
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to load config: %w", err)
-// 	}
+	for alert := range alertChan {
+		fmt.Printf("🚨 ALERT: %s - %s\n", alert.RuleName, alert.Message)
+		fmt.Printf("   Severity: %s\n", alert.Severity)
+		fmt.Printf("   Error Count: %d in %v\n", alert.ErrorCount, alert.TimeWindow)
+		fmt.Printf("   Timestamp: %s\n", alert.Timestamp.Format(time.RFC3339))
 
-// 	// Extract monitoring configuration
-// 	monitoringConfig := Config{
-// 		Enabled:    appConfig.External.Monitoring.Enabled,
-// 		Prometheus: PrometheusConfig(appConfig.External.Monitoring.Prometheus),
-// 		Logging:    LoggerConfig(appConfig.External.Logging),
-// 	}
+		// Here you would typically:
+		// 1. Send notifications (email, Slack, PagerDuty, etc.)
+		// 2. Create tickets in your issue tracking system
+		// 3. Trigger automated remediation actions
+		// 4. Log to external alerting systems
 
-// 	// Create monitoring service
-// 	return NewService(monitoringConfig)
-// }
+		// Example: Send to external alerting system
+		sendToExternalAlerting(alert)
+	}
+}
+
+// sendToExternalAlerting simulates sending alerts to external systems
+func sendToExternalAlerting(alert *Alert) {
+	// This would integrate with your alerting infrastructure
+	fmt.Printf("📧 Sending alert to external system: %s\n", alert.ID)
+
+	// Example integrations:
+	// - Send to Slack webhook
+	// - Send to PagerDuty
+	// - Send email notification
+	// - Create Jira ticket
+	// - Send to monitoring dashboard
+}
+
+// ExampleCustomErrorTracking demonstrates custom error tracking patterns
+func ExampleCustomErrorTracking(service *Service) {
+	ctx := context.Background()
+
+	// 1. Track business logic errors
+	businessErr := errors.New("insufficient funds for transaction")
+	errorID := service.TrackError(ctx, businessErr, CategoryValidation, "process_payment", "payment_service")
+
+	// Add business context
+	service.AddErrorContext(errorID, "user_id", "user-123")
+	service.AddErrorContext(errorID, "transaction_amount", 1500.00)
+	service.AddErrorContext(errorID, "account_balance", 750.00)
+
+	// 2. Track integration errors
+	integrationErr := errors.New("third-party API rate limit exceeded")
+	errorID2 := service.TrackError(ctx, integrationErr, CategoryExternal, "call_payment_api", "stripe_integration")
+
+	service.AddErrorContext(errorID2, "api_endpoint", "/v1/charges")
+	service.AddErrorContext(errorID2, "rate_limit", "100/hour")
+	service.AddErrorContext(errorID2, "retry_after", "3600")
+
+	// 3. Track security events
+	securityErr := errors.New("suspicious login pattern detected")
+	errorID3 := service.TrackError(ctx, securityErr, CategorySecurity, "analyze_login_pattern", "security_service")
+
+	service.AddErrorContext(errorID3, "ip_address", "192.168.1.100")
+	service.AddErrorContext(errorID3, "failed_attempts", 5)
+	service.AddErrorContext(errorID3, "time_window", "5 minutes")
+}
+
+// ExampleDistributedTracing demonstrates distributed tracing across services
+func ExampleDistributedTracing(service *Service) {
+	ctx := context.Background()
+
+	// 1. Start main operation trace
+	mainTrace, ctx := service.StartTrace(ctx, "user_registration")
+	service.AddTraceTag(ctx, "service", "auth-service")
+	service.AddTraceTag(ctx, "version", "1.0.0")
+
+	// 2. Trace validation step
+	validationTrace, ctx := service.StartTrace(ctx, "validate_user_data")
+	service.AddTraceTag(ctx, "validation_type", "email_and_password")
+
+	// Simulate validation work
+	time.Sleep(50 * time.Millisecond)
+	service.FinishTrace(ctx, validationTrace, nil)
+
+	// 3. Trace database operations
+	dbTrace, ctx := service.StartTrace(ctx, "create_user_record")
+	service.AddTraceTag(ctx, "database", "postgresql")
+	service.AddTraceTag(ctx, "table", "users")
+
+	// Simulate database work
+	time.Sleep(100 * time.Millisecond)
+	service.FinishTrace(ctx, dbTrace, nil)
+
+	// 4. Trace external service call
+	emailTrace, ctx := service.StartTrace(ctx, "send_welcome_email")
+	service.AddTraceTag(ctx, "email_service", "sendgrid")
+	service.AddTraceTag(ctx, "template", "welcome_template")
+
+	// Simulate email service call
+	time.Sleep(200 * time.Millisecond)
+	service.FinishTrace(ctx, emailTrace, nil)
+
+	// 5. Finish main trace
+	service.FinishTrace(ctx, mainTrace, nil)
+
+	fmt.Println("Distributed trace completed with multiple spans")
+}
+
+// ExampleLogAggregationQueries demonstrates log querying capabilities
+func ExampleLogAggregationQueries(service *Service) {
+	// 1. Search for authentication failures
+	authFailures := service.SearchLogs(LogSearchQuery{
+		EventType: "auth",
+		Level:     "error",
+		Message:   "failed",
+		Start:     time.Now().Add(-1 * time.Hour),
+		End:       time.Now(),
+		Limit:     100,
+	})
+
+	fmt.Printf("Found %d authentication failures in the last hour\n", len(authFailures))
+
+	// 2. Get database performance metrics
+	dbMetrics := service.GetLogMetrics("database", "postgres", AggregationMinute,
+		time.Now().Add(-1*time.Hour), time.Now())
+
+	fmt.Printf("Database metrics for the last hour: %d data points\n", len(dbMetrics))
+
+	// 3. Analyze error patterns
+	errorPatterns := service.GetLogPatterns("error", "")
+	fmt.Printf("Detected %d error patterns\n", len(errorPatterns))
+
+	for _, pattern := range errorPatterns {
+		fmt.Printf("- Pattern: %s, Frequency: %.2f/min, Severity: %s\n",
+			pattern.Pattern, pattern.Frequency, pattern.Severity)
+	}
+
+	// 4. Get system statistics
+	stats := service.GetLogStatistics(time.Now().Add(-24*time.Hour), time.Now())
+	fmt.Printf("System statistics for the last 24 hours:\n")
+	fmt.Printf("- Total entries: %d\n", stats.TotalEntries)
+	fmt.Printf("- Error rate: %.2f%%\n", stats.ErrorRate)
+	fmt.Printf("- Average duration: %.2fms\n", stats.AvgDuration)
+}

@@ -129,6 +129,30 @@ func setExternalDefaults(external *ExternalConfig) {
 	external.Monitoring.Prometheus.Path = "/metrics"
 	external.Monitoring.Prometheus.Port = 8081
 
+	// Error tracker defaults
+	external.Monitoring.ErrorTracker.Enabled = true
+	external.Monitoring.ErrorTracker.MaxErrors = 10000
+	external.Monitoring.ErrorTracker.RetentionPeriod = 7 * 24 * time.Hour // 7 days
+	external.Monitoring.ErrorTracker.AlertingEnabled = true
+	external.Monitoring.ErrorTracker.AlertBuffer = 1000
+	external.Monitoring.ErrorTracker.DefaultSeverity = "medium"
+	external.Monitoring.ErrorTracker.EnableStackTrace = true
+	external.Monitoring.ErrorTracker.EnableGrouping = true
+
+	// Log aggregator defaults
+	external.Monitoring.Aggregator.Enabled = true
+	external.Monitoring.Aggregator.MaxEntries = 100000
+	external.Monitoring.Aggregator.RetentionPeriod = 24 * time.Hour
+	external.Monitoring.Aggregator.AggregationLevels = []string{"minute", "hour", "day"}
+	external.Monitoring.Aggregator.PatternDetection = true
+	external.Monitoring.Aggregator.MetricsEnabled = true
+
+	// Tracing defaults
+	external.Monitoring.Tracing.Enabled = true
+	external.Monitoring.Tracing.ServiceName = "go-auth-system"
+	external.Monitoring.Tracing.ServiceVersion = "1.0.0"
+	external.Monitoring.Tracing.SampleRate = 0.1 // 10% sampling
+
 	// Logging defaults
 	external.Logging.Level = "info"
 	external.Logging.Format = "json"

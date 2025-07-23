@@ -11,17 +11,30 @@ import (
 
 // Service provides monitoring capabilities including metrics and logging
 type Service struct {
-	metrics   *Metrics
-	logger    *Logger
-	collector *MetricsCollector
-	registry  *prometheus.Registry
+	metrics      *Metrics
+	logger       *Logger
+	collector    *MetricsCollector
+	registry     *prometheus.Registry
+	errorTracker *ErrorTracker
+	aggregator   *LogAggregator
 }
 
 // Config contains configuration for the monitoring service
 type Config struct {
-	Enabled    bool             `yaml:"enabled"`
-	Prometheus PrometheusConfig `yaml:"prometheus"`
-	Logging    LoggerConfig     `yaml:"logging"`
+	Enabled      bool                `yaml:"enabled"`
+	Prometheus   PrometheusConfig    `yaml:"prometheus"`
+	Logging      LoggerConfig        `yaml:"logging"`
+	ErrorTracker ErrorTrackerConfig  `yaml:"error_tracker"`
+	Aggregator   LogAggregatorConfig `yaml:"log_aggregator"`
+	Tracing      TracingConfig       `yaml:"tracing"`
+}
+
+// TracingConfig contains distributed tracing configuration
+type TracingConfig struct {
+	Enabled        bool    `yaml:"enabled"`
+	ServiceName    string  `yaml:"service_name"`
+	ServiceVersion string  `yaml:"service_version"`
+	SampleRate     float64 `yaml:"sample_rate"`
 }
 
 // PrometheusConfig contains Prometheus-specific configuration
@@ -52,11 +65,25 @@ func NewService(config Config) (*Service, error) {
 	// Create metrics collector
 	collector := NewMetricsCollector(metrics)
 
+	// Create error tracker
+	var errorTracker *ErrorTracker
+	if config.ErrorTracker.Enabled {
+		errorTracker = NewErrorTracker(config.ErrorTracker, logger)
+	}
+
+	// Create log aggregator
+	var aggregator *LogAggregator
+	if config.Aggregator.Enabled {
+		aggregator = NewLogAggregator(config.Aggregator, logger)
+	}
+
 	service := &Service{
-		metrics:   metrics,
-		logger:    logger,
-		collector: collector,
-		registry:  registry,
+		metrics:      metrics,
+		logger:       logger,
+		collector:    collector,
+		registry:     registry,
+		errorTracker: errorTracker,
+		aggregator:   aggregator,
 	}
 
 	logger.Info("Monitoring service initialized")
@@ -77,6 +104,16 @@ func (s *Service) GetLogger() *Logger {
 // GetRegistry returns the Prometheus registry
 func (s *Service) GetRegistry() *prometheus.Registry {
 	return s.registry
+}
+
+// GetErrorTracker returns the error tracker instance
+func (s *Service) GetErrorTracker() *ErrorTracker {
+	return s.errorTracker
+}
+
+// GetLogAggregator returns the log aggregator instance
+func (s *Service) GetLogAggregator() *LogAggregator {
+	return s.aggregator
 }
 
 // StartCollection starts periodic metrics collection
@@ -330,6 +367,25 @@ func (s *Service) RecordSecurityEvent(ctx context.Context, event string, severit
 	if s.logger != nil {
 		s.logger.SecurityEvent(ctx, event, severity, details)
 	}
+
+	// Add to log aggregator if enabled
+	if s.aggregator != nil {
+		entry := LogEntry{
+			Timestamp:     time.Now(),
+			Level:         "warn",
+			Message:       event,
+			EventType:     "security",
+			Component:     "auth",
+			Operation:     event,
+			UserID:        getStringFromContext(ctx, "user_id"),
+			RequestID:     getStringFromContext(ctx, "request_id"),
+			TraceID:       getStringFromContext(ctx, "trace_id"),
+			CorrelationID: getStringFromContext(ctx, "correlation_id"),
+			ClientIP:      getStringFromContext(ctx, "client_ip"),
+			Fields:        details,
+		}
+		s.aggregator.AddLogEntry(entry)
+	}
 }
 
 // RecordAuditEvent records an audit trail event
@@ -358,6 +414,130 @@ func (s *Service) UpdateDatabaseConnections(active, idle, max int) {
 	if s.metrics != nil {
 		s.metrics.RecordDatabaseConnections(active, idle, max)
 	}
+}
+
+// TrackError tracks an error with the error tracker
+func (s *Service) TrackError(ctx context.Context, err error, category ErrorCategory, operation, component string) string {
+	if s.errorTracker != nil {
+		return s.errorTracker.TrackError(ctx, err, category, operation, component)
+	}
+	return ""
+}
+
+// StartTrace starts a new distributed trace
+func (s *Service) StartTrace(ctx context.Context, operation string) (*TraceContext, context.Context) {
+	if s.logger != nil {
+		return s.logger.StartTrace(ctx, operation)
+	}
+	return nil, ctx
+}
+
+// FinishTrace completes a distributed trace
+func (s *Service) FinishTrace(ctx context.Context, trace *TraceContext, err error) {
+	if s.logger != nil {
+		s.logger.FinishTrace(ctx, trace, err)
+	}
+}
+
+// AddTraceTag adds a tag to the current trace
+func (s *Service) AddTraceTag(ctx context.Context, key, value string) {
+	if s.logger != nil {
+		s.logger.AddTraceTag(ctx, key, value)
+	}
+}
+
+// CreateCorrelation creates a new correlation context
+func (s *Service) CreateCorrelation(requestID, sessionID, userID, clientIP, userAgent string) *CorrelationContext {
+	if s.logger != nil {
+		return s.logger.CreateCorrelation(requestID, sessionID, userID, clientIP, userAgent)
+	}
+	return nil
+}
+
+// WithCorrelation adds correlation context to the logger
+func (s *Service) WithCorrelation(ctx context.Context, correlation *CorrelationContext) context.Context {
+	if s.logger != nil {
+		return s.logger.WithCorrelation(ctx, correlation)
+	}
+	return ctx
+}
+
+// SearchLogs searches log entries
+func (s *Service) SearchLogs(query LogSearchQuery) []*LogEntry {
+	if s.aggregator != nil {
+		return s.aggregator.SearchLogs(query)
+	}
+	return nil
+}
+
+// GetLogStatistics returns log statistics
+func (s *Service) GetLogStatistics(start, end time.Time) *LogStatistics {
+	if s.aggregator != nil {
+		return s.aggregator.GetLogStatistics(start, end)
+	}
+	return nil
+}
+
+// GetLogMetrics returns aggregated log metrics
+func (s *Service) GetLogMetrics(eventType, component string, level AggregationLevel, start, end time.Time) []*LogMetric {
+	if s.aggregator != nil {
+		return s.aggregator.GetMetrics(eventType, component, level, start, end)
+	}
+	return nil
+}
+
+// GetLogPatterns returns detected log patterns
+func (s *Service) GetLogPatterns(eventType, component string) []*LogPattern {
+	if s.aggregator != nil {
+		return s.aggregator.GetPatterns(eventType, component)
+	}
+	return nil
+}
+
+// GetErrors returns tracked errors
+func (s *Service) GetErrors(category ErrorCategory, severity ErrorSeverity, resolved *bool) []*ErrorEvent {
+	if s.errorTracker != nil {
+		return s.errorTracker.GetErrors(category, severity, resolved)
+	}
+	return nil
+}
+
+// GetAlerts returns alerts
+func (s *Service) GetAlerts(resolved *bool) []*Alert {
+	if s.errorTracker != nil {
+		return s.errorTracker.GetAlerts(resolved)
+	}
+	return nil
+}
+
+// GetAlertChannel returns the alert channel
+func (s *Service) GetAlertChannel() <-chan *Alert {
+	if s.errorTracker != nil {
+		return s.errorTracker.GetAlertChannel()
+	}
+	return nil
+}
+
+// ResolveError marks an error as resolved
+func (s *Service) ResolveError(errorID, resolvedBy string) {
+	if s.errorTracker != nil {
+		s.errorTracker.ResolveError(errorID, resolvedBy)
+	}
+}
+
+// AddErrorContext adds context to an error
+func (s *Service) AddErrorContext(errorID string, key string, value interface{}) {
+	if s.errorTracker != nil {
+		s.errorTracker.AddErrorContext(errorID, key, value)
+	}
+}
+
+// ExportLogMetrics exports log metrics
+func (s *Service) ExportLogMetrics(format string) ([]byte, error) {
+	if s.aggregator != nil {
+		return s.aggregator.ExportMetrics(format)
+	}
+	return nil, fmt.Errorf("log aggregator not enabled")
 }
 
 // Close closes the monitoring service and any open resources
