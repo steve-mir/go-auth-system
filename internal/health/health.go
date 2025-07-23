@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
 	"github.com/steve-mir/go-auth-system/internal/repository/postgres"
+	"github.com/steve-mir/go-auth-system/internal/repository/redis"
 )
 
 // Status represents the health status of a component
@@ -277,6 +279,7 @@ func (c *RedisChecker) Check(ctx context.Context) ComponentHealth {
 
 	// Get Redis info
 	info, err := c.client.Info(ctx, "memory").Result()
+	log.Println("Redis Info:", info)
 	if err != nil {
 		return ComponentHealth{
 			Status:    StatusDegraded,

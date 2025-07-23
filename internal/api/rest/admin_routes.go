@@ -2,8 +2,11 @@ package rest
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/steve-mir/go-auth-system/internal/service/admin"
 )
 
 // setupAdminRoutes configures admin-specific routes
@@ -43,34 +46,37 @@ func (s *Server) setupAdminRoutes(group *gin.RouterGroup) {
 		configGroup.PUT("", s.updateConfigHandler)
 		configGroup.POST("/reload", s.reloadConfigHandler)
 	}
+
+	// Alerts and notifications
+	alertGroup := group.Group("/alerts")
+	{
+		alertGroup.GET("", s.getActiveAlertsHandler)
+		alertGroup.POST("", s.createAlertHandler)
+		alertGroup.PUT("/:alert_id", s.updateAlertHandler)
+		alertGroup.DELETE("/:alert_id", s.deleteAlertHandler)
+	}
+
+	// Notification settings
+	notificationGroup := group.Group("/notifications")
+	{
+		notificationGroup.GET("/settings", s.getNotificationSettingsHandler)
+		notificationGroup.PUT("/settings", s.updateNotificationSettingsHandler)
+	}
 }
 
 // System information handlers
 
 // getSystemInfoHandler returns system information
 func (s *Server) getSystemInfoHandler(c *gin.Context) {
-	info := gin.H{
-		"service": "go-auth-system",
-		"version": "1.0.0",
-		"build": gin.H{
-			"go_version": "1.23.1",
-			"build_time": "2024-01-01T00:00:00Z", // TODO: Set during build
-			"git_commit": "unknown",              // TODO: Set during build
-		},
-		"runtime": gin.H{
-			"uptime": "unknown", // TODO: Calculate uptime
-		},
-		"features": gin.H{
-			"multi_protocol":  true,
-			"token_types":     []string{"jwt", "paseto"},
-			"hash_algorithms": []string{"argon2", "bcrypt"},
-			"mfa_methods":     []string{"totp", "sms", "email", "webauthn"},
-			"social_auth":     []string{"google", "facebook", "github"},
-			"enterprise_sso":  []string{"saml", "oidc", "ldap"},
-			"encryption":      "aes-256-gcm",
-			"rate_limiting":   true,
-			"audit_logging":   true,
-		},
+	if s.adminService == nil {
+		s.internalServerErrorResponse(c, "Admin service not available")
+		return
+	}
+
+	info, err := s.adminService.GetSystemInfo(c.Request.Context())
+	if err != nil {
+		s.handleServiceError(c, err)
+		return
 	}
 
 	s.successResponse(c, http.StatusOK, info)
@@ -78,30 +84,15 @@ func (s *Server) getSystemInfoHandler(c *gin.Context) {
 
 // getSystemHealthHandler returns detailed system health information
 func (s *Server) getSystemHealthHandler(c *gin.Context) {
-	// TODO: Implement actual health checks for all components
-	health := gin.H{
-		"status": "healthy",
-		"components": gin.H{
-			"database": gin.H{
-				"status":          "healthy",
-				"connections":     10,
-				"max_connections": 100,
-			},
-			"redis": gin.H{
-				"status":       "healthy",
-				"connections":  5,
-				"memory_usage": "50MB",
-			},
-			"token_service": gin.H{
-				"status": "healthy",
-			},
-			"hash_service": gin.H{
-				"status": "healthy",
-			},
-		},
-		"timestamp": gin.H{
-			"checked_at": "2024-01-01T00:00:00Z", // TODO: Use actual timestamp
-		},
+	if s.adminService == nil {
+		s.internalServerErrorResponse(c, "Admin service not available")
+		return
+	}
+
+	health, err := s.adminService.GetSystemHealth(c.Request.Context())
+	if err != nil {
+		s.handleServiceError(c, err)
+		return
 	}
 
 	s.successResponse(c, http.StatusOK, health)
@@ -109,31 +100,15 @@ func (s *Server) getSystemHealthHandler(c *gin.Context) {
 
 // getSystemMetricsHandler returns system metrics
 func (s *Server) getSystemMetricsHandler(c *gin.Context) {
-	// TODO: Implement actual metrics collection
-	metrics := gin.H{
-		"requests": gin.H{
-			"total":        1000,
-			"success_rate": 99.5,
-			"avg_latency":  "50ms",
-		},
-		"authentication": gin.H{
-			"total_logins":    500,
-			"failed_logins":   5,
-			"success_rate":    99.0,
-			"active_sessions": 100,
-		},
-		"users": gin.H{
-			"total_users":     250,
-			"active_users":    200,
-			"verified_users":  240,
-			"locked_accounts": 2,
-		},
-		"tokens": gin.H{
-			"issued_tokens":      1000,
-			"active_tokens":      800,
-			"expired_tokens":     200,
-			"blacklisted_tokens": 5,
-		},
+	if s.adminService == nil {
+		s.internalServerErrorResponse(c, "Admin service not available")
+		return
+	}
+
+	metrics, err := s.adminService.GetSystemMetrics(c.Request.Context())
+	if err != nil {
+		s.handleServiceError(c, err)
+		return
 	}
 
 	s.successResponse(c, http.StatusOK, metrics)
@@ -143,86 +118,97 @@ func (s *Server) getSystemMetricsHandler(c *gin.Context) {
 
 // getUserStatsHandler returns user statistics
 func (s *Server) getUserStatsHandler(c *gin.Context) {
-	// TODO: Implement actual user statistics
-	stats := gin.H{
-		"total_users":     250,
-		"active_users":    200,
-		"verified_users":  240,
-		"locked_accounts": 2,
-		"users_by_role": gin.H{
-			"admin":     5,
-			"moderator": 10,
-			"user":      235,
-		},
-		"registration_trend": []gin.H{
-			{"date": "2024-01-01", "count": 10},
-			{"date": "2024-01-02", "count": 15},
-			{"date": "2024-01-03", "count": 8},
-		},
+	if s.adminService == nil {
+		s.internalServerErrorResponse(c, "Admin service not available")
+		return
+	}
+
+	stats, err := s.adminService.GetUserStats(c.Request.Context())
+	if err != nil {
+		s.handleServiceError(c, err)
+		return
 	}
 
 	s.successResponse(c, http.StatusOK, stats)
 }
 
-// BulkUserActionRequest represents a bulk user action request
-type BulkUserActionRequest struct {
-	UserIDs []string `json:"user_ids" validate:"required,min=1"`
-	Action  string   `json:"action" validate:"required,oneof=lock unlock verify_email verify_phone delete"`
-}
-
 // bulkUserActionsHandler handles bulk user actions
 func (s *Server) bulkUserActionsHandler(c *gin.Context) {
-	var req BulkUserActionRequest
+	if s.adminService == nil {
+		s.internalServerErrorResponse(c, "Admin service not available")
+		return
+	}
+
+	var req admin.BulkUserActionRequest
 	if !s.bindAndValidate(c, &req) {
 		return
 	}
 
-	// TODO: Implement actual bulk user actions
-	results := gin.H{
-		"action":  req.Action,
-		"total":   len(req.UserIDs),
-		"success": len(req.UserIDs),
-		"failed":  0,
-		"errors":  []string{},
+	result, err := s.adminService.BulkUserActions(c.Request.Context(), &req)
+	if err != nil {
+		s.handleServiceError(c, err)
+		return
 	}
 
-	s.successResponse(c, http.StatusOK, results)
+	s.successResponse(c, http.StatusOK, result)
 }
 
 // getAllUserSessionsHandler returns all active user sessions
 func (s *Server) getAllUserSessionsHandler(c *gin.Context) {
+	if s.adminService == nil {
+		s.internalServerErrorResponse(c, "Admin service not available")
+		return
+	}
+
 	page, limit, valid := s.GetPaginationParams(c)
 	if !valid {
 		return
 	}
 
-	// TODO: Implement actual session retrieval
-	sessions := []gin.H{
-		{
-			"session_id": "session-1",
-			"user_id":    "user-1",
-			"user_email": "user1@example.com",
-			"ip_address": "192.168.1.1",
-			"user_agent": "Mozilla/5.0...",
-			"created_at": "2024-01-01T00:00:00Z",
-			"last_used":  "2024-01-01T01:00:00Z",
-			"expires_at": "2024-01-02T00:00:00Z",
-		},
+	// Get additional query parameters
+	userID := c.Query("user_id")
+	sortBy := c.Query("sort_by")
+	sortOrder := c.Query("sort_order")
+
+	req := &admin.GetSessionsRequest{
+		Page:      page,
+		Limit:     limit,
+		UserID:    userID,
+		SortBy:    sortBy,
+		SortOrder: sortOrder,
 	}
 
-	pagination := calculatePagination(page, limit, int64(len(sessions)))
-	s.paginatedResponse(c, http.StatusOK, sessions, pagination)
+	response, err := s.adminService.GetAllUserSessions(c.Request.Context(), req)
+	if err != nil {
+		s.handleServiceError(c, err)
+		return
+	}
+
+	s.paginatedResponse(c, http.StatusOK, response.Sessions, &response.Pagination)
 }
 
 // deleteUserSessionHandler deletes a specific user session
 func (s *Server) deleteUserSessionHandler(c *gin.Context) {
-	sessionID, valid := s.parseUUIDParam(c, "session_id")
+	if s.adminService == nil {
+		s.internalServerErrorResponse(c, "Admin service not available")
+		return
+	}
+
+	sessionIDStr, valid := s.parseUUIDParam(c, "session_id")
 	if !valid {
 		return
 	}
 
-	// TODO: Implement actual session deletion
-	_ = sessionID
+	sessionID, err := uuid.Parse(sessionIDStr)
+	if err != nil {
+		s.badRequestResponse(c, "Invalid session ID format", nil)
+		return
+	}
+
+	if err := s.adminService.DeleteUserSession(c.Request.Context(), sessionID); err != nil {
+		s.handleServiceError(c, err)
+		return
+	}
 
 	s.successResponse(c, http.StatusOK, gin.H{
 		"message": "Session deleted successfully",
@@ -233,137 +219,142 @@ func (s *Server) deleteUserSessionHandler(c *gin.Context) {
 
 // getRoleStatsHandler returns role statistics
 func (s *Server) getRoleStatsHandler(c *gin.Context) {
-	// TODO: Implement actual role statistics
-	stats := gin.H{
-		"total_roles": 10,
-		"role_usage": gin.H{
-			"admin":     5,
-			"moderator": 10,
-			"user":      235,
-		},
-		"permission_usage": gin.H{
-			"user:read":   250,
-			"user:write":  15,
-			"role:manage": 5,
-		},
+	if s.adminService == nil {
+		s.internalServerErrorResponse(c, "Admin service not available")
+		return
+	}
+
+	stats, err := s.adminService.GetRoleStats(c.Request.Context())
+	if err != nil {
+		s.handleServiceError(c, err)
+		return
 	}
 
 	s.successResponse(c, http.StatusOK, stats)
 }
 
-// BulkRoleAssignRequest represents a bulk role assignment request
-type BulkRoleAssignRequest struct {
-	UserIDs []string `json:"user_ids" validate:"required,min=1"`
-	RoleID  string   `json:"role_id" validate:"required,uuid"`
-	Action  string   `json:"action" validate:"required,oneof=assign remove"`
-}
-
 // bulkRoleAssignHandler handles bulk role assignments
 func (s *Server) bulkRoleAssignHandler(c *gin.Context) {
-	var req BulkRoleAssignRequest
+	if s.adminService == nil {
+		s.internalServerErrorResponse(c, "Admin service not available")
+		return
+	}
+
+	var req admin.BulkRoleAssignRequest
 	if !s.bindAndValidate(c, &req) {
 		return
 	}
 
-	// TODO: Implement actual bulk role assignment
-	results := gin.H{
-		"action":  req.Action,
-		"role_id": req.RoleID,
-		"total":   len(req.UserIDs),
-		"success": len(req.UserIDs),
-		"failed":  0,
-		"errors":  []string{},
+	result, err := s.adminService.BulkRoleAssign(c.Request.Context(), &req)
+	if err != nil {
+		s.handleServiceError(c, err)
+		return
 	}
 
-	s.successResponse(c, http.StatusOK, results)
+	s.successResponse(c, http.StatusOK, result)
 }
 
 // Audit handlers
 
 // getAuditLogsHandler returns audit logs
 func (s *Server) getAuditLogsHandler(c *gin.Context) {
+	if s.adminService == nil {
+		s.internalServerErrorResponse(c, "Admin service not available")
+		return
+	}
+
 	page, limit, valid := s.GetPaginationParams(c)
 	if !valid {
 		return
 	}
 
-	// TODO: Implement actual audit log retrieval
-	logs := []gin.H{
-		{
-			"id":            "log-1",
-			"user_id":       "user-1",
-			"action":        "login",
-			"resource_type": "user",
-			"resource_id":   "user-1",
-			"ip_address":    "192.168.1.1",
-			"user_agent":    "Mozilla/5.0...",
-			"timestamp":     "2024-01-01T00:00:00Z",
-			"metadata": gin.H{
-				"success": true,
-			},
-		},
+	// Parse query parameters
+	userID := c.Query("user_id")
+	action := c.Query("action")
+	resourceType := c.Query("resource_type")
+	sortBy := c.Query("sort_by")
+	sortOrder := c.Query("sort_order")
+
+	// Parse time range if provided
+	var startTime, endTime time.Time
+	if startTimeStr := c.Query("start_time"); startTimeStr != "" {
+		if t, err := time.Parse(time.RFC3339, startTimeStr); err == nil {
+			startTime = t
+		}
+	}
+	if endTimeStr := c.Query("end_time"); endTimeStr != "" {
+		if t, err := time.Parse(time.RFC3339, endTimeStr); err == nil {
+			endTime = t
+		}
 	}
 
-	pagination := calculatePagination(page, limit, int64(len(logs)))
-	s.paginatedResponse(c, http.StatusOK, logs, pagination)
+	req := &admin.GetAuditLogsRequest{
+		Page:         page,
+		Limit:        limit,
+		UserID:       userID,
+		Action:       action,
+		ResourceType: resourceType,
+		StartTime:    startTime,
+		EndTime:      endTime,
+		SortBy:       sortBy,
+		SortOrder:    sortOrder,
+	}
+
+	response, err := s.adminService.GetAuditLogs(c.Request.Context(), req)
+	if err != nil {
+		s.handleServiceError(c, err)
+		return
+	}
+
+	s.paginatedResponse(c, http.StatusOK, response.Logs, &response.Pagination)
 }
 
 // getAuditEventsHandler returns audit events with filtering
 func (s *Server) getAuditEventsHandler(c *gin.Context) {
+	if s.adminService == nil {
+		s.internalServerErrorResponse(c, "Admin service not available")
+		return
+	}
+
 	page, limit, valid := s.GetPaginationParams(c)
 	if !valid {
 		return
 	}
 
-	// TODO: Implement actual audit event retrieval with filtering
-	events := []gin.H{
-		{
-			"event_type": "authentication",
-			"count":      100,
-			"last_seen":  "2024-01-01T00:00:00Z",
-		},
-		{
-			"event_type": "authorization",
-			"count":      50,
-			"last_seen":  "2024-01-01T00:00:00Z",
-		},
+	eventType := c.Query("event_type")
+	sortBy := c.Query("sort_by")
+	sortOrder := c.Query("sort_order")
+
+	req := &admin.GetAuditEventsRequest{
+		Page:      page,
+		Limit:     limit,
+		EventType: eventType,
+		SortBy:    sortBy,
+		SortOrder: sortOrder,
 	}
 
-	pagination := calculatePagination(page, limit, int64(len(events)))
-	s.paginatedResponse(c, http.StatusOK, events, pagination)
+	response, err := s.adminService.GetAuditEvents(c.Request.Context(), req)
+	if err != nil {
+		s.handleServiceError(c, err)
+		return
+	}
+
+	s.paginatedResponse(c, http.StatusOK, response.Events, &response.Pagination)
 }
 
 // Configuration handlers
 
 // getConfigHandler returns current configuration
 func (s *Server) getConfigHandler(c *gin.Context) {
-	// TODO: Return actual configuration (sanitized, no secrets)
-	config := gin.H{
-		"server": gin.H{
-			"host":        "0.0.0.0",
-			"port":        8080,
-			"environment": "development",
-		},
-		"security": gin.H{
-			"password_hash": gin.H{
-				"algorithm": "argon2",
-			},
-			"token": gin.H{
-				"type":        "jwt",
-				"access_ttl":  "15m",
-				"refresh_ttl": "7d",
-			},
-			"rate_limit": gin.H{
-				"enabled":  true,
-				"requests": 100,
-				"window":   "1m",
-			},
-		},
-		"features": gin.H{
-			"mfa_enabled":    true,
-			"social_auth":    true,
-			"enterprise_sso": true,
-		},
+	if s.adminService == nil {
+		s.internalServerErrorResponse(c, "Admin service not available")
+		return
+	}
+
+	config, err := s.adminService.GetConfiguration(c.Request.Context())
+	if err != nil {
+		s.handleServiceError(c, err)
+		return
 	}
 
 	s.successResponse(c, http.StatusOK, config)
@@ -371,23 +362,193 @@ func (s *Server) getConfigHandler(c *gin.Context) {
 
 // updateConfigHandler updates configuration
 func (s *Server) updateConfigHandler(c *gin.Context) {
-	var req map[string]interface{}
+	if s.adminService == nil {
+		s.internalServerErrorResponse(c, "Admin service not available")
+		return
+	}
+
+	var req admin.UpdateConfigurationRequest
 	if !s.bindAndValidate(c, &req) {
 		return
 	}
 
-	// TODO: Implement actual configuration update
+	if err := s.adminService.UpdateConfiguration(c.Request.Context(), &req); err != nil {
+		s.handleServiceError(c, err)
+		return
+	}
+
 	s.successResponse(c, http.StatusOK, gin.H{
-		"message":        "Configuration updated successfully",
-		"updated_fields": len(req),
+		"message":   "Configuration updated successfully",
+		"timestamp": time.Now(),
 	})
 }
 
 // reloadConfigHandler reloads configuration
 func (s *Server) reloadConfigHandler(c *gin.Context) {
-	// TODO: Implement actual configuration reload
+	if s.adminService == nil {
+		s.internalServerErrorResponse(c, "Admin service not available")
+		return
+	}
+
+	if err := s.adminService.ReloadConfiguration(c.Request.Context()); err != nil {
+		s.handleServiceError(c, err)
+		return
+	}
+
 	s.successResponse(c, http.StatusOK, gin.H{
 		"message":   "Configuration reloaded successfully",
-		"timestamp": "2024-01-01T00:00:00Z",
+		"timestamp": time.Now(),
 	})
+}
+
+// Alert handlers
+
+// getActiveAlertsHandler returns active alerts
+func (s *Server) getActiveAlertsHandler(c *gin.Context) {
+	if s.adminService == nil {
+		s.internalServerErrorResponse(c, "Admin service not available")
+		return
+	}
+
+	response, err := s.adminService.GetActiveAlerts(c.Request.Context())
+	if err != nil {
+		s.handleServiceError(c, err)
+		return
+	}
+
+	s.successResponse(c, http.StatusOK, response)
+}
+
+// createAlertHandler creates a new alert
+func (s *Server) createAlertHandler(c *gin.Context) {
+	if s.adminService == nil {
+		s.internalServerErrorResponse(c, "Admin service not available")
+		return
+	}
+
+	var req admin.CreateAlertRequest
+	if !s.bindAndValidate(c, &req) {
+		return
+	}
+
+	alert, err := s.adminService.CreateAlert(c.Request.Context(), &req)
+	if err != nil {
+		s.handleServiceError(c, err)
+		return
+	}
+
+	s.successResponse(c, http.StatusCreated, alert)
+}
+
+// updateAlertHandler updates an existing alert
+func (s *Server) updateAlertHandler(c *gin.Context) {
+	if s.adminService == nil {
+		s.internalServerErrorResponse(c, "Admin service not available")
+		return
+	}
+
+	alertIDStr, valid := s.parseUUIDParam(c, "alert_id")
+	if !valid {
+		return
+	}
+
+	alertID, err := uuid.Parse(alertIDStr)
+	if err != nil {
+		s.badRequestResponse(c, "Invalid alert ID format", nil)
+		return
+	}
+
+	var req admin.UpdateAlertRequest
+	if !s.bindAndValidate(c, &req) {
+		return
+	}
+
+	alert, err := s.adminService.UpdateAlert(c.Request.Context(), alertID, &req)
+	if err != nil {
+		s.handleServiceError(c, err)
+		return
+	}
+
+	s.successResponse(c, http.StatusOK, alert)
+}
+
+// deleteAlertHandler deletes an alert
+func (s *Server) deleteAlertHandler(c *gin.Context) {
+	if s.adminService == nil {
+		s.internalServerErrorResponse(c, "Admin service not available")
+		return
+	}
+
+	alertIDStr, valid := s.parseUUIDParam(c, "alert_id")
+	if !valid {
+		return
+	}
+
+	alertID, err := uuid.Parse(alertIDStr)
+	if err != nil {
+		s.badRequestResponse(c, "Invalid alert ID format", nil)
+		return
+	}
+
+	if err := s.adminService.DeleteAlert(c.Request.Context(), alertID); err != nil {
+		s.handleServiceError(c, err)
+		return
+	}
+
+	s.successResponse(c, http.StatusOK, gin.H{
+		"message": "Alert deleted successfully",
+	})
+}
+
+// Notification handlers
+
+// getNotificationSettingsHandler returns notification settings
+func (s *Server) getNotificationSettingsHandler(c *gin.Context) {
+	if s.adminService == nil {
+		s.internalServerErrorResponse(c, "Admin service not available")
+		return
+	}
+
+	settings, err := s.adminService.GetNotificationSettings(c.Request.Context())
+	if err != nil {
+		s.handleServiceError(c, err)
+		return
+	}
+
+	s.successResponse(c, http.StatusOK, settings)
+}
+
+// updateNotificationSettingsHandler updates notification settings
+func (s *Server) updateNotificationSettingsHandler(c *gin.Context) {
+	if s.adminService == nil {
+		s.internalServerErrorResponse(c, "Admin service not available")
+		return
+	}
+
+	var req admin.UpdateNotificationSettingsRequest
+	if !s.bindAndValidate(c, &req) {
+		return
+	}
+
+	if err := s.adminService.UpdateNotificationSettings(c.Request.Context(), &req); err != nil {
+		s.handleServiceError(c, err)
+		return
+	}
+
+	s.successResponse(c, http.StatusOK, gin.H{
+		"message":   "Notification settings updated successfully",
+		"timestamp": time.Now(),
+	})
+}
+
+// Helper method to convert admin.PaginationInfo to response.PaginationMeta
+func (s *Server) convertPaginationInfo(info *admin.PaginationInfo) *PaginationMeta {
+	return &PaginationMeta{
+		Page:       info.Page,
+		Limit:      info.Limit,
+		Total:      info.Total,
+		TotalPages: info.TotalPages,
+		HasNext:    info.HasNext,
+		HasPrev:    info.HasPrev,
+	}
 }

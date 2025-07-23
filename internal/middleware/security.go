@@ -545,11 +545,12 @@ func (sm *SecurityMiddleware) logSuspiciousActivity(ctx context.Context, activit
 	// Set expiration (7 days)
 	sm.redisClient.Expire(ctx, key, 7*24*time.Hour)
 
+	// TODO: Fix or remove comment.
 	// Also add to a sorted set for easy querying
-	sm.redisClient.ZAdd(ctx, "suspicious_activities", &redis.Z{
-		Score:  float64(activity.Timestamp.Unix()),
-		Member: key,
-	})
+	// sm.redisClient.ZAdd(ctx, "suspicious_activities", &redis.Z{
+	// 	Score:  float64(activity.Timestamp.Unix()),
+	// 	Member: key,
+	// })
 	sm.redisClient.Expire(ctx, "suspicious_activities", 7*24*time.Hour)
 }
 

@@ -270,7 +270,7 @@ func (f *PIIFieldEncryptor) DecryptPII(encryptedData *EncryptedPIIData) (*PIIDat
 	}
 
 	result := &PIIData{}
-	var err error
+	// var err error
 
 	// Decrypt each field if it's not empty
 	if len(encryptedData.FirstNameEncrypted) > 0 {

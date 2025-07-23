@@ -8,13 +8,14 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/steve-mir/go-auth-system/internal/config"
 	"github.com/steve-mir/go-auth-system/internal/repository/redis"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func setupTestRedisClient(t *testing.T) *redis.Client {
-	client, err := redis.NewClient(&redis.Config{
+	client, err := redis.NewClient(&config.RedisConfig{
 		Host:     "localhost",
 		Port:     6379,
 		Password: "",

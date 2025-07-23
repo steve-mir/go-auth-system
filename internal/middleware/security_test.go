@@ -297,9 +297,10 @@ func TestSecurityMiddleware_DetectTimeAnomaly(t *testing.T) {
 	config := DefaultSecurityConfig()
 	config.EnableTimeAnomalyDetection = true
 	config.UnusualHourThreshold = 2 // 2 AM
-	middleware := NewSecurityMiddleware(config, redisClient)
 
-	clientIP := "203.0.113.1"
+	// TODO: Remove comment or use variables.
+	// middleware := NewSecurityMiddleware(config, redisClient)
+	// clientIP := "203.0.113.1"
 
 	// Mock current time to test different hours
 	originalTime := time.Now()

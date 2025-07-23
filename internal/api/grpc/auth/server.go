@@ -92,7 +92,7 @@ func (s *Server) Login(ctx context.Context, req *pb.LoginRequest) (*pb.LoginResp
 	}
 
 	// Convert user profile
-	grpcUserProfile := &pb.UserProfile{
+	grpcAuthUserProfile := &pb.AuthUserProfile{
 		UserId:        userProfile.ID.String(),
 		Email:         userProfile.Email,
 		Username:      userProfile.Username,
@@ -113,7 +113,7 @@ func (s *Server) Login(ctx context.Context, req *pb.LoginRequest) (*pb.LoginResp
 		AccessToken:  resp.AccessToken,
 		RefreshToken: resp.RefreshToken,
 		ExpiresAt:    timestamppb.New(resp.ExpiresAt),
-		UserProfile:  grpcUserProfile,
+		UserProfile:  grpcAuthUserProfile,
 		MfaRequired:  false, // Set based on your business logic
 		MfaToken:     "",
 	}, nil

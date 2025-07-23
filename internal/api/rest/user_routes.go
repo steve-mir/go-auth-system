@@ -147,7 +147,7 @@ func (s *Server) listUsersHandler(c *gin.Context) {
 		return
 	}
 
-	search, status, valid := s.GetFilterParams(c)
+	search, _, valid := s.GetFilterParams(c)
 	if !valid {
 		return
 	}
