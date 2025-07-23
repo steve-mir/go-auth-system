@@ -48,7 +48,21 @@ spec:
           name: metrics
           protocol: TCP
         env:
-        # Database configuration
+        # Instance identification for horizontal scaling
+        - name: INSTANCE_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        
+        # Database configuration with connection pooling
         - name: DB_HOST
           value: postgres-service
         - name: DB_PORT
@@ -67,14 +81,40 @@ spec:
               key: DB_PASSWORD
         - name: DB_SSL_MODE
           value: disable
+        - name: DB_MAX_OPEN_CONNS
+          value: "25"
+        - name: DB_MAX_IDLE_CONNS
+          value: "5"
+        - name: DB_CONN_MAX_LIFETIME
+          value: "300"
+        - name: DB_CONN_MAX_IDLE_TIME
+          value: "60"
         
-        # Redis configuration
+        # Read replica configuration
+        - name: DB_READ_STRATEGY
+          value: "round_robin"
+        - name: DB_READ_POOL_SIZE
+          value: "15"
+        - name: DB_READ_MAX_IDLE_CONNS
+          value: "3"
+        
+        # Redis configuration with connection pooling
         - name: REDIS_HOST
           value: redis-service
         - name: REDIS_PORT
           value: "6379"
         - name: REDIS_DB
           value: "0"
+        - name: REDIS_POOL_SIZE
+          value: "20"
+        - name: REDIS_MIN_IDLE_CONNS
+          value: "5"
+        - name: REDIS_DIAL_TIMEOUT
+          value: "5s"
+        - name: REDIS_READ_TIMEOUT
+          value: "3s"
+        - name: REDIS_WRITE_TIMEOUT
+          value: "3s"
         
         # Security configuration
         - name: JWT_SIGNING_KEY
@@ -93,6 +133,18 @@ spec:
               name: go-auth-system-secrets
               key: ENCRYPTION_MASTER_KEY
         
+        # Rate limiting configuration for distributed scaling
+        - name: RATE_LIMIT_ENABLED
+          value: "true"
+        - name: RATE_LIMIT_REQUESTS_PER_MIN
+          value: "100"
+        - name: RATE_LIMIT_BURST_SIZE
+          value: "20"
+        - name: RATE_LIMIT_WINDOW_SIZE
+          value: "1m"
+        - name: RATE_LIMIT_CLEANUP_PERIOD
+          value: "5m"
+        
         # Application configuration
         - name: ENVIRONMENT
           value: production
@@ -108,6 +160,10 @@ spec:
           value: "true"
         - name: AUDIT_LOGGING_ENABLED
           value: "true"
+        - name: PROMETHEUS_ENABLED
+          value: "true"
+        - name: PROMETHEUS_PORT
+          value: "8081"
         
         volumeMounts:
         - name: config

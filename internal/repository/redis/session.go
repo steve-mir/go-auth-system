@@ -212,39 +212,33 @@ func (s *SessionStore) DeleteUserSessions(ctx context.Context, userID string) er
 		return fmt.Errorf("user ID cannot be empty")
 	}
 
-	// TODO: Implement.
-	// Get all user sessions
-	// sessions, err := s.GetUserSessions(ctx, userID)
-	// if err != nil {
-	// 	return err
-	// }
+	// Use Lua script for atomic operation to find and delete user sessions
+	luaScript := `
+		local prefix = ARGV[1]
+		local user_id = ARGV[2]
+		local keys = redis.call('KEYS', prefix .. '*')
+		local deleted = 0
+		
+		for i = 1, #keys do
+			local session_data = redis.call('GET', keys[i])
+			if session_data then
+				local session = cjson.decode(session_data)
+				if session.user_id == user_id then
+					redis.call('DEL', keys[i])
+					deleted = deleted + 1
+				end
+			end
+		end
+		
+		return deleted
+	`
 
-	// Delete each session
-	// for _, session := range sessions {
-	// 	// Extract session ID from the stored data (we need to find the key)
-	// 	pattern := s.prefix + "*"
-	// 	keys, err := s.client.Keys(ctx, pattern).Result()
-	// 	if err != nil {
-	// 		continue
-	// 	}
+	result, err := s.client.Eval(ctx, luaScript, []string{}, s.prefix, userID).Result()
+	if err != nil {
+		return fmt.Errorf("failed to delete user sessions: %w", err)
+	}
 
-	// 	for _, key := range keys {
-	// 		jsonData, err := s.client.Get(ctx, key).Result()
-	// 		if err != nil {
-	// 			continue
-	// 		}
-
-	// 		var data SessionData
-	// 		if err := json.Unmarshal([]byte(jsonData), &data); err != nil {
-	// 			continue
-	// 		}
-
-	// 		if data.UserID == userID {
-	// 			s.client.Del(ctx, key)
-	// 		}
-	// 	}
-	// }
-
+	_ = result // Number of deleted sessions
 	return nil
 }
 

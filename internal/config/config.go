@@ -50,6 +50,24 @@ type DatabaseConfig struct {
 	ConnMaxLifetime time.Duration `yaml:"conn_max_lifetime"`
 	ConnMaxIdleTime time.Duration `yaml:"conn_max_idle_time"`
 	ConnectTimeout  int           `yaml:"connect_timeout"`
+
+	// Read replica configuration
+	ReadReplicas []ReadReplicaConfig `yaml:"read_replicas"`
+
+	// Connection pool settings for read replicas
+	ReadPoolSize     int `yaml:"read_pool_size"`
+	ReadMaxIdleConns int `yaml:"read_max_idle_conns"`
+
+	// Load balancing strategy for read replicas
+	ReadStrategy string `yaml:"read_strategy"` // "round_robin", "random", "least_connections"
+}
+
+// ReadReplicaConfig contains read replica configuration
+type ReadReplicaConfig struct {
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
+	Weight   int    `yaml:"weight"`   // For weighted load balancing
+	Priority int    `yaml:"priority"` // For failover priority
 }
 
 // RedisConfig contains Redis connection configuration
