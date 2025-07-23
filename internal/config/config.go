@@ -268,8 +268,9 @@ type AuditLoggingConfig struct {
 
 // ExternalConfig contains external service configuration
 type ExternalConfig struct {
-	Monitoring MonitoringConfig `yaml:"monitoring"`
-	Logging    LoggingConfig    `yaml:"logging"`
+	Monitoring MonitoringConfig   `yaml:"monitoring"`
+	Logging    LoggingConfig      `yaml:"logging"`
+	Email      EmailServiceConfig `yaml:"email"`
 }
 
 // MonitoringConfig contains monitoring configuration
@@ -323,6 +324,105 @@ type LoggingConfig struct {
 	Level  string `yaml:"level"`
 	Format string `yaml:"format"`
 	Output string `yaml:"output"`
+}
+
+// EmailServiceConfig contains email service configuration
+type EmailServiceConfig struct {
+	Enabled         bool                           `yaml:"enabled"`
+	DefaultProvider string                         `yaml:"default_provider"`
+	Providers       map[string]EmailProviderConfig `yaml:"providers"`
+	Templates       EmailTemplateConfig            `yaml:"templates"`
+	RateLimit       EmailRateLimitConfig           `yaml:"rate_limit"`
+	Tracking        EmailTrackingConfig            `yaml:"tracking"`
+	Retry           EmailRetryConfig               `yaml:"retry"`
+}
+
+// EmailProviderConfig represents configuration for an email provider
+type EmailProviderConfig struct {
+	Type     string               `yaml:"type"`
+	Enabled  bool                 `yaml:"enabled"`
+	Priority int                  `yaml:"priority"`
+	SMTP     *EmailSMTPConfig     `yaml:"smtp,omitempty"`
+	SendGrid *EmailSendGridConfig `yaml:"sendgrid,omitempty"`
+	Mailgun  *EmailMailgunConfig  `yaml:"mailgun,omitempty"`
+	SES      *EmailSESConfig      `yaml:"ses,omitempty"`
+	Postmark *EmailPostmarkConfig `yaml:"postmark,omitempty"`
+	Resend   *EmailResendConfig   `yaml:"resend,omitempty"`
+}
+
+// EmailSMTPConfig represents SMTP configuration
+type EmailSMTPConfig struct {
+	Host       string `yaml:"host"`
+	Port       int    `yaml:"port"`
+	Username   string `yaml:"username"`
+	Password   string `yaml:"password"`
+	TLS        bool   `yaml:"tls"`
+	StartTLS   bool   `yaml:"start_tls"`
+	SkipVerify bool   `yaml:"skip_verify"`
+}
+
+// EmailSendGridConfig represents SendGrid configuration
+type EmailSendGridConfig struct {
+	APIKey string `yaml:"api_key"`
+}
+
+// EmailMailgunConfig represents Mailgun configuration
+type EmailMailgunConfig struct {
+	APIKey string `yaml:"api_key"`
+	Domain string `yaml:"domain"`
+	Region string `yaml:"region"`
+}
+
+// EmailSESConfig represents AWS SES configuration
+type EmailSESConfig struct {
+	Region          string `yaml:"region"`
+	AccessKeyID     string `yaml:"access_key_id"`
+	SecretAccessKey string `yaml:"secret_access_key"`
+	SessionToken    string `yaml:"session_token,omitempty"`
+}
+
+// EmailPostmarkConfig represents Postmark configuration
+type EmailPostmarkConfig struct {
+	APIKey string `yaml:"api_key"`
+}
+
+// EmailResendConfig represents Resend configuration
+type EmailResendConfig struct {
+	APIKey string `yaml:"api_key"`
+}
+
+// EmailTemplateConfig represents template configuration
+type EmailTemplateConfig struct {
+	DefaultFrom     string `yaml:"default_from"`
+	DefaultFromName string `yaml:"default_from_name"`
+	BaseURL         string `yaml:"base_url"`
+	AssetsURL       string `yaml:"assets_url"`
+	UnsubscribeURL  string `yaml:"unsubscribe_url"`
+}
+
+// EmailRateLimitConfig represents rate limiting configuration
+type EmailRateLimitConfig struct {
+	Enabled        bool          `yaml:"enabled"`
+	RequestsPerMin int           `yaml:"requests_per_minute"`
+	BurstSize      int           `yaml:"burst_size"`
+	WindowSize     time.Duration `yaml:"window_size"`
+}
+
+// EmailTrackingConfig represents email tracking configuration
+type EmailTrackingConfig struct {
+	Enabled        bool   `yaml:"enabled"`
+	OpenTracking   bool   `yaml:"open_tracking"`
+	ClickTracking  bool   `yaml:"click_tracking"`
+	TrackingDomain string `yaml:"tracking_domain"`
+}
+
+// EmailRetryConfig represents retry configuration
+type EmailRetryConfig struct {
+	Enabled      bool          `yaml:"enabled"`
+	MaxRetries   int           `yaml:"max_retries"`
+	InitialDelay time.Duration `yaml:"initial_delay"`
+	MaxDelay     time.Duration `yaml:"max_delay"`
+	Multiplier   float64       `yaml:"multiplier"`
 }
 
 // Load loads configuration from file and environment variables
@@ -432,4 +532,11 @@ func loadFromEnv(config *Config) {
 	config.External.Monitoring.Enabled = getEnvBool("MONITORING_ENABLED", config.External.Monitoring.Enabled)
 	config.External.Monitoring.Prometheus.Enabled = getEnvBool("PROMETHEUS_ENABLED", config.External.Monitoring.Prometheus.Enabled)
 	config.External.Monitoring.Prometheus.Port = getEnvInt("PROMETHEUS_PORT", config.External.Monitoring.Prometheus.Port)
+
+	// Email configuration
+	config.External.Email.Enabled = getEnvBool("EMAIL_ENABLED", config.External.Email.Enabled)
+	config.External.Email.DefaultProvider = getEnvString("EMAIL_DEFAULT_PROVIDER", config.External.Email.DefaultProvider)
+	config.External.Email.Templates.DefaultFrom = getEnvString("EMAIL_DEFAULT_FROM", config.External.Email.Templates.DefaultFrom)
+	config.External.Email.Templates.DefaultFromName = getEnvString("EMAIL_DEFAULT_FROM_NAME", config.External.Email.Templates.DefaultFromName)
+	config.External.Email.Templates.BaseURL = getEnvString("EMAIL_BASE_URL", config.External.Email.Templates.BaseURL)
 }

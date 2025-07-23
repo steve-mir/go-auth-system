@@ -1,0 +1,153 @@
+# Email Service Configuration Example
+# Copy this to config.yaml and customize for your environment
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  grpc_port: 9090
+  environment: "development"
+
+database:
+  host: "localhost"
+  port: 5432
+  name: "auth_system"
+  user: "postgres"
+  password: "postgres"
+  ssl_mode: "disable"
+
+redis:
+  host: "localhost"
+  port: 6379
+  password: ""
+  db: 0
+
+external:
+  email:
+    enabled: true
+    default_provider: "smtp"
+    
+    # Email providers configuration
+    providers:
+      # SMTP Configuration (Gmail example)
+      smtp:
+        type: "smtp"
+        enabled: true
+        priority: 1
+        smtp:
+          host: "smtp.gmail.com"
+          port: 587
+          username: "your-email@gmail.com"
+          password: "your-app-password"  # Use app password for Gmail
+          tls: false
+          start_tls: true
+          skip_verify: false
+      
+      # SendGrid Configuration
+      sendgrid:
+        type: "sendgrid"
+        enabled: false
+        priority: 2
+        sendgrid:
+          api_key: "SG.your-sendgrid-api-key"
+      
+      # Mailgun Configuration
+      mailgun:
+        type: "mailgun"
+        enabled: false
+        priority: 3
+        mailgun:
+          api_key: "your-mailgun-api-key"
+          domain: "your-domain.com"
+          region: "us"  # or "eu"
+      
+      # AWS SES Configuration
+      ses:
+        type: "ses"
+        enabled: false
+        priority: 4
+        ses:
+          region: "us-east-1"
+          access_key_id: "your-access-key"
+          secret_access_key: "your-secret-key"
+      
+      # Postmark Configuration
+      postmark:
+        type: "postmark"
+        enabled: false
+        priority: 5
+        postmark:
+          api_key: "your-postmark-api-key"
+      
+      # Resend Configuration
+      resend:
+        type: "resend"
+        enabled: false
+        priority: 6
+        resend:
+          api_key: "your-resend-api-key"
+    
+    # Template configuration
+    templates:
+      default_from: "noreply@yourapp.com"
+      default_from_name: "Your App Name"
+      base_url: "https://yourapp.com"
+      assets_url: "https://assets.yourapp.com"
+      unsubscribe_url: "https://yourapp.com/unsubscribe"
+    
+    # Rate limiting
+    rate_limit:
+      enabled: true
+      requests_per_minute: 100
+      burst_size: 20
+      window_size: "1m"
+    
+    # Email tracking
+    tracking:
+      enabled: true
+      open_tracking: true
+      click_tracking: true
+      tracking_domain: "track.yourapp.com"
+    
+    # Retry configuration
+    retry:
+      enabled: true
+      max_retries: 3
+      initial_delay: "30s"
+      max_delay: "10m"
+      multiplier: 2.0
+
+# Security configuration
+security:
+  password_hash:
+    algorithm: "argon2"
+  token:
+    type: "jwt"
+    access_ttl: "15m"
+    refresh_ttl: "168h"  # 7 days
+    signing_key: "your-jwt-signing-key"
+    issuer: "go-auth-system"
+    audience: "go-auth-system"
+
+# Features configuration
+features:
+  mfa:
+    enabled: true
+    email:
+      enabled: true
+      subject: "Your verification code"
+  admin_dashboard:
+    enabled: true
+  audit_logging:
+    enabled: true
+
+# Environment variables that can override config:
+# EMAIL_ENABLED=true
+# EMAIL_DEFAULT_PROVIDER=smtp
+# EMAIL_DEFAULT_FROM=noreply@yourapp.com
+# EMAIL_DEFAULT_FROM_NAME="Your App"
+# EMAIL_BASE_URL=https://yourapp.com
+# SMTP_HOST=smtp.gmail.com
+# SMTP_PORT=587
+# SMTP_USERNAME=your-email@gmail.com
+# SMTP_PASSWORD=your-app-password
+# SENDGRID_API_KEY=SG.your-api-key

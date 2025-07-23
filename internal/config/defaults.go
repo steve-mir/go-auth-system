@@ -157,6 +157,53 @@ func setExternalDefaults(external *ExternalConfig) {
 	external.Logging.Level = "info"
 	external.Logging.Format = "json"
 	external.Logging.Output = "stdout"
+
+	// Email defaults
+	setEmailDefaults(&external.Email)
+}
+
+// setEmailDefaults sets default email service configuration
+func setEmailDefaults(email *EmailServiceConfig) {
+	email.Enabled = false
+	email.DefaultProvider = "smtp"
+
+	// Initialize providers map
+	email.Providers = make(map[string]EmailProviderConfig)
+
+	// Default SMTP provider
+	email.Providers["smtp"] = EmailProviderConfig{
+		Type:    "smtp",
+		Enabled: false,
+		SMTP: &EmailSMTPConfig{
+			Host:     "localhost",
+			Port:     587,
+			TLS:      false,
+			StartTLS: true,
+		},
+	}
+
+	// Template defaults
+	email.Templates.DefaultFrom = "noreply@localhost"
+	email.Templates.DefaultFromName = "Go Auth System"
+	email.Templates.BaseURL = "http://localhost:8080"
+
+	// Rate limit defaults
+	email.RateLimit.Enabled = true
+	email.RateLimit.RequestsPerMin = 60
+	email.RateLimit.BurstSize = 10
+	email.RateLimit.WindowSize = 1 * time.Minute
+
+	// Tracking defaults
+	email.Tracking.Enabled = false
+	email.Tracking.OpenTracking = false
+	email.Tracking.ClickTracking = false
+
+	// Retry defaults
+	email.Retry.Enabled = true
+	email.Retry.MaxRetries = 3
+	email.Retry.InitialDelay = 30 * time.Second
+	email.Retry.MaxDelay = 10 * time.Minute
+	email.Retry.Multiplier = 2.0
 }
 
 // parsePort parses a port string to integer
