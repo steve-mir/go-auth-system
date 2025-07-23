@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/steve-mir/go-auth-system/internal/service/role"
+	role "github.com/steve-mir/go-auth-system/internal/service/role1"
 )
 
 // setupRoleRoutes configures role management routes

@@ -10,10 +10,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/steve-mir/go-auth-system/internal/config"
 	"github.com/steve-mir/go-auth-system/internal/middleware"
-	"github.com/steve-mir/go-auth-system/internal/service/admin"
+
+	// "github.com/steve-mir/go-auth-system/internal/service/admin"
 	"github.com/steve-mir/go-auth-system/internal/service/auth"
-	"github.com/steve-mir/go-auth-system/internal/service/role"
-	"github.com/steve-mir/go-auth-system/internal/service/user"
+	role "github.com/steve-mir/go-auth-system/internal/service/role1"
+	user "github.com/steve-mir/go-auth-system/internal/service/user1"
 )
 
 // Server represents the REST API server
@@ -24,7 +25,7 @@ type Server struct {
 	middleware *middleware.MiddlewareManager
 
 	// Service dependencies
-	adminService  admin.AdminService
+	// adminService  admin.AdminService
 	authService   auth.AuthService
 	userService   user.UserService
 	roleService   role.Service
@@ -137,7 +138,7 @@ func NewServer(
 	authService auth.AuthService,
 	userService user.UserService,
 	roleService role.Service,
-	adminService admin.AdminService,
+	// adminService admin.AdminService,
 	healthService HealthService,
 	// ssoService SSOService,
 ) *Server {
@@ -157,14 +158,14 @@ func NewServer(
 	}
 
 	s := &Server{
-		router:        router,
-		server:        server,
-		config:        cfg,
-		middleware:    middlewareManager,
-		authService:   authService,
-		userService:   userService,
-		roleService:   roleService,
-		adminService:  adminService,
+		router:      router,
+		server:      server,
+		config:      cfg,
+		middleware:  middlewareManager,
+		authService: authService,
+		userService: userService,
+		roleService: roleService,
+		// adminService:  adminService,
 		healthService: healthService,
 		// ssoService:    ssoService,
 	}
@@ -247,10 +248,10 @@ func (s *Server) setupRoutes() {
 			roleGroup := protected.Group("/roles")
 			s.setupRoleRoutes(roleGroup)
 
-			// Admin routes (require admin role)
-			adminGroup := protected.Group("/admin")
-			adminGroup.Use(s.adminAuthorizationMiddleware())
-			s.setupAdminRoutes(adminGroup)
+			//TODO: Admin routes (require admin role)
+			// adminGroup := protected.Group("/admin")
+			// adminGroup.Use(s.adminAuthorizationMiddleware())
+			// s.setupAdminRoutes(adminGroup)
 		}
 	}
 }

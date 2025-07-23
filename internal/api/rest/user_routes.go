@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/steve-mir/go-auth-system/internal/service/user"
+	user "github.com/steve-mir/go-auth-system/internal/service/user1"
 )
 
 // setupUserRoutes configures user management routes

@@ -1,4 +1,4 @@
-package auth
+package auth1
 
 import (
 	"context"
@@ -9,22 +9,19 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/steve-mir/go-auth-system/internal/errors"
-	"github.com/steve-mir/go-auth-system/internal/repository/postgres"
 	"github.com/steve-mir/go-auth-system/internal/repository/postgres/db"
 	"github.com/steve-mir/go-auth-system/internal/repository/redis"
 )
 
 // PostgresUserRepository adapts SQLC queries to UserRepository interface
 type PostgresUserRepository struct {
-	queries *postgres.DB
-	store   *db.Store
+	queries *db.Queries
 }
 
 // NewPostgresUserRepository creates a new PostgreSQL user repository
-func NewPostgresUserRepository(queries *postgres.DB) UserRepository {
+func NewPostgresUserRepository(queries *db.Queries) UserRepository {
 	return &PostgresUserRepository{
 		queries: queries,
-		store:   db.NewStore(queries.Primary()),
 	}
 }
 
@@ -44,7 +41,7 @@ func (r *PostgresUserRepository) CreateUser(ctx context.Context, user *CreateUse
 		PhoneEncrypted:     user.PhoneEncrypted,
 	}
 
-	dbUser, err := r.store.CreateUser(ctx, params)
+	dbUser, err := r.queries.CreateUser(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
@@ -53,7 +50,7 @@ func (r *PostgresUserRepository) CreateUser(ctx context.Context, user *CreateUse
 }
 
 func (r *PostgresUserRepository) GetUserByEmail(ctx context.Context, email string) (*UserData, error) {
-	dbUser, err := r.store.GetUserByEmail(ctx, email)
+	dbUser, err := r.queries.GetUserByEmail(ctx, email)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, errors.New(errors.ErrorTypeNotFound, "USER_NOT_FOUND", "User not found")
@@ -66,7 +63,7 @@ func (r *PostgresUserRepository) GetUserByEmail(ctx context.Context, email strin
 
 func (r *PostgresUserRepository) GetUserByUsername(ctx context.Context, username string) (*UserData, error) {
 	usernameParam := pgtype.Text{String: username, Valid: true}
-	dbUser, err := r.store.GetUserByUsername(ctx, usernameParam)
+	dbUser, err := r.queries.GetUserByUsername(ctx, usernameParam)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, errors.New(errors.ErrorTypeNotFound, "USER_NOT_FOUND", "User not found")
@@ -83,7 +80,7 @@ func (r *PostgresUserRepository) GetUserByID(ctx context.Context, userID string)
 		return nil, errors.New(errors.ErrorTypeValidation, "INVALID_USER_ID", "Invalid user ID format")
 	}
 
-	dbUser, err := r.store.GetUserByID(ctx, id)
+	dbUser, err := r.queries.GetUserByID(ctx, id)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, errors.New(errors.ErrorTypeNotFound, "USER_NOT_FOUND", "User not found")
@@ -112,7 +109,7 @@ func (r *PostgresUserRepository) UpdateUserLoginInfo(ctx context.Context, userID
 		LastLoginAt:         lastLoginAt,
 	}
 
-	return r.store.UpdateUserLoginInfo(ctx, params)
+	return r.queries.UpdateUserLoginInfo(ctx, params)
 }
 
 func (r *PostgresUserRepository) GetUserRoles(ctx context.Context, userID string) ([]string, error) {
@@ -123,7 +120,7 @@ func (r *PostgresUserRepository) GetUserRoles(ctx context.Context, userID string
 	}
 
 	// Get user roles from database
-	roles, err := r.store.GetUserRoles(ctx, uid)
+	roles, err := r.queries.GetUserRoles(ctx, uid)
 	if err != nil {
 		return nil, err
 	}

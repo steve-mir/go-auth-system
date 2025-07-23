@@ -23,10 +23,9 @@ import (
 	"github.com/steve-mir/go-auth-system/internal/security/crypto"
 	"github.com/steve-mir/go-auth-system/internal/security/hash"
 	"github.com/steve-mir/go-auth-system/internal/security/token"
-	"github.com/steve-mir/go-auth-system/internal/service/admin"
 	"github.com/steve-mir/go-auth-system/internal/service/auth"
-	"github.com/steve-mir/go-auth-system/internal/service/role"
-	"github.com/steve-mir/go-auth-system/internal/service/user"
+	role "github.com/steve-mir/go-auth-system/internal/service/role1"
+	user "github.com/steve-mir/go-auth-system/internal/service/user1"
 )
 
 func main() {
@@ -235,16 +234,15 @@ func runServer(ctx context.Context, cfg *config.Config) error {
 	// Initialize repositories
 	log.Printf("Initializing repositories...")
 
-	authUserRepo := postgres.NewUserRepository(db) // auth.NewPostgresUserRepository(db)
+	authUserRepo := auth.NewPostgresUserRepository(db) // postgres.NewUserRepository(db) //
 	// roleRepo := postgres.NewRoleRepository(db)
-	roleRepo := postgres.NewRoleRepository(db)
+	roleRepo := role.NewPostgresRepository(db)
 	redisStore := redis.NewSessionStore(redisClient)
 	sessionStore := auth.NewRedisSessionRepository(redisStore)
 	redisBlacklist := redis.NewTokenBlacklist(redisClient)
 	blacklistRepo := auth.NewRedisTokenBlacklistRepository(redisBlacklist)
 
 	userRepo := user.NewPostgresUserRepository(db) //postgres.NewUserRepository(db)
-	// userRepo2 := postgres.NewUserRepository(db)
 
 	log.Printf("Repositories initialized")
 
@@ -258,7 +256,7 @@ func runServer(ctx context.Context, cfg *config.Config) error {
 		BlacklistRepo: blacklistRepo,
 		TokenService:  tokenSvc,
 		HashService:   hashSvc,
-		Encryptor:     encryptorSvc,
+		Encryptor:     encryptorSvc.GetEncryptor(),
 	}
 	authService := auth.NewAuthService(cfg, authDeps)
 
@@ -268,19 +266,19 @@ func runServer(ctx context.Context, cfg *config.Config) error {
 		SessionRepo: sessionStore,
 		// AuditRepo:   auditRepo, // TODO: Initialize audit repository
 		HashService: hashSvc,
-		Encryptor:   encryptorSvc,
+		Encryptor:   encryptorSvc.GetEncryptor(),
 	})
 
 	// Initialize role service
 	roleService := role.NewService(roleRepo)
 
 	// Initialize admin service
-	adminService := admin.NewService(admin.Dependencies{
-		Config:      cfg,
-		UserService: userService,
-		RoleService: roleService,
-		// SessionRepo: sessionStore,
-	})
+	// adminService := admin.NewService(admin.Dependencies{
+	// 	Config:      cfg,
+	// 	UserService: userService,
+	// 	RoleService: roleService,
+	// 	// SessionRepo: sessionStore,
+	// })
 
 	log.Printf("Business services initialized")
 
@@ -292,7 +290,7 @@ func runServer(ctx context.Context, cfg *config.Config) error {
 		authService,
 		userService,
 		roleService,
-		adminService,
+		// adminService,
 		healthSvc,
 		// ssoService,
 	)
