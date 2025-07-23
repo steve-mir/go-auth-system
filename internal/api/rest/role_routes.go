@@ -5,7 +5,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/steve-mir/go-auth-system/internal/service/role"
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
+	// "github.com/steve-mir/go-auth-system/internal/service/role"
 )
 
 // setupRoleRoutes configures role management routes
@@ -31,7 +32,7 @@ func (s *Server) setupRoleRoutes(group *gin.RouterGroup) {
 
 // createRoleHandler creates a new role
 func (s *Server) createRoleHandler(c *gin.Context) {
-	var req role.CreateRoleRequest
+	var req interfaces.CreateRoleRequest
 	if !s.bindAndValidate(c, &req) {
 		return
 	}
@@ -56,7 +57,7 @@ func (s *Server) listRolesHandler(c *gin.Context) {
 		return
 	}
 
-	req := role.ListRolesRequest{
+	req := interfaces.ListRolesRequest{
 		Limit:  limit,
 		Offset: (page - 1) * limit,
 	}
@@ -106,7 +107,7 @@ func (s *Server) updateRoleHandler(c *gin.Context) {
 		return
 	}
 
-	var req role.UpdateRoleRequest
+	var req interfaces.UpdateRoleRequest
 	if !s.bindAndValidate(c, &req) {
 		return
 	}
@@ -276,7 +277,7 @@ func (s *Server) validatePermissionHandler(c *gin.Context) {
 		return
 	}
 
-	permission := role.Permission{
+	permission := interfaces.Permission{
 		Resource:   req.Resource,
 		Action:     req.Action,
 		Scope:      req.Scope,
@@ -298,7 +299,7 @@ func (s *Server) validatePermissionHandler(c *gin.Context) {
 
 // validateAccessHandler validates access using attribute-based access control
 func (s *Server) validateAccessHandler(c *gin.Context) {
-	var req role.AccessRequest
+	var req interfaces.AccessRequest
 	if !s.bindAndValidate(c, &req) {
 		return
 	}

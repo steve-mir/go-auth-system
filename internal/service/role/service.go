@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/steve-mir/go-auth-system/internal/errors"
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
 )
 
 // service implements the Service interface
@@ -18,7 +19,7 @@ type service struct {
 }
 
 // NewService creates a new role service
-func NewService(repo Repository) Service {
+func NewService(repo Repository) interfaces.RoleService {
 	return &service{
 		repo:      repo,
 		validator: validator.New(),
@@ -26,7 +27,7 @@ func NewService(repo Repository) Service {
 }
 
 // CreateRole creates a new role
-func (s *service) CreateRole(ctx context.Context, req CreateRoleRequest) (*Role, error) {
+func (s *service) CreateRole(ctx context.Context, req interfaces.CreateRoleRequest) (*interfaces.Role, error) {
 	// Validate request
 	if err := s.validator.Struct(req); err != nil {
 		return nil, &errors.AppError{
@@ -49,7 +50,7 @@ func (s *service) CreateRole(ctx context.Context, req CreateRoleRequest) (*Role,
 	}
 
 	// Create role
-	role := &Role{
+	role := &interfaces.Role{
 		Name:        req.Name,
 		Description: req.Description,
 		Permissions: req.Permissions,
@@ -63,17 +64,17 @@ func (s *service) CreateRole(ctx context.Context, req CreateRoleRequest) (*Role,
 }
 
 // GetRole retrieves a role by ID
-func (s *service) GetRole(ctx context.Context, roleID uuid.UUID) (*Role, error) {
+func (s *service) GetRole(ctx context.Context, roleID uuid.UUID) (*interfaces.Role, error) {
 	return s.repo.GetRoleByID(ctx, roleID)
 }
 
 // GetRoleByName retrieves a role by name
-func (s *service) GetRoleByName(ctx context.Context, name string) (*Role, error) {
+func (s *service) GetRoleByName(ctx context.Context, name string) (*interfaces.Role, error) {
 	return s.repo.GetRoleByName(ctx, name)
 }
 
 // UpdateRole updates an existing role
-func (s *service) UpdateRole(ctx context.Context, roleID uuid.UUID, req UpdateRoleRequest) (*Role, error) {
+func (s *service) UpdateRole(ctx context.Context, roleID uuid.UUID, req interfaces.UpdateRoleRequest) (*interfaces.Role, error) {
 	// Validate request
 	if err := s.validator.Struct(req); err != nil {
 		return nil, &errors.AppError{
@@ -152,7 +153,7 @@ func (s *service) DeleteRole(ctx context.Context, roleID uuid.UUID) error {
 }
 
 // ListRoles retrieves a paginated list of roles
-func (s *service) ListRoles(ctx context.Context, req ListRolesRequest) (*ListRolesResponse, error) {
+func (s *service) ListRoles(ctx context.Context, req interfaces.ListRolesRequest) (*interfaces.ListRolesResponse, error) {
 	// Validate request
 	if err := s.validator.Struct(req); err != nil {
 		return nil, &errors.AppError{
@@ -182,7 +183,7 @@ func (s *service) ListRoles(ctx context.Context, req ListRolesRequest) (*ListRol
 		return nil, err
 	}
 
-	return &ListRolesResponse{
+	return &interfaces.ListRolesResponse{
 		Roles:   roles,
 		Total:   total,
 		Limit:   req.Limit,
@@ -209,24 +210,24 @@ func (s *service) RemoveRoleFromUser(ctx context.Context, userID, roleID uuid.UU
 }
 
 // GetUserRoles retrieves all roles assigned to a user
-func (s *service) GetUserRoles(ctx context.Context, userID uuid.UUID) ([]*Role, error) {
+func (s *service) GetUserRoles(ctx context.Context, userID uuid.UUID) ([]*interfaces.Role, error) {
 	return s.repo.GetUserRoles(ctx, userID)
 }
 
 // GetRoleUsers retrieves all users assigned to a role
-func (s *service) GetRoleUsers(ctx context.Context, roleID uuid.UUID) ([]*UserInfo, error) {
+func (s *service) GetRoleUsers(ctx context.Context, roleID uuid.UUID) ([]*interfaces.UserInfo, error) {
 	return s.repo.GetRoleUsers(ctx, roleID)
 }
 
 // ValidatePermission checks if a user has a specific permission
-func (s *service) ValidatePermission(ctx context.Context, userID uuid.UUID, permission Permission) (bool, error) {
+func (s *service) ValidatePermission(ctx context.Context, userID uuid.UUID, permission interfaces.Permission) (bool, error) {
 	userRoles, err := s.repo.GetUserRoles(ctx, userID)
 	if err != nil {
 		return false, err
 	}
 
 	// Collect all permissions from user roles
-	var allPermissions []Permission
+	var allPermissions []interfaces.Permission
 	for _, role := range userRoles {
 		allPermissions = append(allPermissions, role.Permissions...)
 	}
@@ -238,14 +239,14 @@ func (s *service) ValidatePermission(ctx context.Context, userID uuid.UUID, perm
 }
 
 // ValidatePermissions checks if a user has multiple permissions
-func (s *service) ValidatePermissions(ctx context.Context, userID uuid.UUID, permissions []Permission) (map[string]bool, error) {
+func (s *service) ValidatePermissions(ctx context.Context, userID uuid.UUID, permissions []interfaces.Permission) (map[string]bool, error) {
 	userRoles, err := s.repo.GetUserRoles(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Collect all permissions from user roles
-	var allPermissions []Permission
+	var allPermissions []interfaces.Permission
 	for _, role := range userRoles {
 		allPermissions = append(allPermissions, role.Permissions...)
 	}
@@ -263,15 +264,15 @@ func (s *service) ValidatePermissions(ctx context.Context, userID uuid.UUID, per
 }
 
 // GetUserPermissions retrieves all permissions for a user
-func (s *service) GetUserPermissions(ctx context.Context, userID uuid.UUID) ([]Permission, error) {
+func (s *service) GetUserPermissions(ctx context.Context, userID uuid.UUID) ([]interfaces.Permission, error) {
 	userRoles, err := s.repo.GetUserRoles(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Collect all permissions from user roles
-	var allPermissions []Permission
-	permissionMap := make(map[string]Permission) // Use map to deduplicate
+	var allPermissions []interfaces.Permission
+	permissionMap := make(map[string]interfaces.Permission) // Use map to deduplicate
 
 	for _, role := range userRoles {
 		for _, permission := range role.Permissions {
@@ -288,18 +289,18 @@ func (s *service) GetUserPermissions(ctx context.Context, userID uuid.UUID) ([]P
 }
 
 // ValidateAccess performs attribute-based access control validation
-func (s *service) ValidateAccess(ctx context.Context, req AccessRequest) (*AccessResponse, error) {
+func (s *service) ValidateAccess(ctx context.Context, req interfaces.AccessRequest) (*interfaces.AccessResponse, error) {
 	// Get user permissions
 	userPermissions, err := s.GetUserPermissions(ctx, req.UserID)
 	if err != nil {
-		return &AccessResponse{
+		return &interfaces.AccessResponse{
 			Allowed: false,
 			Reason:  "failed to retrieve user permissions",
 		}, err
 	}
 
 	// Create the requested permission
-	requestedPermission := Permission{
+	requestedPermission := interfaces.Permission{
 		Resource:   req.Resource,
 		Action:     req.Action,
 		Scope:      req.Scope,
@@ -309,14 +310,14 @@ func (s *service) ValidateAccess(ctx context.Context, req AccessRequest) (*Acces
 	// Check basic permission
 	permissionSet := NewPermissionSet(userPermissions)
 	if !permissionSet.Contains(requestedPermission) {
-		return &AccessResponse{
+		return &interfaces.AccessResponse{
 			Allowed: false,
 			Reason:  fmt.Sprintf("user does not have permission: %s", requestedPermission.String()),
 		}, nil
 	}
 
 	// Find matching permissions for detailed response
-	var matchedPermissions []Permission
+	var matchedPermissions []interfaces.Permission
 	for _, perm := range userPermissions {
 		if s.permissionMatches(perm, requestedPermission, req.Context) {
 			matchedPermissions = append(matchedPermissions, perm)
@@ -326,7 +327,7 @@ func (s *service) ValidateAccess(ctx context.Context, req AccessRequest) (*Acces
 	// Perform attribute-based validation
 	allowed := s.validateAttributes(matchedPermissions, req)
 
-	response := &AccessResponse{
+	response := &interfaces.AccessResponse{
 		Allowed:            allowed,
 		MatchedPermissions: matchedPermissions,
 		Context:            req.Context,
@@ -340,7 +341,7 @@ func (s *service) ValidateAccess(ctx context.Context, req AccessRequest) (*Acces
 }
 
 // validatePermissions validates a slice of permissions
-func (s *service) validatePermissions(permissions []Permission) error {
+func (s *service) validatePermissions(permissions []interfaces.Permission) error {
 	for _, perm := range permissions {
 		if err := s.validatePermission(perm); err != nil {
 			return err
@@ -350,7 +351,7 @@ func (s *service) validatePermissions(permissions []Permission) error {
 }
 
 // validatePermission validates a single permission
-func (s *service) validatePermission(perm Permission) error {
+func (s *service) validatePermission(perm interfaces.Permission) error {
 	if perm.Resource == "" {
 		return NewInvalidPermissionError(perm.String(), "resource cannot be empty")
 	}
@@ -373,9 +374,9 @@ func (s *service) validatePermission(perm Permission) error {
 }
 
 // permissionMatches checks if a permission matches the requested permission with context
-func (s *service) permissionMatches(userPerm, requestedPerm Permission, context map[string]any) bool {
+func (s *service) permissionMatches(userPerm, requestedPerm interfaces.Permission, context map[string]any) bool {
 	// Basic permission matching
-	permSet := NewPermissionSet([]Permission{userPerm})
+	permSet := NewPermissionSet([]interfaces.Permission{userPerm})
 	if !permSet.Contains(requestedPerm) {
 		return false
 	}
@@ -396,7 +397,7 @@ func (s *service) permissionMatches(userPerm, requestedPerm Permission, context 
 }
 
 // validateAttributes performs attribute-based access control validation
-func (s *service) validateAttributes(permissions []Permission, req AccessRequest) bool {
+func (s *service) validateAttributes(permissions []interfaces.Permission, req interfaces.AccessRequest) bool {
 	if len(permissions) == 0 {
 		return false
 	}
@@ -476,14 +477,14 @@ func (s *service) valuesMatch(expected, actual any) bool {
 }
 
 // GetEffectivePermissions retrieves all effective permissions for a user with inheritance
-func (s *service) GetEffectivePermissions(ctx context.Context, userID uuid.UUID) ([]Permission, error) {
+func (s *service) GetEffectivePermissions(ctx context.Context, userID uuid.UUID) ([]interfaces.Permission, error) {
 	userRoles, err := s.repo.GetUserRoles(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Use a map to deduplicate permissions and handle inheritance
-	effectivePerms := make(map[string]Permission)
+	effectivePerms := make(map[string]interfaces.Permission)
 
 	for _, role := range userRoles {
 		for _, permission := range role.Permissions {
@@ -500,7 +501,7 @@ func (s *service) GetEffectivePermissions(ctx context.Context, userID uuid.UUID)
 	}
 
 	// Convert map back to slice
-	var result []Permission
+	var result []interfaces.Permission
 	for _, perm := range effectivePerms {
 		result = append(result, perm)
 	}
@@ -519,7 +520,7 @@ func (s *service) CheckResourceAccess(ctx context.Context, userID uuid.UUID, res
 	result := make(map[string]bool)
 
 	for _, action := range actions {
-		permission := Permission{
+		permission := interfaces.Permission{
 			Resource: resource,
 			Action:   action,
 		}
@@ -569,7 +570,7 @@ func (s *service) ValidateRoleHierarchy(ctx context.Context, userID uuid.UUID, r
 }
 
 // mergePermissionAttributes merges attributes from two permissions
-func (s *service) mergePermissionAttributes(existing, new Permission) Permission {
+func (s *service) mergePermissionAttributes(existing, new interfaces.Permission) interfaces.Permission {
 	merged := existing
 
 	// If new permission has broader scope, use it

@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/google/uuid"
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
 )
 
 // ExampleUsage demonstrates how to use the role service
@@ -16,10 +17,10 @@ func ExampleUsage(service Service) {
 
 	// Example 1: Create a new role
 	fmt.Println("=== Creating a new role ===")
-	adminRole, err := service.CreateRole(ctx, CreateRoleRequest{
+	adminRole, err := service.CreateRole(ctx, interfaces.CreateRoleRequest{
 		Name:        "admin",
 		Description: "System administrator with full access",
-		Permissions: []Permission{
+		Permissions: []interfaces.Permission{
 			PermUserManageAll,
 			PermRoleManage,
 			PermSystemManage,
@@ -34,10 +35,10 @@ func ExampleUsage(service Service) {
 
 	// Example 2: Create a user role
 	fmt.Println("\n=== Creating a user role ===")
-	userRole, err := service.CreateRole(ctx, CreateRoleRequest{
+	userRole, err := service.CreateRole(ctx, interfaces.CreateRoleRequest{
 		Name:        "user",
 		Description: "Regular user with limited access",
-		Permissions: []Permission{
+		Permissions: []interfaces.Permission{
 			PermUserReadOwn,
 			PermUserUpdateOwn,
 		},
@@ -50,10 +51,10 @@ func ExampleUsage(service Service) {
 
 	// Example 3: Create a role with attribute-based permissions
 	fmt.Println("\n=== Creating a role with ABAC permissions ===")
-	managerRole, err := service.CreateRole(ctx, CreateRoleRequest{
+	managerRole, err := service.CreateRole(ctx, interfaces.CreateRoleRequest{
 		Name:        "manager",
 		Description: "Department manager with team access",
-		Permissions: []Permission{
+		Permissions: []interfaces.Permission{
 			{
 				Resource: "user",
 				Action:   "read",
@@ -131,7 +132,7 @@ func ExampleUsage(service Service) {
 	fmt.Println("\n=== Testing attribute-based access control ===")
 
 	// Test access to engineering department documents
-	accessReq := AccessRequest{
+	accessReq := interfaces.AccessRequest{
 		UserID:   userID,
 		Resource: "document",
 		Action:   "read",
@@ -179,13 +180,13 @@ func ExampleUsage(service Service) {
 	// Example 8: Update a role
 	fmt.Println("\n=== Updating a role ===")
 	newDescription := "Updated user role with additional permissions"
-	updatedPermissions := []Permission{
+	updatedPermissions := []interfaces.Permission{
 		PermUserReadOwn,
 		PermUserUpdateOwn,
 		{Resource: "profile", Action: "read", Scope: "own"},
 	}
 
-	updatedRole, err := service.UpdateRole(ctx, userRole.ID, UpdateRoleRequest{
+	updatedRole, err := service.UpdateRole(ctx, userRole.ID, interfaces.UpdateRoleRequest{
 		Description: &newDescription,
 		Permissions: updatedPermissions,
 	})
@@ -197,7 +198,7 @@ func ExampleUsage(service Service) {
 
 	// Example 9: List roles with pagination
 	fmt.Println("\n=== Listing roles ===")
-	rolesList, err := service.ListRoles(ctx, ListRolesRequest{
+	rolesList, err := service.ListRoles(ctx, interfaces.ListRolesRequest{
 		Limit:  10,
 		Offset: 0,
 	})
@@ -221,17 +222,17 @@ func ExampleRoleDefinitions() {
 	superAdmin := CreateRoleRequest{
 		Name:        "super-admin",
 		Description: "Super administrator with unrestricted access",
-		Permissions: []Permission{
+		Permissions: []interfaces.Permission{
 			{Resource: "*", Action: "*"},
 		},
 	}
 	fmt.Printf("Super Admin: %d permissions\n", len(superAdmin.Permissions))
 
 	// System Admin - System management without user data access
-	systemAdmin := CreateRoleRequest{
+	systemAdmin := interfaces.CreateRoleRequest{
 		Name:        "system-admin",
 		Description: "System administrator for infrastructure management",
-		Permissions: []Permission{
+		Permissions: []interfaces.Permission{
 			PermSystemRead,
 			PermSystemManage,
 			PermAuditRead,
@@ -243,10 +244,10 @@ func ExampleRoleDefinitions() {
 	fmt.Printf("System Admin: %d permissions\n", len(systemAdmin.Permissions))
 
 	// User Admin - User and role management
-	userAdmin := CreateRoleRequest{
+	userAdmin := interfaces.CreateRoleRequest{
 		Name:        "user-admin",
 		Description: "User administrator for account management",
-		Permissions: []Permission{
+		Permissions: []interfaces.Permission{
 			PermUserReadAll,
 			PermUserManageAll,
 			PermRoleRead,
@@ -258,10 +259,10 @@ func ExampleRoleDefinitions() {
 	fmt.Printf("User Admin: %d permissions\n", len(userAdmin.Permissions))
 
 	// Department Manager - Team-specific access
-	deptManager := CreateRoleRequest{
+	deptManager := interfaces.CreateRoleRequest{
 		Name:        "dept-manager",
 		Description: "Department manager with team oversight",
-		Permissions: []Permission{
+		Permissions: []interfaces.Permission{
 			{
 				Resource: "user",
 				Action:   "read",
@@ -292,10 +293,10 @@ func ExampleRoleDefinitions() {
 	fmt.Printf("Department Manager: %d permissions\n", len(deptManager.Permissions))
 
 	// Regular User - Basic self-service
-	regularUser := CreateRoleRequest{
+	regularUser := interfaces.CreateRoleRequest{
 		Name:        "user",
 		Description: "Regular user with self-service capabilities",
-		Permissions: []Permission{
+		Permissions: []interfaces.Permission{
 			PermUserReadOwn,
 			PermUserUpdateOwn,
 			{Resource: "profile", Action: "read", Scope: "own"},
@@ -307,10 +308,10 @@ func ExampleRoleDefinitions() {
 	fmt.Printf("Regular User: %d permissions\n", len(regularUser.Permissions))
 
 	// Read-Only User - View access only
-	readOnlyUser := CreateRoleRequest{
+	readOnlyUser := interfaces.CreateRoleRequest{
 		Name:        "readonly",
 		Description: "Read-only user for viewing purposes",
-		Permissions: []Permission{
+		Permissions: []interfaces.Permission{
 			PermUserReadOwn,
 			{Resource: "profile", Action: "read", Scope: "own"},
 			{Resource: "document", Action: "read", Scope: "public"},
@@ -320,10 +321,10 @@ func ExampleRoleDefinitions() {
 	fmt.Printf("Read-Only User: %d permissions\n", len(readOnlyUser.Permissions))
 
 	// API Service - Service-to-service access
-	apiService := CreateRoleRequest{
+	apiService := interfaces.CreateRoleRequest{
 		Name:        "api-service",
 		Description: "API service account for automated operations",
-		Permissions: []Permission{
+		Permissions: []interfaces.Permission{
 			{Resource: "user", Action: "read", Scope: "all"},
 			{Resource: "user", Action: "create"},
 			{Resource: "session", Action: "create"},

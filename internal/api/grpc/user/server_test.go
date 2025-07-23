@@ -11,29 +11,30 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/steve-mir/go-auth-system/internal/service/user"
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
+	// "github.com/steve-mir/go-auth-system/internal/service/user"
 	"github.com/steve-mir/go-auth-system/pb"
 )
 
-// MockUserService is a mock implementation of user.UserService
+// MockUserService is a mock implementation of interfaces.UserService
 type MockUserService struct {
 	mock.Mock
 }
 
-func (m *MockUserService) GetProfile(ctx context.Context, userID string) (*user.UserProfile, error) {
+func (m *MockUserService) GetProfile(ctx context.Context, userID string) (*interfaces.UserProfile, error) {
 	args := m.Called(ctx, userID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*user.UserProfile), args.Error(1)
+	return args.Get(0).(*interfaces.UserProfile), args.Error(1)
 }
 
-func (m *MockUserService) UpdateProfile(ctx context.Context, userID string, req *user.UpdateProfileRequest) (*user.UserProfile, error) {
+func (m *MockUserService) UpdateProfile(ctx context.Context, userID string, req *interfaces.UpdateProfileRequest) (*interfaces.UserProfile, error) {
 	args := m.Called(ctx, userID, req)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*user.UserProfile), args.Error(1)
+	return args.Get(0).(*interfaces.UserProfile), args.Error(1)
 }
 
 func (m *MockUserService) DeleteUser(ctx context.Context, userID string) error {
@@ -41,15 +42,15 @@ func (m *MockUserService) DeleteUser(ctx context.Context, userID string) error {
 	return args.Error(0)
 }
 
-func (m *MockUserService) ListUsers(ctx context.Context, req *user.ListUsersRequest) (*user.ListUsersResponse, error) {
+func (m *MockUserService) ListUsers(ctx context.Context, req *interfaces.ListUsersRequest) (*interfaces.ListUsersResponse, error) {
 	args := m.Called(ctx, req)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*user.ListUsersResponse), args.Error(1)
+	return args.Get(0).(*interfaces.ListUsersResponse), args.Error(1)
 }
 
-func (m *MockUserService) ChangePassword(ctx context.Context, userID string, req *user.ChangePasswordRequest) error {
+func (m *MockUserService) ChangePassword(ctx context.Context, userID string, req *interfaces.ChangePasswordRequest) error {
 	args := m.Called(ctx, userID, req)
 	return args.Error(0)
 }
@@ -81,7 +82,7 @@ func TestServer_GetProfile(t *testing.T) {
 				now := time.Now()
 				lastLogin := now.Add(-time.Hour)
 
-				m.On("GetProfile", mock.Anything, "user-123").Return(&user.UserProfile{
+				m.On("GetProfile", mock.Anything, "user-123").Return(&interfaces.UserProfile{
 					ID:        userID,
 					Email:     "test@example.com",
 					Username:  "testuser",
@@ -182,10 +183,10 @@ func TestServer_UpdateProfile(t *testing.T) {
 				userID := uuid.New()
 				now := time.Now()
 
-				m.On("UpdateProfile", mock.Anything, "user-123", mock.MatchedBy(func(req *user.UpdateProfileRequest) bool {
+				m.On("UpdateProfile", mock.Anything, "user-123", mock.MatchedBy(func(req *interfaces.UpdateProfileRequest) bool {
 					return req.FirstName != nil && *req.FirstName == "Updated" &&
 						req.LastName != nil && *req.LastName == "Name"
-				})).Return(&user.UserProfile{
+				})).Return(&interfaces.UserProfile{
 					ID:        userID,
 					Email:     "test@example.com",
 					Username:  "testuser",

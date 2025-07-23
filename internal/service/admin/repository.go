@@ -4,12 +4,13 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
 )
 
 // SessionRepository defines the interface for session data access
 type SessionRepository interface {
 	// GetAllSessions retrieves all user sessions with pagination and filtering
-	GetAllSessions(ctx context.Context, req *GetSessionsRequest) ([]UserSession, int64, error)
+	GetAllSessions(ctx context.Context, req *interfaces.GetSessionsRequest) ([]interfaces.UserSession, int64, error)
 
 	// DeleteSession deletes a specific session
 	DeleteSession(ctx context.Context, sessionID uuid.UUID) error
@@ -33,19 +34,19 @@ type SessionRepository interface {
 // AlertRepository defines the interface for alert data access
 type AlertRepository interface {
 	// CreateAlert creates a new alert
-	CreateAlert(ctx context.Context, alert *Alert) error
+	CreateAlert(ctx context.Context, alert *interfaces.Alert) error
 
 	// GetAlertByID retrieves an alert by ID
-	GetAlertByID(ctx context.Context, alertID uuid.UUID) (*Alert, error)
+	GetAlertByID(ctx context.Context, alertID uuid.UUID) (*interfaces.Alert, error)
 
 	// GetActiveAlerts retrieves all active alerts
-	GetActiveAlerts(ctx context.Context) ([]Alert, error)
+	GetActiveAlerts(ctx context.Context) ([]interfaces.Alert, error)
 
 	// GetAlerts retrieves alerts with pagination and filtering
 	GetAlerts(ctx context.Context, req *GetAlertsRequest) ([]Alert, int64, error)
 
 	// UpdateAlert updates an existing alert
-	UpdateAlert(ctx context.Context, alert *Alert) error
+	UpdateAlert(ctx context.Context, alert *interfaces.Alert) error
 
 	// DeleteAlert deletes an alert
 	DeleteAlert(ctx context.Context, alertID uuid.UUID) error
@@ -63,10 +64,10 @@ type AlertRepository interface {
 // NotificationRepository defines the interface for notification settings data access
 type NotificationRepository interface {
 	// GetNotificationSettings retrieves notification settings
-	GetNotificationSettings(ctx context.Context) (*NotificationSettings, error)
+	GetNotificationSettings(ctx context.Context) (*interfaces.NotificationSettings, error)
 
 	// UpdateNotificationSettings updates notification settings
-	UpdateNotificationSettings(ctx context.Context, req *UpdateNotificationSettingsRequest) error
+	UpdateNotificationSettings(ctx context.Context, req *interfaces.UpdateNotificationSettingsRequest) error
 
 	// CreateNotificationSettings creates initial notification settings
 	CreateNotificationSettings(ctx context.Context, settings *NotificationSettings) error

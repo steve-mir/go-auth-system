@@ -10,6 +10,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/google/uuid"
+
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
 	"github.com/steve-mir/go-auth-system/internal/service/role"
 	"github.com/steve-mir/go-auth-system/pb"
 )
@@ -35,12 +37,12 @@ func (s *Server) CreateRole(ctx context.Context, req *pb.CreateRoleRequest) (*pb
 	}
 
 	// Convert string permissions to Permission structs
-	var permissions []role.Permission
+	var permissions interfaces.Permission
 	for _, perm := range req.Permissions {
 		// Parse permission string (format: "resource:action" or "resource:action:scope")
 		parts := strings.Split(perm, ":")
 		if len(parts) >= 2 {
-			permission := role.Permission{
+			permission := interfaces.Permission{
 				Resource: parts[0],
 				Action:   parts[1],
 			}
@@ -52,7 +54,7 @@ func (s *Server) CreateRole(ctx context.Context, req *pb.CreateRoleRequest) (*pb
 	}
 
 	// Convert gRPC request to service request
-	createReq := role.CreateRoleRequest{
+	createReq := interfaces.CreateRoleRequest{
 		Name:        req.Name,
 		Description: req.Description,
 		Permissions: permissions,
@@ -139,7 +141,7 @@ func (s *Server) UpdateRole(ctx context.Context, req *pb.UpdateRoleRequest) (*pb
 	}
 
 	// Convert string permissions to Permission structs
-	var permissions []role.Permission
+	var permissions interfaces.Permission
 	for _, perm := range req.Permissions {
 		// Parse permission string (format: "resource:action" or "resource:action:scope")
 		parts := strings.Split(perm, ":")

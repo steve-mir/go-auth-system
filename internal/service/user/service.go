@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
 )
 
 // Service implements the UserService interface
@@ -15,14 +16,14 @@ type Service struct {
 }
 
 // NewService creates a new user service instance
-func NewService(deps *Dependencies) *Service {
+func NewService(deps *Dependencies) interfaces.UserService {
 	return &Service{
 		deps: deps,
 	}
 }
 
 // GetProfile retrieves user profile information by user ID
-func (s *Service) GetProfile(ctx context.Context, userID string) (*UserProfile, error) {
+func (s *Service) GetProfile(ctx context.Context, userID string) (*interfaces.UserProfile, error) {
 	// Validate user ID
 	if _, err := uuid.Parse(userID); err != nil {
 		return nil, NewInvalidInputError("user_id", "must be a valid UUID")
@@ -55,7 +56,7 @@ func (s *Service) GetProfile(ctx context.Context, userID string) (*UserProfile, 
 }
 
 // UpdateProfile updates user profile information with data encryption
-func (s *Service) UpdateProfile(ctx context.Context, userID string, req *UpdateProfileRequest) (*UserProfile, error) {
+func (s *Service) UpdateProfile(ctx context.Context, userID string, req *interfaces.UpdateProfileRequest) (*interfaces.UserProfile, error) {
 	// Validate user ID
 	if _, err := uuid.Parse(userID); err != nil {
 		return nil, NewInvalidInputError("user_id", "must be a valid UUID")
@@ -189,7 +190,7 @@ func (s *Service) DeleteUser(ctx context.Context, userID string) error {
 }
 
 // ListUsers retrieves users with pagination and filtering
-func (s *Service) ListUsers(ctx context.Context, req *ListUsersRequest) (*ListUsersResponse, error) {
+func (s *Service) ListUsers(ctx context.Context, req *interfaces.ListUsersRequest) (*interfaces.ListUsersResponse, error) {
 	// Set defaults
 	if req.Page < 1 {
 		req.Page = 1
@@ -224,7 +225,7 @@ func (s *Service) ListUsers(ctx context.Context, req *ListUsersRequest) (*ListUs
 	}
 
 	// Convert to user profiles
-	profiles := make([]*UserProfile, 0, len(users))
+	profiles := make([]*interfaces.UserProfile, 0, len(users))
 	for _, userData := range users {
 		profile, err := s.buildUserProfile(userData)
 		if err != nil {
@@ -245,7 +246,7 @@ func (s *Service) ListUsers(ctx context.Context, req *ListUsersRequest) (*ListUs
 	// Calculate total pages
 	totalPages := int32((total + int64(req.PageSize) - 1) / int64(req.PageSize))
 
-	return &ListUsersResponse{
+	return &interfaces.ListUsersResponse{
 		Users:      profiles,
 		Total:      total,
 		Page:       req.Page,
@@ -255,7 +256,7 @@ func (s *Service) ListUsers(ctx context.Context, req *ListUsersRequest) (*ListUs
 }
 
 // ChangePassword allows users to change their password
-func (s *Service) ChangePassword(ctx context.Context, userID string, req *ChangePasswordRequest) error {
+func (s *Service) ChangePassword(ctx context.Context, userID string, req *interfaces.ChangePasswordRequest) error {
 	// Validate user ID
 	if _, err := uuid.Parse(userID); err != nil {
 		return NewInvalidInputError("user_id", "must be a valid UUID")
@@ -333,8 +334,8 @@ func (s *Service) GetUserRoles(ctx context.Context, userID string) ([]string, er
 // Helper methods
 
 // buildUserProfile converts UserData to UserProfile with decryption
-func (s *Service) buildUserProfile(userData *UserData) (*UserProfile, error) {
-	profile := &UserProfile{
+func (s *Service) buildUserProfile(userData *UserData) (*interfaces.UserProfile, error) {
+	profile := &interfaces.UserProfile{
 		ID:        uuid.MustParse(userData.ID),
 		Email:     userData.Email,
 		Username:  userData.Username,
@@ -391,7 +392,7 @@ func (s *Service) encryptString(value string) ([]byte, error) {
 }
 
 // getUpdatedFields returns a list of fields that were updated
-func (s *Service) getUpdatedFields(req *UpdateProfileRequest) []string {
+func (s *Service) getUpdatedFields(req *interfaces.UpdateProfileRequest) []string {
 	var fields []string
 	if req.Email != nil {
 		fields = append(fields, "email")

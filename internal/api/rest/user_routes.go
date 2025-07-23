@@ -4,7 +4,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/steve-mir/go-auth-system/internal/service/user"
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
+	// "github.com/steve-mir/go-auth-system/internal/service/user"
 )
 
 // setupUserRoutes configures user management routes
@@ -51,7 +52,7 @@ func (s *Server) updateUserProfileHandler(c *gin.Context) {
 		return
 	}
 
-	var req user.UpdateProfileRequest
+	var req interfaces.UpdateProfileRequest
 	if !s.bindAndValidate(c, &req) {
 		return
 	}
@@ -84,7 +85,7 @@ func (s *Server) changePasswordHandler(c *gin.Context) {
 		return
 	}
 
-	var req user.ChangePasswordRequest
+	var req interfaces.ChangePasswordRequest
 	if !s.bindAndValidate(c, &req) {
 		return
 	}
@@ -157,7 +158,7 @@ func (s *Server) listUsersHandler(c *gin.Context) {
 		return
 	}
 
-	req := &user.ListUsersRequest{
+	req := &interfaces.ListUsersRequest{
 		Page:     int32(page),
 		PageSize: int32(limit),
 		Search:   search,
@@ -198,7 +199,7 @@ func (s *Server) updateUserByIDHandler(c *gin.Context) {
 		return
 	}
 
-	var req user.UpdateProfileRequest
+	var req interfaces.UpdateProfileRequest
 	if !s.bindAndValidate(c, &req) {
 		return
 	}

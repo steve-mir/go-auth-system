@@ -9,12 +9,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/steve-mir/go-auth-system/internal/config"
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
 	"github.com/steve-mir/go-auth-system/internal/middleware"
 
 	// "github.com/steve-mir/go-auth-system/internal/service/admin"
 	"github.com/steve-mir/go-auth-system/internal/service/auth"
-	"github.com/steve-mir/go-auth-system/internal/service/role"
-	"github.com/steve-mir/go-auth-system/internal/service/user"
+	// "github.com/steve-mir/go-auth-system/internal/service/role"
+	// "github.com/steve-mir/go-auth-system/internal/service/user"
 )
 
 // Server represents the REST API server
@@ -25,10 +26,10 @@ type Server struct {
 	middleware *middleware.MiddlewareManager
 
 	// Service dependencies
-	// adminService  admin.AdminService
+	adminService  interfaces.AdminService
 	authService   auth.AuthService
-	userService   user.UserService
-	roleService   role.Service
+	userService   interfaces.UserService
+	roleService   interfaces.RoleService
 	healthService HealthService
 	ssoService    SSOService
 }
@@ -136,9 +137,9 @@ func NewServer(
 	cfg *config.ServerConfig,
 	middlewareManager *middleware.MiddlewareManager,
 	authService auth.AuthService,
-	userService user.UserService,
-	roleService role.Service,
-	// adminService admin.AdminService,
+	userService interfaces.UserService,
+	roleService interfaces.RoleService,
+	adminService interfaces.AdminService,
 	healthService HealthService,
 	// ssoService SSOService,
 ) *Server {

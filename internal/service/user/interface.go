@@ -8,25 +8,25 @@ import (
 )
 
 // UserService defines the interface for user management operations
-type UserService interface {
-	// GetProfile retrieves user profile information by user ID
-	GetProfile(ctx context.Context, userID string) (*UserProfile, error)
+// type UserService interface {
+// 	// GetProfile retrieves user profile information by user ID
+// 	GetProfile(ctx context.Context, userID string) (*UserProfile, error)
 
-	// UpdateProfile updates user profile information with data encryption
-	UpdateProfile(ctx context.Context, userID string, req *UpdateProfileRequest) (*UserProfile, error)
+// 	// UpdateProfile updates user profile information with data encryption
+// 	UpdateProfile(ctx context.Context, userID string, req *UpdateProfileRequest) (*UserProfile, error)
 
-	// DeleteUser deletes a user and performs proper cleanup
-	DeleteUser(ctx context.Context, userID string) error
+// 	// DeleteUser deletes a user and performs proper cleanup
+// 	DeleteUser(ctx context.Context, userID string) error
 
-	// ListUsers retrieves users with pagination and filtering
-	ListUsers(ctx context.Context, req *ListUsersRequest) (*ListUsersResponse, error)
+// 	// ListUsers retrieves users with pagination and filtering
+// 	ListUsers(ctx context.Context, req *ListUsersRequest) (*ListUsersResponse, error)
 
-	// ChangePassword allows users to change their password
-	ChangePassword(ctx context.Context, userID string, req *ChangePasswordRequest) error
+// 	// ChangePassword allows users to change their password
+// 	ChangePassword(ctx context.Context, userID string, req *ChangePasswordRequest) error
 
-	// GetUserRoles retrieves roles assigned to a user
-	GetUserRoles(ctx context.Context, userID string) ([]string, error)
-}
+// 	// GetUserRoles retrieves roles assigned to a user
+// 	GetUserRoles(ctx context.Context, userID string) ([]string, error)
+// }
 
 // Repository interfaces that the user service depends on
 type UserRepository interface {

@@ -268,18 +268,20 @@ func (r *RedisSessionRepository) DeleteUserSessions(ctx context.Context, userID 
 
 // PostgresAuditRepository adapts SQLC queries to AuditRepository interface
 type PostgresAuditRepository struct {
-	queries *db.Queries
+	queries *postgres.DB
+	store   *db.Store
 }
 
 // NewPostgresAuditRepository creates a new PostgreSQL audit repository
-func NewPostgresAuditRepository(queries *db.Queries) AuditRepository {
+func NewPostgresAuditRepository(queries *postgres.DB, store *db.Store) AuditRepository {
 	return &PostgresAuditRepository{
 		queries: queries,
+		store:   store,
 	}
 }
 
 func (r *PostgresAuditRepository) LogUserAction(ctx context.Context, action *AuditLogData) error {
-	// This would require implementing audit log creation
+	//TODO: This would require implementing audit log creation
 	// For now, we'll just return nil as audit functionality is in a later task
 	return nil
 }

@@ -1,21 +1,20 @@
-package role
+package interfaces
 
 import (
 	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/steve-mir/go-auth-system/internal/interfaces"
 )
 
 // Role represents a role with permissions
 type Role struct {
-	ID          uuid.UUID               `json:"id"`
-	Name        string                  `json:"name"`
-	Description string                  `json:"description,omitempty"`
-	Permissions []interfaces.Permission `json:"permissions"`
-	CreatedAt   time.Time               `json:"created_at"`
-	UpdatedAt   time.Time               `json:"updated_at"`
+	ID          uuid.UUID    `json:"id"`
+	Name        string       `json:"name"`
+	Description string       `json:"description,omitempty"`
+	Permissions []Permission `json:"permissions"`
+	CreatedAt   time.Time    `json:"created_at"`
+	UpdatedAt   time.Time    `json:"updated_at"`
 }
 
 // Permission represents a specific permission
@@ -44,16 +43,16 @@ type UserInfo struct {
 
 // CreateRoleRequest represents a request to create a new role
 type CreateRoleRequest struct {
-	Name        string                  `json:"name" validate:"required,min=1,max=100"`
-	Description string                  `json:"description,omitempty" validate:"max=500"`
-	Permissions []interfaces.Permission `json:"permissions,omitempty"`
+	Name        string       `json:"name" validate:"required,min=1,max=100"`
+	Description string       `json:"description,omitempty" validate:"max=500"`
+	Permissions []Permission `json:"permissions,omitempty"`
 }
 
 // UpdateRoleRequest represents a request to update an existing role
 type UpdateRoleRequest struct {
-	Name        *string                 `json:"name,omitempty" validate:"omitempty,min=1,max=100"`
-	Description *string                 `json:"description,omitempty" validate:"omitempty,max=500"`
-	Permissions []interfaces.Permission `json:"permissions,omitempty"`
+	Name        *string      `json:"name,omitempty" validate:"omitempty,min=1,max=100"`
+	Description *string      `json:"description,omitempty" validate:"omitempty,max=500"`
+	Permissions []Permission `json:"permissions,omitempty"`
 }
 
 // ListRolesRequest represents a request to list roles
@@ -83,17 +82,17 @@ type AccessRequest struct {
 
 // AccessResponse represents the result of access validation
 type AccessResponse struct {
-	Allowed            bool                    `json:"allowed"`
-	Reason             string                  `json:"reason,omitempty"`
-	MatchedPermissions []interfaces.Permission `json:"matched_permissions,omitempty"`
-	Context            map[string]any          `json:"context,omitempty"`
+	Allowed            bool           `json:"allowed"`
+	Reason             string         `json:"reason,omitempty"`
+	MatchedPermissions []Permission   `json:"matched_permissions,omitempty"`
+	Context            map[string]any `json:"context,omitempty"`
 }
 
 // PermissionSet represents a set of permissions for efficient lookups
 type PermissionSet map[string]bool
 
 // NewPermissionSet creates a new permission set from a slice of permissions
-func NewPermissionSet(permissions []interfaces.Permission) PermissionSet {
+func NewPermissionSet(permissions []Permission) PermissionSet {
 	set := make(PermissionSet)
 	for _, perm := range permissions {
 		set[perm.String()] = true
@@ -106,7 +105,7 @@ func NewPermissionSet(permissions []interfaces.Permission) PermissionSet {
 }
 
 // Contains checks if the permission set contains a specific permission
-func (ps PermissionSet) Contains(permission interfaces.Permission) bool {
+func (ps PermissionSet) Contains(permission Permission) bool {
 	// Check exact match
 	if ps[permission.String()] {
 		return true
@@ -129,13 +128,13 @@ func (ps PermissionSet) Contains(permission interfaces.Permission) bool {
 }
 
 // MarshalPermissions converts permissions slice to JSON for database storage
-func MarshalPermissions(permissions []interfaces.Permission) ([]byte, error) {
+func MarshalPermissions(permissions []Permission) ([]byte, error) {
 	return json.Marshal(permissions)
 }
 
 // UnmarshalPermissions converts JSON to permissions slice from database
-func UnmarshalPermissions(data []byte) ([]interfaces.Permission, error) {
-	var permissions []interfaces.Permission
+func UnmarshalPermissions(data []byte) ([]Permission, error) {
+	var permissions []Permission
 	if len(data) == 0 {
 		return permissions, nil
 	}
@@ -150,7 +149,7 @@ func NewGuestRole() *Role {
 	return &Role{
 		Name:        "guest",
 		Description: "Guest user with minimal access",
-		Permissions: []interfaces.Permission{
+		Permissions: []Permission{
 			PermUserReadOwn,
 		},
 	}
@@ -161,7 +160,7 @@ func NewUserRole() *Role {
 	return &Role{
 		Name:        "user",
 		Description: "Standard user with basic permissions",
-		Permissions: []interfaces.Permission{
+		Permissions: []Permission{
 			PermUserReadOwn,
 			PermUserUpdateOwn,
 			PermSessionRead,
@@ -174,7 +173,7 @@ func NewModeratorRole() *Role {
 	return &Role{
 		Name:        "moderator",
 		Description: "Moderator with user management permissions",
-		Permissions: []interfaces.Permission{
+		Permissions: []Permission{
 			PermUserReadOwn,
 			PermUserUpdateOwn,
 			PermUserReadAll,
@@ -189,7 +188,7 @@ func NewAdminRole() *Role {
 	return &Role{
 		Name:        "admin",
 		Description: "Administrator with full system access",
-		Permissions: []interfaces.Permission{
+		Permissions: []Permission{
 			PermUserManageAll,
 			PermRoleManage,
 			PermSessionManage,
@@ -204,28 +203,28 @@ func NewSuperUserRole() *Role {
 	return &Role{
 		Name:        "superuser",
 		Description: "Super user with unrestricted access",
-		Permissions: []interfaces.Permission{
+		Permissions: []Permission{
 			{Resource: "*", Action: "*", Scope: ScopeAll},
 		},
 	}
 }
 
 // HasPermission checks if a role has a specific permission
-func (r *Role) HasPermission(permission interfaces.Permission) bool {
+func (r *Role) HasPermission(permission Permission) bool {
 	permSet := NewPermissionSet(r.Permissions)
 	return permSet.Contains(permission)
 }
 
 // AddPermission adds a permission to the role if it doesn't already exist
-func (r *Role) AddPermission(permission interfaces.Permission) {
+func (r *Role) AddPermission(permission Permission) {
 	if !r.HasPermission(permission) {
 		r.Permissions = append(r.Permissions, permission)
 	}
 }
 
 // RemovePermission removes a permission from the role
-func (r *Role) RemovePermission(permission interfaces.Permission) {
-	var filtered []interfaces.Permission
+func (r *Role) RemovePermission(permission Permission) {
+	var filtered []Permission
 	for _, perm := range r.Permissions {
 		if perm.String() != permission.String() {
 			filtered = append(filtered, perm)
@@ -260,28 +259,28 @@ const (
 // Common permissions
 var (
 	// User permissions
-	PermUserCreateOwn = interfaces.Permission{Resource: ResourceUser, Action: ActionCreate, Scope: ScopeOwn}
-	PermUserReadOwn   = interfaces.Permission{Resource: ResourceUser, Action: ActionRead, Scope: ScopeOwn}
-	PermUserUpdateOwn = interfaces.Permission{Resource: ResourceUser, Action: ActionUpdate, Scope: ScopeOwn}
-	PermUserDeleteOwn = interfaces.Permission{Resource: ResourceUser, Action: ActionDelete, Scope: ScopeOwn}
-	PermUserReadAll   = interfaces.Permission{Resource: ResourceUser, Action: ActionRead, Scope: ScopeAll}
-	PermUserManageAll = interfaces.Permission{Resource: ResourceUser, Action: ActionManage, Scope: ScopeAll}
+	PermUserCreateOwn = Permission{Resource: ResourceUser, Action: ActionCreate, Scope: ScopeOwn}
+	PermUserReadOwn   = Permission{Resource: ResourceUser, Action: ActionRead, Scope: ScopeOwn}
+	PermUserUpdateOwn = Permission{Resource: ResourceUser, Action: ActionUpdate, Scope: ScopeOwn}
+	PermUserDeleteOwn = Permission{Resource: ResourceUser, Action: ActionDelete, Scope: ScopeOwn}
+	PermUserReadAll   = Permission{Resource: ResourceUser, Action: ActionRead, Scope: ScopeAll}
+	PermUserManageAll = Permission{Resource: ResourceUser, Action: ActionManage, Scope: ScopeAll}
 
 	// Role permissions
-	PermRoleCreate = interfaces.Permission{Resource: ResourceRole, Action: ActionCreate}
-	PermRoleRead   = interfaces.Permission{Resource: ResourceRole, Action: ActionRead}
-	PermRoleUpdate = interfaces.Permission{Resource: ResourceRole, Action: ActionUpdate}
-	PermRoleDelete = interfaces.Permission{Resource: ResourceRole, Action: ActionDelete}
-	PermRoleManage = interfaces.Permission{Resource: ResourceRole, Action: ActionManage}
+	PermRoleCreate = Permission{Resource: ResourceRole, Action: ActionCreate}
+	PermRoleRead   = Permission{Resource: ResourceRole, Action: ActionRead}
+	PermRoleUpdate = Permission{Resource: ResourceRole, Action: ActionUpdate}
+	PermRoleDelete = Permission{Resource: ResourceRole, Action: ActionDelete}
+	PermRoleManage = Permission{Resource: ResourceRole, Action: ActionManage}
 
 	// System permissions
-	PermSystemRead   = interfaces.Permission{Resource: ResourceSystem, Action: ActionRead}
-	PermSystemManage = interfaces.Permission{Resource: ResourceSystem, Action: ActionManage}
+	PermSystemRead   = Permission{Resource: ResourceSystem, Action: ActionRead}
+	PermSystemManage = Permission{Resource: ResourceSystem, Action: ActionManage}
 
 	// Audit permissions
-	PermAuditRead = interfaces.Permission{Resource: ResourceAudit, Action: ActionRead}
+	PermAuditRead = Permission{Resource: ResourceAudit, Action: ActionRead}
 
 	// Session permissions
-	PermSessionRead   = interfaces.Permission{Resource: ResourceSession, Action: ActionRead, Scope: ScopeOwn}
-	PermSessionManage = interfaces.Permission{Resource: ResourceSession, Action: ActionManage, Scope: ScopeAll}
+	PermSessionRead   = Permission{Resource: ResourceSession, Action: ActionRead, Scope: ScopeOwn}
+	PermSessionManage = Permission{Resource: ResourceSession, Action: ActionManage, Scope: ScopeAll}
 )

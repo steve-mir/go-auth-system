@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
 	"github.com/steve-mir/go-auth-system/internal/repository/postgres"
 	"github.com/steve-mir/go-auth-system/internal/repository/postgres/db"
 )
@@ -25,7 +26,7 @@ func NewPostgresRepository(queries *postgres.DB, store *db.Store) Repository {
 }
 
 // CreateRole creates a new role in the database
-func (r *PostgresRepository) CreateRole(ctx context.Context, role *Role) error {
+func (r *PostgresRepository) CreateRole(ctx context.Context, role *interfaces.Role) error {
 	permissionsJSON, err := MarshalPermissions(role.Permissions)
 	if err != nil {
 		return err
@@ -49,7 +50,7 @@ func (r *PostgresRepository) CreateRole(ctx context.Context, role *Role) error {
 }
 
 // GetRoleByID retrieves a role by its ID
-func (r *PostgresRepository) GetRoleByID(ctx context.Context, roleID uuid.UUID) (*Role, error) {
+func (r *PostgresRepository) GetRoleByID(ctx context.Context, roleID uuid.UUID) (*interfaces.Role, error) {
 	dbRole, err := r.store.GetRoleByID(ctx, roleID)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -62,7 +63,7 @@ func (r *PostgresRepository) GetRoleByID(ctx context.Context, roleID uuid.UUID) 
 }
 
 // GetRoleByName retrieves a role by its name
-func (r *PostgresRepository) GetRoleByName(ctx context.Context, name string) (*Role, error) {
+func (r *PostgresRepository) GetRoleByName(ctx context.Context, name string) (*interfaces.Role, error) {
 	dbRole, err := r.store.GetRoleByName(ctx, name)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -75,7 +76,7 @@ func (r *PostgresRepository) GetRoleByName(ctx context.Context, name string) (*R
 }
 
 // UpdateRole updates an existing role
-func (r *PostgresRepository) UpdateRole(ctx context.Context, role *Role) error {
+func (r *PostgresRepository) UpdateRole(ctx context.Context, role *interfaces.Role) error {
 	permissionsJSON, err := MarshalPermissions(role.Permissions)
 	if err != nil {
 		return err
@@ -110,7 +111,7 @@ func (r *PostgresRepository) DeleteRole(ctx context.Context, roleID uuid.UUID) e
 }
 
 // ListRoles retrieves a paginated list of roles
-func (r *PostgresRepository) ListRoles(ctx context.Context, limit, offset int) ([]*Role, error) {
+func (r *PostgresRepository) ListRoles(ctx context.Context, limit, offset int) ([]*interfaces.Role, error) {
 	dbRoles, err := r.store.ListRoles(ctx, db.ListRolesParams{
 		Limit:  int32(limit),
 		Offset: int32(offset),
@@ -119,7 +120,7 @@ func (r *PostgresRepository) ListRoles(ctx context.Context, limit, offset int) (
 		return nil, err
 	}
 
-	roles := make([]*Role, len(dbRoles))
+	roles := make([]*interfaces.Role, len(dbRoles))
 	for i, dbRole := range dbRoles {
 		role, err := r.dbRoleToRole(dbRole)
 		if err != nil {
@@ -160,13 +161,13 @@ func (r *PostgresRepository) RemoveRoleFromUser(ctx context.Context, userID, rol
 }
 
 // GetUserRoles retrieves all roles assigned to a user
-func (r *PostgresRepository) GetUserRoles(ctx context.Context, userID uuid.UUID) ([]*Role, error) {
+func (r *PostgresRepository) GetUserRoles(ctx context.Context, userID uuid.UUID) ([]*interfaces.Role, error) {
 	dbRoles, err := r.store.GetUserRoles(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	roles := make([]*Role, len(dbRoles))
+	roles := make([]*interfaces.Role, len(dbRoles))
 	for i, dbRole := range dbRoles {
 		role, err := r.dbRoleToRole(dbRole)
 		if err != nil {
@@ -179,15 +180,15 @@ func (r *PostgresRepository) GetUserRoles(ctx context.Context, userID uuid.UUID)
 }
 
 // GetRoleUsers retrieves all users assigned to a role
-func (r *PostgresRepository) GetRoleUsers(ctx context.Context, roleID uuid.UUID) ([]*UserInfo, error) {
+func (r *PostgresRepository) GetRoleUsers(ctx context.Context, roleID uuid.UUID) ([]*interfaces.UserInfo, error) {
 	dbUsers, err := r.store.GetRoleUsers(ctx, roleID)
 	if err != nil {
 		return nil, err
 	}
 
-	users := make([]*UserInfo, len(dbUsers))
+	users := make([]*interfaces.UserInfo, len(dbUsers))
 	for i, dbUser := range dbUsers {
-		users[i] = &UserInfo{
+		users[i] = &interfaces.UserInfo{
 			ID:        dbUser.ID,
 			Email:     dbUser.Email,
 			Username:  dbUser.Username.String,
@@ -199,13 +200,13 @@ func (r *PostgresRepository) GetRoleUsers(ctx context.Context, roleID uuid.UUID)
 }
 
 // dbRoleToRole converts a database role to a service role
-func (r *PostgresRepository) dbRoleToRole(dbRole db.Role) (*Role, error) {
+func (r *PostgresRepository) dbRoleToRole(dbRole db.Role) (*interfaces.Role, error) {
 	permissions, err := UnmarshalPermissions(dbRole.Permissions)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Role{
+	return &interfaces.Role{
 		ID:          dbRole.ID,
 		Name:        dbRole.Name,
 		Description: dbRole.Description.String,

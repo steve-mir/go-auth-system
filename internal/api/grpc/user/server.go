@@ -8,18 +8,19 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/steve-mir/go-auth-system/internal/service/user"
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
+	// "github.com/steve-mir/go-auth-system/internal/service/user"
 	"github.com/steve-mir/go-auth-system/pb"
 )
 
 // Server implements the gRPC UserService
 type Server struct {
 	pb.UnimplementedUserServiceServer
-	userService user.UserService
+	userService interfaces.UserService
 }
 
 // NewServer creates a new gRPC user server
-func NewServer(userService user.UserService) *Server {
+func NewServer(userService interfaces.UserService) *Server {
 	return &Server{
 		userService: userService,
 	}
@@ -71,7 +72,7 @@ func (s *Server) UpdateProfile(ctx context.Context, req *pb.UpdateProfileRequest
 	}
 
 	// Convert gRPC request to service request
-	updateReq := &user.UpdateProfileRequest{}
+	updateReq := &interfaces.UpdateProfileRequest{}
 
 	if req.FirstName != nil {
 		updateReq.FirstName = req.FirstName
@@ -140,7 +141,7 @@ func (s *Server) DeleteUser(ctx context.Context, req *pb.DeleteUserRequest) (*pb
 // ListUsers retrieves a paginated list of users
 func (s *Server) ListUsers(ctx context.Context, req *pb.ListUsersRequest) (*pb.ListUsersResponse, error) {
 	// Convert gRPC request to service request
-	listReq := &user.ListUsersRequest{
+	listReq := &interfaces.ListUsersRequest{
 		Page:     req.Page,
 		PageSize: req.PageSize,
 		Search:   req.Search,
@@ -196,7 +197,7 @@ func (s *Server) ChangePassword(ctx context.Context, req *pb.ChangePasswordReque
 	}
 
 	// Convert gRPC request to service request
-	changeReq := &user.ChangePasswordRequest{
+	changeReq := &interfaces.ChangePasswordRequest{
 		CurrentPassword: req.CurrentPassword,
 		NewPassword:     req.NewPassword,
 	}

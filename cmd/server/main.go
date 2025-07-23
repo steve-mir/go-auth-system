@@ -24,6 +24,7 @@ import (
 	"github.com/steve-mir/go-auth-system/internal/security/crypto"
 	"github.com/steve-mir/go-auth-system/internal/security/hash"
 	"github.com/steve-mir/go-auth-system/internal/security/token"
+	"github.com/steve-mir/go-auth-system/internal/service/admin"
 	"github.com/steve-mir/go-auth-system/internal/service/auth"
 	"github.com/steve-mir/go-auth-system/internal/service/role"
 	"github.com/steve-mir/go-auth-system/internal/service/user"
@@ -235,9 +236,10 @@ func runServer(ctx context.Context, cfg *config.Config) error {
 	// Initialize repositories
 	log.Printf("Initializing repositories...")
 
-	authUserRepo := auth.NewPostgresUserRepository(db, sqlc.NewStore(db.Primary()))
-	roleRepo := role.NewPostgresRepository(db, sqlc.NewStore(db.Primary()))
-	userRepo := user.NewPostgresUserRepository(db, sqlc.NewStore(db.Primary()))
+	store := sqlc.NewStore(db.Primary())
+	authUserRepo := auth.NewPostgresUserRepository(db, store)
+	roleRepo := role.NewPostgresRepository(db, store)
+	userRepo := user.NewPostgresUserRepository(db, store)
 	redisStore := redis.NewSessionStore(redisClient)
 	sessionStore := auth.NewRedisSessionRepository(redisStore)
 	redisBlacklist := redis.NewTokenBlacklist(redisClient)
@@ -263,7 +265,7 @@ func runServer(ctx context.Context, cfg *config.Config) error {
 	userService := user.NewService(&user.Dependencies{
 		UserRepo:    userRepo,
 		SessionRepo: sessionStore,
-		// AuditRepo:   auditRepo, // TODO: Initialize audit repository
+		AuditRepo:   user.NewPostgresAuditRepository(db, store),
 		HashService: hashSvc,
 		Encryptor:   encryptorSvc.GetEncryptor(),
 	})
@@ -272,12 +274,17 @@ func runServer(ctx context.Context, cfg *config.Config) error {
 	roleService := role.NewService(roleRepo)
 
 	// Initialize admin service
-	// adminService := admin.NewService(admin.Dependencies{
-	// 	Config:      cfg,
-	// 	UserService: userService,
-	// 	RoleService: roleService,
-	// 	// SessionRepo: sessionStore,
-	// })
+	adminService := admin.NewService(admin.Dependencies{
+		Config:      cfg,
+		UserService: userService,
+		RoleService: roleService,
+		// SessionRepo: sessionStore,
+		// AuditService      audit.AuditService
+		// MonitoringService *monitoring.Service
+		// SessionRepo       SessionRepository
+		// AlertRepo         AlertRepository
+		// NotificationRepo  NotificationRepository
+	})
 
 	log.Printf("Business services initialized")
 
@@ -289,7 +296,7 @@ func runServer(ctx context.Context, cfg *config.Config) error {
 		authService,
 		userService,
 		roleService,
-		// adminService,
+		adminService,
 		healthSvc,
 		// ssoService,
 	)
