@@ -12,6 +12,21 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Alert struct {
+	ID         uuid.UUID        `db:"id" json:"id"`
+	Type       string           `db:"type" json:"type"`
+	Severity   string           `db:"severity" json:"severity"`
+	Title      string           `db:"title" json:"title"`
+	Message    string           `db:"message" json:"message"`
+	Source     string           `db:"source" json:"source"`
+	Metadata   json.RawMessage  `db:"metadata" json:"metadata"`
+	CreatedAt  pgtype.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt  pgtype.Timestamp `db:"updated_at" json:"updated_at"`
+	ResolvedAt pgtype.Timestamp `db:"resolved_at" json:"resolved_at"`
+	IsActive   pgtype.Bool      `db:"is_active" json:"is_active"`
+	IsResolved pgtype.Bool      `db:"is_resolved" json:"is_resolved"`
+}
+
 type AuditLog struct {
 	ID           uuid.UUID        `db:"id" json:"id"`
 	UserID       uuid.UUID        `db:"user_id" json:"user_id"`
@@ -24,6 +39,19 @@ type AuditLog struct {
 	Timestamp    pgtype.Timestamp `db:"timestamp" json:"timestamp"`
 }
 
+type NotificationSetting struct {
+	ID              uuid.UUID        `db:"id" json:"id"`
+	EmailEnabled    pgtype.Bool      `db:"email_enabled" json:"email_enabled"`
+	EmailRecipients []string         `db:"email_recipients" json:"email_recipients"`
+	SlackEnabled    pgtype.Bool      `db:"slack_enabled" json:"slack_enabled"`
+	SlackWebhook    pgtype.Text      `db:"slack_webhook" json:"slack_webhook"`
+	SmsEnabled      pgtype.Bool      `db:"sms_enabled" json:"sms_enabled"`
+	SmsRecipients   []string         `db:"sms_recipients" json:"sms_recipients"`
+	Thresholds      []byte           `db:"thresholds" json:"thresholds"`
+	CreatedAt       pgtype.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt       pgtype.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
 type Role struct {
 	ID          uuid.UUID        `db:"id" json:"id"`
 	Name        string           `db:"name" json:"name"`
@@ -31,6 +59,21 @@ type Role struct {
 	Permissions json.RawMessage  `db:"permissions" json:"permissions"`
 	CreatedAt   pgtype.Timestamp `db:"created_at" json:"created_at"`
 	UpdatedAt   pgtype.Timestamp `db:"updated_at" json:"updated_at"`
+}
+
+type SocialAccount struct {
+	ID           uuid.UUID        `db:"id" json:"id"`
+	UserID       uuid.UUID        `db:"user_id" json:"user_id"`
+	Provider     string           `db:"provider" json:"provider"`
+	SocialID     string           `db:"social_id" json:"social_id"`
+	Email        pgtype.Text      `db:"email" json:"email"`
+	Name         pgtype.Text      `db:"name" json:"name"`
+	AccessToken  pgtype.Text      `db:"access_token" json:"access_token"`
+	RefreshToken pgtype.Text      `db:"refresh_token" json:"refresh_token"`
+	ExpiresAt    pgtype.Timestamp `db:"expires_at" json:"expires_at"`
+	Metadata     json.RawMessage  `db:"metadata" json:"metadata"`
+	CreatedAt    pgtype.Timestamp `db:"created_at" json:"created_at"`
+	UpdatedAt    pgtype.Timestamp `db:"updated_at" json:"updated_at"`
 }
 
 type User struct {

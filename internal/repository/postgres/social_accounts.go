@@ -2,59 +2,57 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/steve-mir/go-auth-system/internal/repository/postgres/db"
 	"github.com/steve-mir/go-auth-system/internal/service/sso"
 )
 
-// SocialAccountRepository handles social account data operations
+// SocialAccountRepository handles social account data operations using SQLC
 type SocialAccountRepository struct {
-	db *sql.DB
+	queries *db.Queries
 }
 
-// NewSocialAccountRepository creates a new social account repository
-func NewSocialAccountRepository(db *sql.DB) *SocialAccountRepository {
+// NewSocialAccountRepository creates a new social account repository using SQLC
+func NewSocialAccountRepository(queries *db.Queries) *SocialAccountRepository {
 	return &SocialAccountRepository{
-		db: db,
+		queries: queries,
 	}
 }
 
 // CreateSocialAccount creates a new social account link
 func (r *SocialAccountRepository) CreateSocialAccount(ctx context.Context, account *sso.SocialAccount) error {
-	query := `
-		INSERT INTO social_accounts (id, user_id, provider, social_id, email, name, access_token, refresh_token, expires_at, metadata, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-	`
-
-	var expiresAt *time.Time
+	var expiresAt pgtype.Timestamp
 	if account.ExpiresAt != nil {
-		expiresAt = account.ExpiresAt
+		expiresAt = pgtype.Timestamp{Time: *account.ExpiresAt, Valid: true}
 	}
 
-	metadataJSON := "{}"
-	if account.Metadata != nil && len(account.Metadata) > 0 {
-		// Convert metadata to JSON string
-		// For simplicity, we'll store as empty JSON for now
-		// In production, you'd want proper JSON marshaling
+	metadataJSON, err := json.Marshal(account.Metadata)
+	if err != nil {
+		metadataJSON = []byte("{}")
 	}
 
-	_, err := r.db.ExecContext(ctx, query,
-		account.ID,
-		account.UserID,
-		account.Provider,
-		account.SocialID,
-		account.Email,
-		account.Name,
-		account.AccessToken,
-		account.RefreshToken,
-		expiresAt,
-		metadataJSON,
-		account.CreatedAt,
-		account.UpdatedAt,
-	)
+	accountId, _ := uuid.Parse(account.ID)
+	params := db.CreateSocialAccountParams{
+		ID:           accountId,
+		UserID:       uuid.MustParse(account.UserID),
+		Provider:     account.Provider,
+		SocialID:     account.SocialID,
+		Email:        pgtype.Text{String: account.Email, Valid: account.Email != ""},
+		Name:         pgtype.Text{String: account.Name, Valid: account.Name != ""},
+		AccessToken:  pgtype.Text{String: account.AccessToken, Valid: account.AccessToken != ""},
+		RefreshToken: pgtype.Text{String: account.RefreshToken, Valid: account.RefreshToken != ""},
+		ExpiresAt:    expiresAt,
+		Metadata:     metadataJSON,
+		CreatedAt:    pgtype.Timestamp{Time: account.CreatedAt, Valid: true},
+		UpdatedAt:    pgtype.Timestamp{Time: account.UpdatedAt, Valid: true},
+	}
 
+	_, err = r.queries.CreateSocialAccount(ctx, params)
 	if err != nil {
 		return fmt.Errorf("failed to create social account: %w", err)
 	}
@@ -64,101 +62,38 @@ func (r *SocialAccountRepository) CreateSocialAccount(ctx context.Context, accou
 
 // GetSocialAccountByProviderAndSocialID retrieves a social account by provider and social ID
 func (r *SocialAccountRepository) GetSocialAccountByProviderAndSocialID(ctx context.Context, provider, socialID string) (*sso.SocialAccount, error) {
-	query := `
-		SELECT id, user_id, provider, social_id, email, name, access_token, refresh_token, expires_at, metadata, created_at, updated_at
-		FROM social_accounts
-		WHERE provider = $1 AND social_id = $2
-	`
+	params := db.GetSocialAccountByProviderAndSocialIDParams{
+		Provider: provider,
+		SocialID: socialID,
+	}
 
-	var account sso.SocialAccount
-	var expiresAt sql.NullTime
-	var metadata string
-
-	err := r.db.QueryRowContext(ctx, query, provider, socialID).Scan(
-		&account.ID,
-		&account.UserID,
-		&account.Provider,
-		&account.SocialID,
-		&account.Email,
-		&account.Name,
-		&account.AccessToken,
-		&account.RefreshToken,
-		&expiresAt,
-		&metadata,
-		&account.CreatedAt,
-		&account.UpdatedAt,
-	)
-
+	dbAccount, err := r.queries.GetSocialAccountByProviderAndSocialID(ctx, params)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil // Not found
-		}
-		return nil, fmt.Errorf("failed to get social account: %w", err)
+		return nil, nil // Not found
 	}
 
-	if expiresAt.Valid {
-		account.ExpiresAt = &expiresAt.Time
-	}
-
-	// Parse metadata JSON if needed
-	account.Metadata = make(map[string]string)
-
-	return &account, nil
+	return r.convertDBSocialAccountToSSO(&dbAccount)
 }
 
 // GetSocialAccountsByUserID retrieves all social accounts for a user
 func (r *SocialAccountRepository) GetSocialAccountsByUserID(ctx context.Context, userID string) ([]*sso.SocialAccount, error) {
-	query := `
-		SELECT id, user_id, provider, social_id, email, name, access_token, refresh_token, expires_at, metadata, created_at, updated_at
-		FROM social_accounts
-		WHERE user_id = $1
-		ORDER BY created_at DESC
-	`
-
-	rows, err := r.db.QueryContext(ctx, query, userID)
+	parsedUserID, err := uuid.Parse(userID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query social accounts: %w", err)
+		return nil, fmt.Errorf("invalid user ID: %w", err)
 	}
-	defer rows.Close()
 
-	var accounts []*sso.SocialAccount
+	dbAccounts, err := r.queries.GetSocialAccountsByUserID(ctx, parsedUserID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get social accounts: %w", err)
+	}
 
-	for rows.Next() {
-		var account sso.SocialAccount
-		var expiresAt sql.NullTime
-		var metadata string
-
-		err := rows.Scan(
-			&account.ID,
-			&account.UserID,
-			&account.Provider,
-			&account.SocialID,
-			&account.Email,
-			&account.Name,
-			&account.AccessToken,
-			&account.RefreshToken,
-			&expiresAt,
-			&metadata,
-			&account.CreatedAt,
-			&account.UpdatedAt,
-		)
-
+	accounts := make([]*sso.SocialAccount, len(dbAccounts))
+	for i, dbAccount := range dbAccounts {
+		account, err := r.convertDBSocialAccountToSSO(&dbAccount)
 		if err != nil {
-			return nil, fmt.Errorf("failed to scan social account: %w", err)
+			return nil, fmt.Errorf("failed to convert account %d: %w", i, err)
 		}
-
-		if expiresAt.Valid {
-			account.ExpiresAt = &expiresAt.Time
-		}
-
-		// Parse metadata JSON if needed
-		account.Metadata = make(map[string]string)
-
-		accounts = append(accounts, &account)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating social accounts: %w", err)
+		accounts[i] = account
 	}
 
 	return accounts, nil
@@ -166,92 +101,58 @@ func (r *SocialAccountRepository) GetSocialAccountsByUserID(ctx context.Context,
 
 // GetSocialAccountByUserIDAndProvider retrieves a social account by user ID and provider
 func (r *SocialAccountRepository) GetSocialAccountByUserIDAndProvider(ctx context.Context, userID, provider string) (*sso.SocialAccount, error) {
-	query := `
-		SELECT id, user_id, provider, social_id, email, name, access_token, refresh_token, expires_at, metadata, created_at, updated_at
-		FROM social_accounts
-		WHERE user_id = $1 AND provider = $2
-	`
-
-	var account sso.SocialAccount
-	var expiresAt sql.NullTime
-	var metadata string
-
-	err := r.db.QueryRowContext(ctx, query, userID, provider).Scan(
-		&account.ID,
-		&account.UserID,
-		&account.Provider,
-		&account.SocialID,
-		&account.Email,
-		&account.Name,
-		&account.AccessToken,
-		&account.RefreshToken,
-		&expiresAt,
-		&metadata,
-		&account.CreatedAt,
-		&account.UpdatedAt,
-	)
-
+	parsedUserID, err := uuid.Parse(userID)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil // Not found
-		}
-		return nil, fmt.Errorf("failed to get social account: %w", err)
+		return nil, fmt.Errorf("invalid user ID: %w", err)
 	}
 
-	if expiresAt.Valid {
-		account.ExpiresAt = &expiresAt.Time
+	params := db.GetSocialAccountByUserIDAndProviderParams{
+		UserID:   parsedUserID,
+		Provider: provider,
 	}
 
-	// Parse metadata JSON if needed
-	account.Metadata = make(map[string]string)
+	dbAccount, err := r.queries.GetSocialAccountByUserIDAndProvider(ctx, params)
+	if err != nil {
+		return nil, nil // Not found
+	}
 
-	return &account, nil
+	return r.convertDBSocialAccountToSSO(&dbAccount)
 }
 
 // UpdateSocialAccount updates a social account
 func (r *SocialAccountRepository) UpdateSocialAccount(ctx context.Context, account *sso.SocialAccount) error {
-	query := `
-		UPDATE social_accounts
-		SET email = $3, name = $4, access_token = $5, refresh_token = $6, expires_at = $7, metadata = $8, updated_at = $9
-		WHERE user_id = $1 AND provider = $2
-	`
-
-	var expiresAt *time.Time
-	if account.ExpiresAt != nil {
-		expiresAt = account.ExpiresAt
+	parsedUserID, err := uuid.Parse(account.UserID)
+	if err != nil {
+		return fmt.Errorf("invalid user ID: %w", err)
 	}
 
-	metadataJSON := "{}"
-	if account.Metadata != nil && len(account.Metadata) > 0 {
-		// Convert metadata to JSON string
-		// For simplicity, we'll store as empty JSON for now
+	var expiresAt pgtype.Timestamp
+	if account.ExpiresAt != nil {
+		expiresAt = pgtype.Timestamp{Time: *account.ExpiresAt, Valid: true}
+	}
+
+	metadataJSON, err := json.Marshal(account.Metadata)
+	if err != nil {
+		metadataJSON = []byte("{}")
 	}
 
 	account.UpdatedAt = time.Now()
 
-	result, err := r.db.ExecContext(ctx, query,
-		account.UserID,
-		account.Provider,
-		account.Email,
-		account.Name,
-		account.AccessToken,
-		account.RefreshToken,
-		expiresAt,
-		metadataJSON,
-		account.UpdatedAt,
-	)
+	params := db.UpdateSocialAccountParams{
+		UserID:       parsedUserID,
+		Provider:     account.Provider,
+		Email:        pgtype.Text{String: account.Email, Valid: account.Email != ""},
+		Name:         pgtype.Text{String: account.Name, Valid: account.Name != ""},
+		AccessToken:  pgtype.Text{String: account.AccessToken, Valid: account.AccessToken != ""},
+		RefreshToken: pgtype.Text{String: account.RefreshToken, Valid: account.RefreshToken != ""},
+		ExpiresAt:    expiresAt,
+		Metadata:     metadataJSON,
+		UpdatedAt:    pgtype.Timestamp{Time: account.UpdatedAt, Valid: true},
+	}
 
+	err = r.queries.UpdateSocialAccount(ctx, params)
 	if err != nil {
 		return fmt.Errorf("failed to update social account: %w", err)
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to get rows affected: %w", err)
-	}
-
-	if rowsAffected == 0 {
-		return fmt.Errorf("social account not found")
 	}
 
 	return nil
@@ -259,20 +160,19 @@ func (r *SocialAccountRepository) UpdateSocialAccount(ctx context.Context, accou
 
 // DeleteSocialAccount deletes a social account
 func (r *SocialAccountRepository) DeleteSocialAccount(ctx context.Context, userID, provider string) error {
-	query := `DELETE FROM social_accounts WHERE user_id = $1 AND provider = $2`
+	parsedUserID, err := uuid.Parse(userID)
+	if err != nil {
+		return fmt.Errorf("invalid user ID: %w", err)
+	}
 
-	result, err := r.db.ExecContext(ctx, query, userID, provider)
+	params := db.DeleteSocialAccountParams{
+		UserID:   parsedUserID,
+		Provider: provider,
+	}
+
+	err = r.queries.DeleteSocialAccount(ctx, params)
 	if err != nil {
 		return fmt.Errorf("failed to delete social account: %w", err)
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to get rows affected: %w", err)
-	}
-
-	if rowsAffected == 0 {
-		return fmt.Errorf("social account not found")
 	}
 
 	return nil
@@ -280,12 +180,64 @@ func (r *SocialAccountRepository) DeleteSocialAccount(ctx context.Context, userI
 
 // DeleteAllUserSocialAccounts deletes all social accounts for a user
 func (r *SocialAccountRepository) DeleteAllUserSocialAccounts(ctx context.Context, userID string) error {
-	query := `DELETE FROM social_accounts WHERE user_id = $1`
+	parsedUserID, err := uuid.Parse(userID)
+	if err != nil {
+		return fmt.Errorf("invalid user ID: %w", err)
+	}
 
-	_, err := r.db.ExecContext(ctx, query, userID)
+	err = r.queries.DeleteAllUserSocialAccounts(ctx, parsedUserID)
 	if err != nil {
 		return fmt.Errorf("failed to delete user social accounts: %w", err)
 	}
 
 	return nil
+}
+
+// convertDBSocialAccountToSSO converts a database social account to SSO social account
+func (r *SocialAccountRepository) convertDBSocialAccountToSSO(dbAccount *db.SocialAccount) (*sso.SocialAccount, error) {
+	account := &sso.SocialAccount{
+		ID:       dbAccount.ID.String(),
+		UserID:   dbAccount.UserID.String(),
+		Provider: dbAccount.Provider,
+		SocialID: dbAccount.SocialID,
+	}
+
+	if dbAccount.Email.Valid {
+		account.Email = dbAccount.Email.String
+	}
+
+	if dbAccount.Name.Valid {
+		account.Name = dbAccount.Name.String
+	}
+
+	if dbAccount.AccessToken.Valid {
+		account.AccessToken = dbAccount.AccessToken.String
+	}
+
+	if dbAccount.RefreshToken.Valid {
+		account.RefreshToken = dbAccount.RefreshToken.String
+	}
+
+	if dbAccount.ExpiresAt.Valid {
+		account.ExpiresAt = &dbAccount.ExpiresAt.Time
+	}
+
+	if dbAccount.CreatedAt.Valid {
+		account.CreatedAt = dbAccount.CreatedAt.Time
+	}
+
+	if dbAccount.UpdatedAt.Valid {
+		account.UpdatedAt = dbAccount.UpdatedAt.Time
+	}
+
+	// Parse metadata
+	account.Metadata = make(map[string]string)
+	if len(dbAccount.Metadata) > 0 {
+		var metadata map[string]string
+		if err := json.Unmarshal(dbAccount.Metadata, &metadata); err == nil {
+			account.Metadata = metadata
+		}
+	}
+
+	return account, nil
 }

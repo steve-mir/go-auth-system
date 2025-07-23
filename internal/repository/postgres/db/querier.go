@@ -13,6 +13,9 @@ import (
 
 type Querier interface {
 	AssignRoleToUser(ctx context.Context, arg AssignRoleToUserParams) error
+	CleanupExpiredSessions(ctx context.Context) error
+	CountAlerts(ctx context.Context, arg CountAlertsParams) (int64, error)
+	CountAllSessions(ctx context.Context, dollar_1 pgtype.UUID) (int64, error)
 	CountAuditLogs(ctx context.Context) (int64, error)
 	CountAuditLogsByAction(ctx context.Context, action string) (int64, error)
 	CountRoles(ctx context.Context) (int64, error)
@@ -20,22 +23,38 @@ type Querier interface {
 	CountUserMFAMethods(ctx context.Context, userID uuid.UUID) (int64, error)
 	CountUserSessions(ctx context.Context, userID uuid.UUID) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
+	CreateAlert(ctx context.Context, arg CreateAlertParams) (Alert, error)
 	CreateAuditLog(ctx context.Context, arg CreateAuditLogParams) (AuditLog, error)
 	CreateMFAConfig(ctx context.Context, arg CreateMFAConfigParams) (UserMfa, error)
+	CreateNotificationSettings(ctx context.Context, arg CreateNotificationSettingsParams) error
 	CreateRole(ctx context.Context, arg CreateRoleParams) (Role, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (UserSession, error)
+	CreateSocialAccount(ctx context.Context, arg CreateSocialAccountParams) (SocialAccount, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	DeleteAlert(ctx context.Context, id uuid.UUID) error
+	DeleteAllUserSocialAccounts(ctx context.Context, userID uuid.UUID) error
+	// -- name: DeleteUserSessions :exec
+	// DELETE FROM user_sessions WHERE user_id = $1;
 	DeleteExpiredSessions(ctx context.Context) error
 	DeleteMFAConfig(ctx context.Context, id uuid.UUID) error
 	DeleteOldAuditLogs(ctx context.Context, timestamp pgtype.Timestamp) error
 	DeleteRole(ctx context.Context, id uuid.UUID) error
 	DeleteSession(ctx context.Context, id uuid.UUID) error
+	// -- name: DeleteSession :exec
+	// DELETE FROM user_sessions WHERE id = $1;
 	DeleteSessionByTokenHash(ctx context.Context, tokenHash string) error
+	DeleteSocialAccount(ctx context.Context, arg DeleteSocialAccountParams) error
 	DeleteUser(ctx context.Context, id uuid.UUID) error
 	DeleteUserMFAConfigs(ctx context.Context, userID uuid.UUID) error
 	DeleteUserSessions(ctx context.Context, userID uuid.UUID) error
 	DisableMFA(ctx context.Context, id uuid.UUID) error
 	EnableMFA(ctx context.Context, id uuid.UUID) error
+	GetActiveAlerts(ctx context.Context) ([]Alert, error)
+	GetActiveSessionsCount(ctx context.Context) (int64, error)
+	GetAlertByID(ctx context.Context, id uuid.UUID) (Alert, error)
+	GetAlerts(ctx context.Context, arg GetAlertsParams) ([]Alert, error)
+	GetAlertsBySeverity(ctx context.Context, severity string) ([]Alert, error)
+	GetAllSessions(ctx context.Context, arg GetAllSessionsParams) ([]GetAllSessionsRow, error)
 	GetAuditLogByID(ctx context.Context, id uuid.UUID) (AuditLog, error)
 	GetAuditLogsByAction(ctx context.Context, arg GetAuditLogsByActionParams) ([]AuditLog, error)
 	GetAuditLogsByResource(ctx context.Context, arg GetAuditLogsByResourceParams) ([]AuditLog, error)
@@ -43,13 +62,17 @@ type Querier interface {
 	GetAuditLogsByUserAndAction(ctx context.Context, arg GetAuditLogsByUserAndActionParams) ([]AuditLog, error)
 	GetEnabledMFAMethods(ctx context.Context, userID uuid.UUID) ([]string, error)
 	GetMFAConfigByID(ctx context.Context, id uuid.UUID) (UserMfa, error)
+	GetNotificationSettings(ctx context.Context) (GetNotificationSettingsRow, error)
 	GetRecentAuditLogs(ctx context.Context, arg GetRecentAuditLogsParams) ([]AuditLog, error)
 	GetRoleByID(ctx context.Context, id uuid.UUID) (Role, error)
 	GetRoleByName(ctx context.Context, name string) (Role, error)
 	GetRoleUsers(ctx context.Context, roleID uuid.UUID) ([]User, error)
-	GetSessionByID(ctx context.Context, id uuid.UUID) (UserSession, error)
+	GetSessionByID(ctx context.Context, id uuid.UUID) (GetSessionByIDRow, error)
 	GetSessionByTokenHash(ctx context.Context, tokenHash string) (UserSession, error)
 	GetSessionsForCleanup(ctx context.Context, limit int32) ([]GetSessionsForCleanupRow, error)
+	GetSocialAccountByProviderAndSocialID(ctx context.Context, arg GetSocialAccountByProviderAndSocialIDParams) (SocialAccount, error)
+	GetSocialAccountByUserIDAndProvider(ctx context.Context, arg GetSocialAccountByUserIDAndProviderParams) (SocialAccount, error)
+	GetSocialAccountsByUserID(ctx context.Context, userID uuid.UUID) ([]SocialAccount, error)
 	GetUserAuditLogs(ctx context.Context, arg GetUserAuditLogsParams) ([]AuditLog, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
@@ -57,16 +80,27 @@ type Querier interface {
 	GetUserMFAByMethod(ctx context.Context, arg GetUserMFAByMethodParams) (UserMfa, error)
 	GetUserMFAConfigs(ctx context.Context, userID uuid.UUID) ([]UserMfa, error)
 	GetUserRoles(ctx context.Context, userID uuid.UUID) ([]Role, error)
-	GetUserSessions(ctx context.Context, arg GetUserSessionsParams) ([]UserSession, error)
+	GetUserSessions(ctx context.Context, arg GetUserSessionsParams) ([]GetUserSessionsRow, error)
 	GetUsersByRole(ctx context.Context, name string) ([]User, error)
 	ListRoles(ctx context.Context, arg ListRolesParams) ([]Role, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
+	MarkAlertResolved(ctx context.Context, arg MarkAlertResolvedParams) error
 	RemoveRoleFromUser(ctx context.Context, arg RemoveRoleFromUserParams) error
+	UpdateAlert(ctx context.Context, arg UpdateAlertParams) error
 	UpdateMFAConfig(ctx context.Context, arg UpdateMFAConfigParams) (UserMfa, error)
 	UpdateRole(ctx context.Context, arg UpdateRoleParams) (Role, error)
+	// -- name: GetSessionByID :one
+	// SELECT * FROM user_sessions WHERE id = $1;
+	// -- name: GetUserSessions :many
+	// SELECT * FROM user_sessions
+	// WHERE user_id = $1 AND expires_at > NOW()
+	// ORDER BY created_at DESC
+	// LIMIT $2 OFFSET $3;
 	UpdateSessionLastUsed(ctx context.Context, id uuid.UUID) error
+	UpdateSocialAccount(ctx context.Context, arg UpdateSocialAccountParams) error
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 	UpdateUserLoginInfo(ctx context.Context, arg UpdateUserLoginInfoParams) error
+	UpsertNotificationSettings(ctx context.Context, arg UpsertNotificationSettingsParams) error
 }
 
 var _ Querier = (*Queries)(nil)

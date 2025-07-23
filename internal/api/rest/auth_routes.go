@@ -32,6 +32,8 @@ func (s *Server) registerHandler(c *gin.Context) {
 
 	// Get client info
 	ipAddress, userAgent := s.getClientInfo(c)
+	req.IPAddress = ipAddress
+	req.UserAgent = userAgent
 
 	// Call auth service
 	resp, err := s.authService.Register(c.Request.Context(), &req)

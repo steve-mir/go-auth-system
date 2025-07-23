@@ -67,60 +67,27 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (U
 }
 
 const deleteExpiredSessions = `-- name: DeleteExpiredSessions :exec
+
 DELETE FROM user_sessions WHERE expires_at < NOW()
 `
 
+// -- name: DeleteUserSessions :exec
+// DELETE FROM user_sessions WHERE user_id = $1;
 func (q *Queries) DeleteExpiredSessions(ctx context.Context) error {
 	_, err := q.db.Exec(ctx, deleteExpiredSessions)
 	return err
 }
 
-const deleteSession = `-- name: DeleteSession :exec
-DELETE FROM user_sessions WHERE id = $1
-`
-
-func (q *Queries) DeleteSession(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.Exec(ctx, deleteSession, id)
-	return err
-}
-
 const deleteSessionByTokenHash = `-- name: DeleteSessionByTokenHash :exec
+
 DELETE FROM user_sessions WHERE token_hash = $1
 `
 
+// -- name: DeleteSession :exec
+// DELETE FROM user_sessions WHERE id = $1;
 func (q *Queries) DeleteSessionByTokenHash(ctx context.Context, tokenHash string) error {
 	_, err := q.db.Exec(ctx, deleteSessionByTokenHash, tokenHash)
 	return err
-}
-
-const deleteUserSessions = `-- name: DeleteUserSessions :exec
-DELETE FROM user_sessions WHERE user_id = $1
-`
-
-func (q *Queries) DeleteUserSessions(ctx context.Context, userID uuid.UUID) error {
-	_, err := q.db.Exec(ctx, deleteUserSessions, userID)
-	return err
-}
-
-const getSessionByID = `-- name: GetSessionByID :one
-SELECT id, user_id, token_hash, token_type, expires_at, created_at, last_used_at, ip_address, user_agent FROM user_sessions WHERE id = $1
-`
-
-func (q *Queries) GetSessionByID(ctx context.Context, id uuid.UUID) (UserSession, error) {
-	row := q.db.QueryRow(ctx, getSessionByID, id)
-	var i UserSession
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.TokenHash,
-		&i.TokenType,
-		&i.ExpiresAt,
-		&i.CreatedAt,
-		&i.LastUsedAt,
-		&i.IpAddress,
-		&i.UserAgent,
-	)
-	return i, err
 }
 
 const getSessionByTokenHash = `-- name: GetSessionByTokenHash :one
@@ -175,55 +142,21 @@ func (q *Queries) GetSessionsForCleanup(ctx context.Context, limit int32) ([]Get
 	return items, nil
 }
 
-const getUserSessions = `-- name: GetUserSessions :many
-SELECT id, user_id, token_hash, token_type, expires_at, created_at, last_used_at, ip_address, user_agent FROM user_sessions 
-WHERE user_id = $1 AND expires_at > NOW()
-ORDER BY created_at DESC
-LIMIT $2 OFFSET $3
-`
-
-type GetUserSessionsParams struct {
-	UserID uuid.UUID `db:"user_id" json:"user_id"`
-	Limit  int32     `db:"limit" json:"limit"`
-	Offset int32     `db:"offset" json:"offset"`
-}
-
-func (q *Queries) GetUserSessions(ctx context.Context, arg GetUserSessionsParams) ([]UserSession, error) {
-	rows, err := q.db.Query(ctx, getUserSessions, arg.UserID, arg.Limit, arg.Offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []UserSession{}
-	for rows.Next() {
-		var i UserSession
-		if err := rows.Scan(
-			&i.ID,
-			&i.UserID,
-			&i.TokenHash,
-			&i.TokenType,
-			&i.ExpiresAt,
-			&i.CreatedAt,
-			&i.LastUsedAt,
-			&i.IpAddress,
-			&i.UserAgent,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const updateSessionLastUsed = `-- name: UpdateSessionLastUsed :exec
+
+
 UPDATE user_sessions SET
     last_used_at = NOW()
 WHERE id = $1
 `
 
+// -- name: GetSessionByID :one
+// SELECT * FROM user_sessions WHERE id = $1;
+// -- name: GetUserSessions :many
+// SELECT * FROM user_sessions
+// WHERE user_id = $1 AND expires_at > NOW()
+// ORDER BY created_at DESC
+// LIMIT $2 OFFSET $3;
 func (q *Queries) UpdateSessionLastUsed(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, updateSessionLastUsed, id)
 	return err

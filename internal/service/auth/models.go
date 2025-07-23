@@ -14,6 +14,8 @@ type RegisterRequest struct {
 	FirstName string `json:"first_name,omitempty" validate:"omitempty,max=100"`
 	LastName  string `json:"last_name,omitempty" validate:"omitempty,max=100"`
 	Phone     string `json:"phone,omitempty" validate:"omitempty,e164"`
+	IPAddress string `json:"-"` // Set programmatically
+	UserAgent string `json:"-"` // Set programmatically
 }
 
 // RegisterResponse represents a user registration response

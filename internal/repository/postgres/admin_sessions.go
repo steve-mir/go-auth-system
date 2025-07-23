@@ -2,124 +2,61 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
-	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/steve-mir/go-auth-system/internal/repository/postgres/db"
 	"github.com/steve-mir/go-auth-system/internal/service/admin"
 )
 
-// AdminSessionRepository implements the admin.SessionRepository interface
+// AdminSessionRepository implements the admin.SessionRepository interface using SQLC
 type AdminSessionRepository struct {
-	db *sql.DB
+	queries *db.Queries
 }
 
-// NewAdminSessionRepository creates a new admin session repository
-func NewAdminSessionRepository(db *sql.DB) *AdminSessionRepository {
+// NewAdminSessionRepository creates a new admin session repository using SQLC
+func NewAdminSessionRepository(queries *db.Queries) *AdminSessionRepository {
 	return &AdminSessionRepository{
-		db: db,
+		queries: queries,
 	}
 }
 
 // GetAllSessions retrieves all user sessions with pagination and filtering
 func (r *AdminSessionRepository) GetAllSessions(ctx context.Context, req *admin.GetSessionsRequest) ([]admin.UserSession, int64, error) {
-	// Build the base query
-	baseQuery := `
-		SELECT 
-			s.id, s.user_id, u.email, s.ip_address, s.user_agent,
-			s.created_at, s.last_used_at, s.expires_at, s.token_type,
-			CASE WHEN s.expires_at > NOW() THEN true ELSE false END as is_active
-		FROM user_sessions s
-		JOIN users u ON s.user_id = u.id
-	`
-
-	countQuery := `
-		SELECT COUNT(*)
-		FROM user_sessions s
-		JOIN users u ON s.user_id = u.id
-	`
-
-	var conditions []string
-	var args []interface{}
-	argIndex := 1
-
-	// Add filters
+	// Parse user ID if provided
+	var userUUID pgtype.UUID
 	if req.UserID != "" {
-		userUUID, err := uuid.Parse(req.UserID)
+		parsedUUID, err := uuid.Parse(req.UserID)
 		if err != nil {
 			return nil, 0, fmt.Errorf("invalid user ID: %w", err)
 		}
-		conditions = append(conditions, fmt.Sprintf("s.user_id = $%d", argIndex))
-		args = append(args, userUUID)
-		argIndex++
-	}
-
-	// Add WHERE clause if conditions exist
-	if len(conditions) > 0 {
-		whereClause := " WHERE " + strings.Join(conditions, " AND ")
-		baseQuery += whereClause
-		countQuery += whereClause
+		userUUID = pgtype.UUID{Bytes: parsedUUID, Valid: true}
 	}
 
 	// Get total count
-	var total int64
-	err := r.db.QueryRowContext(ctx, countQuery, args...).Scan(&total)
+	total, err := r.queries.CountAllSessions(ctx, userUUID)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get sessions count: %w", err)
 	}
 
-	// Add sorting
-	sortBy := "created_at"
-	if req.SortBy != "" {
-		switch req.SortBy {
-		case "created_at", "last_used_at", "expires_at", "user_email":
-			sortBy = req.SortBy
-		}
-	}
-
-	sortOrder := "DESC"
-	if req.SortOrder == "asc" {
-		sortOrder = "ASC"
-	}
-
-	baseQuery += fmt.Sprintf(" ORDER BY %s %s", sortBy, sortOrder)
-
-	// Add pagination
+	// Get sessions
 	offset := (req.Page - 1) * req.Limit
-	baseQuery += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argIndex, argIndex+1)
-	args = append(args, req.Limit, offset)
+	params := db.GetAllSessionsParams{
+		Column1: userUUID,
+		Column2: req.SortBy,
+		Limit:   int32(req.Limit),
+		Offset:  int32(offset),
+	}
 
-	// Execute query
-	rows, err := r.db.QueryContext(ctx, baseQuery, args...)
+	dbSessions, err := r.queries.GetAllSessions(ctx, params)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to query sessions: %w", err)
-	}
-	defer rows.Close()
-
-	var sessions []admin.UserSession
-	for rows.Next() {
-		var session admin.UserSession
-		err := rows.Scan(
-			&session.SessionID,
-			&session.UserID,
-			&session.UserEmail,
-			&session.IPAddress,
-			&session.UserAgent,
-			&session.CreatedAt,
-			&session.LastUsed,
-			&session.ExpiresAt,
-			&session.TokenType,
-			&session.IsActive,
-		)
-		if err != nil {
-			return nil, 0, fmt.Errorf("failed to scan session: %w", err)
-		}
-		sessions = append(sessions, session)
+		return nil, 0, fmt.Errorf("failed to get sessions: %w", err)
 	}
 
-	if err = rows.Err(); err != nil {
-		return nil, 0, fmt.Errorf("error iterating sessions: %w", err)
+	sessions := make([]admin.UserSession, len(dbSessions))
+	for i, dbSession := range dbSessions {
+		sessions[i] = r.convertDBSessionToAdmin(&dbSession)
 	}
 
 	return sessions, total, nil
@@ -127,102 +64,40 @@ func (r *AdminSessionRepository) GetAllSessions(ctx context.Context, req *admin.
 
 // DeleteSession deletes a specific session
 func (r *AdminSessionRepository) DeleteSession(ctx context.Context, sessionID uuid.UUID) error {
-	query := `DELETE FROM user_sessions WHERE id = $1`
-	result, err := r.db.ExecContext(ctx, query, sessionID)
+	err := r.queries.DeleteSession(ctx, sessionID)
 	if err != nil {
 		return fmt.Errorf("failed to delete session: %w", err)
 	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to get rows affected: %w", err)
-	}
-
-	if rowsAffected == 0 {
-		return fmt.Errorf("session not found")
-	}
-
 	return nil
 }
 
 // GetSessionByID retrieves a session by ID
 func (r *AdminSessionRepository) GetSessionByID(ctx context.Context, sessionID uuid.UUID) (*admin.UserSession, error) {
-	query := `
-		SELECT 
-			s.id, s.user_id, u.email, s.ip_address, s.user_agent,
-			s.created_at, s.last_used_at, s.expires_at, s.token_type,
-			CASE WHEN s.expires_at > NOW() THEN true ELSE false END as is_active
-		FROM user_sessions s
-		JOIN users u ON s.user_id = u.id
-		WHERE s.id = $1
-	`
-
-	var session admin.UserSession
-	err := r.db.QueryRowContext(ctx, query, sessionID).Scan(
-		&session.SessionID,
-		&session.UserID,
-		&session.UserEmail,
-		&session.IPAddress,
-		&session.UserAgent,
-		&session.CreatedAt,
-		&session.LastUsed,
-		&session.ExpiresAt,
-		&session.TokenType,
-		&session.IsActive,
-	)
-
+	dbSession, err := r.queries.GetSessionByID(ctx, sessionID)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("session not found")
-		}
 		return nil, fmt.Errorf("failed to get session: %w", err)
 	}
 
+	session := r.convertGetSessionByIDRowToAdmin(&dbSession)
 	return &session, nil
 }
 
 // GetUserSessions retrieves sessions for a specific user
 func (r *AdminSessionRepository) GetUserSessions(ctx context.Context, userID uuid.UUID) ([]admin.UserSession, error) {
-	query := `
-		SELECT 
-			s.id, s.user_id, u.email, s.ip_address, s.user_agent,
-			s.created_at, s.last_used_at, s.expires_at, s.token_type,
-			CASE WHEN s.expires_at > NOW() THEN true ELSE false END as is_active
-		FROM user_sessions s
-		JOIN users u ON s.user_id = u.id
-		WHERE s.user_id = $1
-		ORDER BY s.created_at DESC
-	`
+	params := db.GetUserSessionsParams{
+		UserID: userID,
+		Limit:  100, // Default limit
+		Offset: 0,
+	}
 
-	rows, err := r.db.QueryContext(ctx, query, userID)
+	dbSessions, err := r.queries.GetUserSessions(ctx, params)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query user sessions: %w", err)
-	}
-	defer rows.Close()
-
-	var sessions []admin.UserSession
-	for rows.Next() {
-		var session admin.UserSession
-		err := rows.Scan(
-			&session.SessionID,
-			&session.UserID,
-			&session.UserEmail,
-			&session.IPAddress,
-			&session.UserAgent,
-			&session.CreatedAt,
-			&session.LastUsed,
-			&session.ExpiresAt,
-			&session.TokenType,
-			&session.IsActive,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan session: %w", err)
-		}
-		sessions = append(sessions, session)
+		return nil, fmt.Errorf("failed to get user sessions: %w", err)
 	}
 
-	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating sessions: %w", err)
+	sessions := make([]admin.UserSession, len(dbSessions))
+	for i, dbSession := range dbSessions {
+		sessions[i] = r.convertGetUserSessionsRowToAdmin(&dbSession)
 	}
 
 	return sessions, nil
@@ -230,8 +105,7 @@ func (r *AdminSessionRepository) GetUserSessions(ctx context.Context, userID uui
 
 // DeleteUserSessions deletes all sessions for a user
 func (r *AdminSessionRepository) DeleteUserSessions(ctx context.Context, userID uuid.UUID) error {
-	query := `DELETE FROM user_sessions WHERE user_id = $1`
-	_, err := r.db.ExecContext(ctx, query, userID)
+	err := r.queries.DeleteUserSessions(ctx, userID)
 	if err != nil {
 		return fmt.Errorf("failed to delete user sessions: %w", err)
 	}
@@ -240,9 +114,7 @@ func (r *AdminSessionRepository) DeleteUserSessions(ctx context.Context, userID 
 
 // GetActiveSessionsCount returns the count of active sessions
 func (r *AdminSessionRepository) GetActiveSessionsCount(ctx context.Context) (int64, error) {
-	query := `SELECT COUNT(*) FROM user_sessions WHERE expires_at > NOW()`
-	var count int64
-	err := r.db.QueryRowContext(ctx, query).Scan(&count)
+	count, err := r.queries.GetActiveSessionsCount(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get active sessions count: %w", err)
 	}
@@ -251,19 +123,108 @@ func (r *AdminSessionRepository) GetActiveSessionsCount(ctx context.Context) (in
 
 // CleanupExpiredSessions removes expired sessions
 func (r *AdminSessionRepository) CleanupExpiredSessions(ctx context.Context) error {
-	query := `DELETE FROM user_sessions WHERE expires_at <= NOW()`
-	result, err := r.db.ExecContext(ctx, query)
+	err := r.queries.CleanupExpiredSessions(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to cleanup expired sessions: %w", err)
 	}
+	return nil
+}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to get rows affected: %w", err)
+// convertDBSessionToAdmin converts a database session to admin session
+func (r *AdminSessionRepository) convertDBSessionToAdmin(dbSession *db.GetAllSessionsRow) admin.UserSession {
+	session := admin.UserSession{
+		SessionID: dbSession.ID,
+		UserID:    dbSession.UserID,
+		UserEmail: dbSession.Email,
+		TokenType: dbSession.TokenType,
+		IsActive:  dbSession.IsActive,
 	}
 
-	// Log the number of cleaned up sessions (could be useful for monitoring)
-	_ = rowsAffected
+	if dbSession.IpAddress != nil {
+		session.IPAddress = dbSession.IpAddress.String()
+	}
 
-	return nil
+	if dbSession.UserAgent.Valid {
+		session.UserAgent = dbSession.UserAgent.String
+	}
+
+	if dbSession.CreatedAt.Valid {
+		session.CreatedAt = dbSession.CreatedAt.Time
+	}
+
+	if dbSession.LastUsedAt.Valid {
+		session.LastUsed = dbSession.LastUsedAt.Time
+	}
+
+	if dbSession.ExpiresAt.Valid {
+		session.ExpiresAt = dbSession.ExpiresAt.Time
+	}
+
+	return session
+}
+
+// convertGetSessionByIDRowToAdmin converts a GetSessionByIDRow to admin session
+func (r *AdminSessionRepository) convertGetSessionByIDRowToAdmin(dbSession *db.GetSessionByIDRow) admin.UserSession {
+	session := admin.UserSession{
+		SessionID: dbSession.ID,
+		UserID:    dbSession.UserID,
+		UserEmail: dbSession.Email,
+		TokenType: dbSession.TokenType,
+		IsActive:  dbSession.IsActive,
+	}
+
+	if dbSession.IpAddress != nil {
+		session.IPAddress = dbSession.IpAddress.String()
+	}
+
+	if dbSession.UserAgent.Valid {
+		session.UserAgent = dbSession.UserAgent.String
+	}
+
+	if dbSession.CreatedAt.Valid {
+		session.CreatedAt = dbSession.CreatedAt.Time
+	}
+
+	if dbSession.LastUsedAt.Valid {
+		session.LastUsed = dbSession.LastUsedAt.Time
+	}
+
+	if dbSession.ExpiresAt.Valid {
+		session.ExpiresAt = dbSession.ExpiresAt.Time
+	}
+
+	return session
+}
+
+// convertGetUserSessionsRowToAdmin converts a GetUserSessionsRow to admin session
+func (r *AdminSessionRepository) convertGetUserSessionsRowToAdmin(dbSession *db.GetUserSessionsRow) admin.UserSession {
+	session := admin.UserSession{
+		SessionID: dbSession.ID,
+		UserID:    dbSession.UserID,
+		UserEmail: dbSession.Email,
+		TokenType: dbSession.TokenType,
+		IsActive:  dbSession.IsActive,
+	}
+
+	if dbSession.IpAddress != nil {
+		session.IPAddress = dbSession.IpAddress.String()
+	}
+
+	if dbSession.UserAgent.Valid {
+		session.UserAgent = dbSession.UserAgent.String
+	}
+
+	if dbSession.CreatedAt.Valid {
+		session.CreatedAt = dbSession.CreatedAt.Time
+	}
+
+	if dbSession.LastUsedAt.Valid {
+		session.LastUsed = dbSession.LastUsedAt.Time
+	}
+
+	if dbSession.ExpiresAt.Valid {
+		session.ExpiresAt = dbSession.ExpiresAt.Time
+	}
+
+	return session
 }

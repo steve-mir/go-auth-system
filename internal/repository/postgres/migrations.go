@@ -48,7 +48,7 @@ func (m *MigrationManager) InitMigrationTable(ctx context.Context) error {
 		ON schema_migrations(applied_at);
 	`
 
-	_, err := m.db.Exec(ctx, query)
+	_, err := m.db.Primary().Exec(ctx, query)
 	if err != nil {
 		return fmt.Errorf("failed to create migration table: %w", err)
 	}
@@ -122,7 +122,7 @@ func (m *MigrationManager) GetAppliedMigrations(ctx context.Context) (map[int]Mi
 		ORDER BY version ASC
 	`
 
-	rows, err := m.db.Query(ctx, query)
+	rows, err := m.db.Primary().Query(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query applied migrations: %w", err)
 	}
@@ -236,7 +236,7 @@ func (m *MigrationManager) MigrateDown(ctx context.Context) error {
 // applyMigration applies a single migration
 func (m *MigrationManager) applyMigration(ctx context.Context, migration Migration) error {
 	// Start transaction
-	tx, err := m.db.Begin(ctx)
+	tx, err := m.db.Primary().Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to start transaction: %w", err)
 	}
@@ -268,7 +268,7 @@ func (m *MigrationManager) applyMigration(ctx context.Context, migration Migrati
 // rollbackMigration rolls back a single migration
 func (m *MigrationManager) rollbackMigration(ctx context.Context, migration Migration) error {
 	// Start transaction
-	tx, err := m.db.Begin(ctx)
+	tx, err := m.db.Primary().Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to start transaction: %w", err)
 	}
@@ -369,5 +369,5 @@ func parseMigrationFilename(filename string) (version int, name, direction strin
 
 // CreateStdlibDB creates a database/sql compatible DB from pgx connection
 func (db *DB) CreateStdlibDB() *sql.DB {
-	return stdlib.OpenDBFromPool(db.Pool)
+	return stdlib.OpenDBFromPool(db.Primary())
 }

@@ -139,8 +139,13 @@ func (l *Logger) WithContext(ctx context.Context) *Logger {
 	}
 
 	if len(attrs) > 0 {
+		// Convert slog.Attr to any for With method
+		args := make([]any, len(attrs))
+		for i, attr := range attrs {
+			args[i] = attr
+		}
 		return &Logger{
-			Logger: l.Logger.With(attrs...),
+			Logger: l.Logger.With(args...),
 			level:  l.level,
 			format: l.format,
 		}
@@ -151,9 +156,9 @@ func (l *Logger) WithContext(ctx context.Context) *Logger {
 
 // WithFields returns a logger with additional fields
 func (l *Logger) WithFields(fields map[string]interface{}) *Logger {
-	attrs := make([]slog.Attr, 0, len(fields))
+	attrs := make([]any, 0, len(fields)*2)
 	for key, value := range fields {
-		attrs = append(attrs, slog.Any(key, value))
+		attrs = append(attrs, key, value)
 	}
 
 	return &Logger{

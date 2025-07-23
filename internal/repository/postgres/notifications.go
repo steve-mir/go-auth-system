@@ -2,76 +2,55 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/steve-mir/go-auth-system/internal/repository/postgres/db"
 	"github.com/steve-mir/go-auth-system/internal/service/admin"
 )
 
-// NotificationRepository implements the admin.NotificationRepository interface
+// NotificationRepository implements the admin.NotificationRepository interface using SQLC
 type NotificationRepository struct {
-	db *sql.DB
+	queries *db.Queries
 }
 
-// NewNotificationRepository creates a new notification repository
-func NewNotificationRepository(db *sql.DB) *NotificationRepository {
+// NewNotificationRepository creates a new notification repository using SQLC
+func NewNotificationRepository(queries *db.Queries) *NotificationRepository {
 	return &NotificationRepository{
-		db: db,
+		queries: queries,
 	}
 }
 
 // GetNotificationSettings retrieves notification settings
 func (r *NotificationRepository) GetNotificationSettings(ctx context.Context) (*admin.NotificationSettings, error) {
-	query := `
-		SELECT 
-			email_enabled, email_recipients, slack_enabled, slack_webhook,
-			sms_enabled, sms_recipients, thresholds
-		FROM notification_settings
-		WHERE id = 1
-	`
-
-	var settings admin.NotificationSettings
-	var emailRecipients pq.StringArray
-	var smsRecipients pq.StringArray
-	var thresholdsJSON []byte
-	var slackWebhook sql.NullString
-
-	err := r.db.QueryRowContext(ctx, query).Scan(
-		&settings.EmailEnabled,
-		&emailRecipients,
-		&settings.SlackEnabled,
-		&slackWebhook,
-		&settings.SMSEnabled,
-		&smsRecipients,
-		&thresholdsJSON,
-	)
-
+	dbSettings, err := r.queries.GetNotificationSettings(ctx)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			// Return default settings if none exist
-			return r.getDefaultNotificationSettings(), nil
-		}
-		return nil, fmt.Errorf("failed to get notification settings: %w", err)
+		// Return default settings if none exist
+		return r.getDefaultNotificationSettings(), nil
 	}
 
-	settings.EmailRecipients = []string(emailRecipients)
-	settings.SMSRecipients = []string(smsRecipients)
-
-	if slackWebhook.Valid {
-		settings.SlackWebhook = slackWebhook.String
+	settings := &admin.NotificationSettings{
+		EmailEnabled:    dbSettings.EmailEnabled.Bool,
+		EmailRecipients: dbSettings.EmailRecipients,
+		SlackEnabled:    dbSettings.SlackEnabled.Bool,
+		SMSEnabled:      dbSettings.SmsEnabled.Bool,
+		SMSRecipients:   dbSettings.SmsRecipients,
 	}
 
-	if len(thresholdsJSON) > 0 {
-		if err := json.Unmarshal(thresholdsJSON, &settings.Thresholds); err != nil {
+	if dbSettings.SlackWebhook.Valid {
+		settings.SlackWebhook = dbSettings.SlackWebhook.String
+	}
+
+	if len(dbSettings.Thresholds) > 0 {
+		if err := json.Unmarshal(dbSettings.Thresholds, &settings.Thresholds); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal thresholds: %w", err)
 		}
 	} else {
 		settings.Thresholds = r.getDefaultThresholds()
 	}
 
-	return &settings, nil
+	return settings, nil
 }
 
 // UpdateNotificationSettings updates notification settings
@@ -111,40 +90,18 @@ func (r *NotificationRepository) UpdateNotificationSettings(ctx context.Context,
 		return fmt.Errorf("failed to marshal thresholds: %w", err)
 	}
 
-	// Upsert the settings
-	query := `
-		INSERT INTO notification_settings (
-			id, email_enabled, email_recipients, slack_enabled, slack_webhook,
-			sms_enabled, sms_recipients, thresholds, updated_at
-		) VALUES (
-			1, $1, $2, $3, $4, $5, $6, $7, NOW()
-		)
-		ON CONFLICT (id) DO UPDATE SET
-			email_enabled = EXCLUDED.email_enabled,
-			email_recipients = EXCLUDED.email_recipients,
-			slack_enabled = EXCLUDED.slack_enabled,
-			slack_webhook = EXCLUDED.slack_webhook,
-			sms_enabled = EXCLUDED.sms_enabled,
-			sms_recipients = EXCLUDED.sms_recipients,
-			thresholds = EXCLUDED.thresholds,
-			updated_at = NOW()
-	`
-
-	var slackWebhook interface{}
-	if currentSettings.SlackWebhook != "" {
-		slackWebhook = currentSettings.SlackWebhook
+	// Prepare parameters
+	params := db.UpsertNotificationSettingsParams{
+		EmailEnabled:    pgtype.Bool{Bool: currentSettings.EmailEnabled, Valid: true},
+		EmailRecipients: currentSettings.EmailRecipients,
+		SlackEnabled:    pgtype.Bool{Bool: currentSettings.SlackEnabled, Valid: true},
+		SlackWebhook:    pgtype.Text{String: currentSettings.SlackWebhook, Valid: currentSettings.SlackWebhook != ""},
+		SmsEnabled:      pgtype.Bool{Bool: currentSettings.SMSEnabled, Valid: true},
+		SmsRecipients:   currentSettings.SMSRecipients,
+		Thresholds:      thresholdsJSON,
 	}
 
-	_, err = r.db.ExecContext(ctx, query,
-		currentSettings.EmailEnabled,
-		pq.Array(currentSettings.EmailRecipients),
-		currentSettings.SlackEnabled,
-		slackWebhook,
-		currentSettings.SMSEnabled,
-		pq.Array(currentSettings.SMSRecipients),
-		thresholdsJSON,
-	)
-
+	err = r.queries.UpsertNotificationSettings(ctx, params)
 	if err != nil {
 		return fmt.Errorf("failed to update notification settings: %w", err)
 	}
@@ -159,30 +116,17 @@ func (r *NotificationRepository) CreateNotificationSettings(ctx context.Context,
 		return fmt.Errorf("failed to marshal thresholds: %w", err)
 	}
 
-	query := `
-		INSERT INTO notification_settings (
-			id, email_enabled, email_recipients, slack_enabled, slack_webhook,
-			sms_enabled, sms_recipients, thresholds, created_at, updated_at
-		) VALUES (
-			1, $1, $2, $3, $4, $5, $6, $7, NOW(), NOW()
-		)
-	`
-
-	var slackWebhook interface{}
-	if settings.SlackWebhook != "" {
-		slackWebhook = settings.SlackWebhook
+	params := db.CreateNotificationSettingsParams{
+		EmailEnabled:    pgtype.Bool{Bool: settings.EmailEnabled, Valid: true},
+		EmailRecipients: settings.EmailRecipients,
+		SlackEnabled:    pgtype.Bool{Bool: settings.SlackEnabled, Valid: true},
+		SlackWebhook:    pgtype.Text{String: settings.SlackWebhook, Valid: settings.SlackWebhook != ""},
+		SmsEnabled:      pgtype.Bool{Bool: settings.SMSEnabled, Valid: true},
+		SmsRecipients:   settings.SMSRecipients,
+		Thresholds:      thresholdsJSON,
 	}
 
-	_, err = r.db.ExecContext(ctx, query,
-		settings.EmailEnabled,
-		pq.Array(settings.EmailRecipients),
-		settings.SlackEnabled,
-		slackWebhook,
-		settings.SMSEnabled,
-		pq.Array(settings.SMSRecipients),
-		thresholdsJSON,
-	)
-
+	err = r.queries.CreateNotificationSettings(ctx, params)
 	if err != nil {
 		return fmt.Errorf("failed to create notification settings: %w", err)
 	}

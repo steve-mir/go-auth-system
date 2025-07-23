@@ -150,7 +150,8 @@ func (drl *DistributedRateLimiter) Allow(ctx context.Context, key string, global
 	globalCount := resultSlice[1].(int64)
 	instanceCount := resultSlice[2].(int64)
 	resetTime := time.UnixMilli(resultSlice[3].(int64))
-	reason := resultSlice[4].(string)
+	// TODO: Remove or use
+	// reason := resultSlice[4].(string)
 
 	// Get distribution information
 	distribution, err := drl.getDistribution(ctx, distributionKey)
