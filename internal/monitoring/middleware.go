@@ -556,7 +556,7 @@ func (s *Service) LogAggregationMiddleware() gin.HandlerFunc {
 	}
 }
 
-// generateID generates a random ID (helper function)
-func generateID() string {
-	return strconv.FormatInt(time.Now().UnixNano(), 36)
-}
+// // generateID generates a random ID (helper function)
+// func generateID() string {
+// 	return strconv.FormatInt(time.Now().UnixNano(), 36)
+// }

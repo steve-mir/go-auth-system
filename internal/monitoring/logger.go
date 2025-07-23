@@ -442,16 +442,6 @@ func getStackTrace() string {
 	return trace.String()
 }
 
-// LogEntry represents a structured log entry for JSON marshaling
-type LogEntry struct {
-	Timestamp string                 `json:"timestamp"`
-	Level     string                 `json:"level"`
-	Message   string                 `json:"message"`
-	Fields    map[string]interface{} `json:"fields,omitempty"`
-	Error     string                 `json:"error,omitempty"`
-	Source    string                 `json:"source,omitempty"`
-}
-
 // MarshalJSON implements json.Marshaler for custom JSON formatting
 func (l *Logger) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]interface{}{

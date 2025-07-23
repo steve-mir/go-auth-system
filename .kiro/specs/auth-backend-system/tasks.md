@@ -118,11 +118,12 @@
   - _Requirements: 5.4_
 
 <!-- TODO: Incomplete. Not implemented in server -->
-- [ ] 16. Create OAuth social authentication integration
+- [-] 16. Create OAuth social authentication integration
   - Implement OAuth2 client for Google authentication
   - Create Facebook OAuth integration with proper scopes
   - Implement GitHub OAuth authentication flow
   - Create user account linking and creation logic for social auth
+  - Add the SSO to the REST Server (server/main.go)
   - Write integration tests for OAuth flows
   - _Requirements: 6.1, 6.2, 6.3, 6.4_
 

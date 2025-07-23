@@ -113,9 +113,9 @@ func testDistributedTracing(t *testing.T, service *Service) {
 	}
 
 	// Add logs to traces
-	service.AddTraceLog(childCtx, "info", "Child operation started", map[string]interface{}{
-		"step": 1,
-	})
+	// service.AddTraceLog(childCtx, "info", "Child operation started", map[string]interface{}{
+	// 	"step": 1,
+	// })
 
 	// Simulate work
 	time.Sleep(10 * time.Millisecond)

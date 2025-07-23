@@ -56,6 +56,7 @@ type LogEntry struct {
 	StatusCode    int                    `json:"status_code,omitempty"`
 	Error         string                 `json:"error,omitempty"`
 	Fields        map[string]interface{} `json:"fields,omitempty"`
+	Source        string                 `json:"source,omitempty"`
 }
 
 // LogPattern represents a detected log pattern
