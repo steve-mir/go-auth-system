@@ -307,7 +307,7 @@ func (s *Service) BulkUserActions(ctx context.Context, req *BulkUserActionReques
 			// TODO: Implement MFA disabling
 			err = s.disableUserMFA(ctx, userID)
 		default:
-			err = errors.NewValidationError("INVALID_ACTION", "Invalid action specified", nil)
+			err = errors.New(errors.ErrorTypeValidation, "INVALID_ACTION", "Invalid action specified")
 		}
 
 		detail := ActionDetail{
@@ -434,7 +434,7 @@ func (s *Service) BulkRoleAssign(ctx context.Context, req *BulkRoleAssignRequest
 		case "remove":
 			err = s.roleService.RemoveRoleFromUser(ctx, userID, req.RoleID)
 		default:
-			err = errors.NewValidationError("INVALID_ACTION", "Invalid action specified", nil)
+			err = errors.New(errors.ErrorTypeValidation, "INVALID_ACTION", "Invalid action specified")
 		}
 
 		detail := ActionDetail{
@@ -466,9 +466,9 @@ func (s *Service) GetAuditLogs(ctx context.Context, req *GetAuditLogsRequest) (*
 	}
 
 	// Convert admin request to audit service request
-	auditReq := &audit.GetAuditLogsRequest{
-		Page:  req.Page,
-		Limit: req.Limit,
+	auditReq := audit.GetAuditLogsRequest{
+		Limit:  int32(req.Limit),
+		Offset: int32((req.Page - 1) * req.Limit),
 	}
 
 	var auditResp *audit.GetAuditLogsResponse
@@ -478,15 +478,15 @@ func (s *Service) GetAuditLogs(ctx context.Context, req *GetAuditLogsRequest) (*
 	if req.UserID != "" {
 		userUUID, parseErr := uuid.Parse(req.UserID)
 		if parseErr != nil {
-			return nil, errors.NewValidationError("INVALID_USER_ID", "Invalid user ID format", nil)
+			return nil, errors.New(errors.ErrorTypeValidation, "INVALID_USER_ID", "Invalid user ID format")
 		}
-		auditResp, err = s.auditService.GetUserAuditLogs(ctx, userUUID, *auditReq)
+		auditResp, err = s.auditService.GetUserAuditLogs(ctx, userUUID, auditReq)
 	} else if req.Action != "" {
-		auditResp, err = s.auditService.GetAuditLogsByAction(ctx, req.Action, *auditReq)
+		auditResp, err = s.auditService.GetAuditLogsByAction(ctx, req.Action, auditReq)
 	} else if !req.StartTime.IsZero() && !req.EndTime.IsZero() {
-		auditResp, err = s.auditService.GetAuditLogsByTimeRange(ctx, req.StartTime, req.EndTime, *auditReq)
+		auditResp, err = s.auditService.GetAuditLogsByTimeRange(ctx, req.StartTime, req.EndTime, auditReq)
 	} else {
-		auditResp, err = s.auditService.GetRecentAuditLogs(ctx, *auditReq)
+		auditResp, err = s.auditService.GetRecentAuditLogs(ctx, auditReq)
 	}
 
 	if err != nil {
@@ -494,30 +494,37 @@ func (s *Service) GetAuditLogs(ctx context.Context, req *GetAuditLogsRequest) (*
 	}
 
 	// Convert audit service response to admin response
-	logs := make([]AuditLog, len(auditResp.Logs))
-	for i, log := range auditResp.Logs {
+	logs := make([]AuditLog, len(auditResp.AuditLogs))
+	for i, log := range auditResp.AuditLogs {
+		var ipAddress string
+		if log.IPAddress != nil {
+			ipAddress = log.IPAddress.String()
+		}
+
 		logs[i] = AuditLog{
 			ID:           log.ID,
 			UserID:       log.UserID,
 			Action:       log.Action,
 			ResourceType: log.ResourceType,
 			ResourceID:   log.ResourceID,
-			IPAddress:    log.IPAddress,
+			IPAddress:    ipAddress,
 			UserAgent:    log.UserAgent,
 			Metadata:     log.Metadata,
 			Timestamp:    log.Timestamp,
 		}
 	}
 
+	totalPages := int((auditResp.TotalCount + int64(req.Limit) - 1) / int64(req.Limit))
+
 	return &GetAuditLogsResponse{
 		Logs: logs,
 		Pagination: PaginationInfo{
-			Page:       auditResp.Pagination.Page,
-			Limit:      auditResp.Pagination.Limit,
-			Total:      auditResp.Pagination.Total,
-			TotalPages: auditResp.Pagination.TotalPages,
-			HasNext:    auditResp.Pagination.HasNext,
-			HasPrev:    auditResp.Pagination.HasPrev,
+			Page:       req.Page,
+			Limit:      req.Limit,
+			Total:      auditResp.TotalCount,
+			TotalPages: totalPages,
+			HasNext:    req.Page < totalPages,
+			HasPrev:    req.Page > 1,
 		},
 	}, nil
 }
@@ -604,13 +611,13 @@ func (s *Service) GetConfiguration(ctx context.Context) (*ConfigurationResponse,
 func (s *Service) UpdateConfiguration(ctx context.Context, req *UpdateConfigurationRequest) error {
 	// TODO: Implement configuration update logic
 	// This would typically involve validating the new configuration and applying it
-	return errors.NewNotImplementedError("CONFIGURATION_UPDATE", "Configuration update not yet implemented")
+	return errors.New(errors.ErrorTypeInternal, "CONFIGURATION_UPDATE", "Configuration update not yet implemented")
 }
 
 // ReloadConfiguration reloads configuration
 func (s *Service) ReloadConfiguration(ctx context.Context) error {
 	// TODO: Implement configuration reload logic
-	return errors.NewNotImplementedError("CONFIGURATION_RELOAD", "Configuration reload not yet implemented")
+	return errors.New(errors.ErrorTypeInternal, "CONFIGURATION_RELOAD", "Configuration reload not yet implemented")
 }
 
 // GetActiveAlerts returns active alerts

@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/steve-mir/go-auth-system/internal/config"
 	"github.com/steve-mir/go-auth-system/internal/middleware"
+	"github.com/steve-mir/go-auth-system/internal/service/admin"
 	"github.com/steve-mir/go-auth-system/internal/service/auth"
 	"github.com/steve-mir/go-auth-system/internal/service/role"
 	"github.com/steve-mir/go-auth-system/internal/service/user"
@@ -22,9 +23,10 @@ type Server struct {
 	middleware *middleware.MiddlewareManager
 
 	// Service dependencies
-	authService auth.AuthService
-	userService user.UserService
-	roleService role.Service
+	adminService admin.AdminService
+	authService  auth.AuthService
+	userService  user.UserService
+	roleService  role.Service
 }
 
 // NewServer creates a new REST API server
@@ -34,6 +36,7 @@ func NewServer(
 	authService auth.AuthService,
 	userService user.UserService,
 	roleService role.Service,
+	adminService admin.AdminService,
 ) *Server {
 	// Set Gin mode based on environment
 	if cfg.Environment == "production" {
@@ -51,13 +54,14 @@ func NewServer(
 	}
 
 	s := &Server{
-		router:      router,
-		server:      server,
-		config:      cfg,
-		middleware:  middlewareManager,
-		authService: authService,
-		userService: userService,
-		roleService: roleService,
+		router:       router,
+		server:       server,
+		config:       cfg,
+		middleware:   middlewareManager,
+		authService:  authService,
+		userService:  userService,
+		roleService:  roleService,
+		adminService: adminService,
 	}
 
 	s.setupMiddleware()

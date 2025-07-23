@@ -7,6 +7,7 @@ import (
 
 	"github.com/steve-mir/go-auth-system/internal/config"
 	"github.com/steve-mir/go-auth-system/internal/middleware"
+	"github.com/steve-mir/go-auth-system/internal/service/admin"
 	"github.com/steve-mir/go-auth-system/internal/service/auth"
 	"github.com/steve-mir/go-auth-system/internal/service/role"
 	"github.com/steve-mir/go-auth-system/internal/service/user"
@@ -32,6 +33,7 @@ func ExampleUsage() {
 	var authService auth.AuthService
 	var userService user.UserService
 	var roleService role.Service
+	var adminService admin.AdminService
 
 	// Create REST API server
 	server := NewServer(
@@ -40,6 +42,7 @@ func ExampleUsage() {
 		authService,
 		userService,
 		roleService,
+		adminService,
 	)
 
 	// Start the server

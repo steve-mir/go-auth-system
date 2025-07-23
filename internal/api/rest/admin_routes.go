@@ -184,7 +184,7 @@ func (s *Server) getAllUserSessionsHandler(c *gin.Context) {
 		return
 	}
 
-	s.paginatedResponse(c, http.StatusOK, response.Sessions, &response.Pagination)
+	s.paginatedResponse(c, http.StatusOK, response.Sessions, s.convertPaginationInfo(&response.Pagination))
 }
 
 // deleteUserSessionHandler deletes a specific user session
@@ -306,7 +306,7 @@ func (s *Server) getAuditLogsHandler(c *gin.Context) {
 		return
 	}
 
-	s.paginatedResponse(c, http.StatusOK, response.Logs, &response.Pagination)
+	s.paginatedResponse(c, http.StatusOK, response.Logs, s.convertPaginationInfo(&response.Pagination))
 }
 
 // getAuditEventsHandler returns audit events with filtering
@@ -339,7 +339,7 @@ func (s *Server) getAuditEventsHandler(c *gin.Context) {
 		return
 	}
 
-	s.paginatedResponse(c, http.StatusOK, response.Events, &response.Pagination)
+	s.paginatedResponse(c, http.StatusOK, response.Events, s.convertPaginationInfo(&response.Pagination))
 }
 
 // Configuration handlers

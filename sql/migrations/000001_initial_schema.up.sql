@@ -94,6 +94,37 @@ CREATE TABLE audit_logs (
     timestamp TIMESTAMP DEFAULT NOW()
 );
 
+-- Alerts for admin dashboard
+CREATE TABLE alerts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    type VARCHAR(50) NOT NULL,
+    severity VARCHAR(20) NOT NULL CHECK (severity IN ('low', 'medium', 'high', 'critical')),
+    title VARCHAR(200) NOT NULL,
+    message TEXT NOT NULL,
+    source VARCHAR(100) NOT NULL,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    resolved_at TIMESTAMP,
+    is_active BOOLEAN DEFAULT TRUE,
+    is_resolved BOOLEAN DEFAULT FALSE
+);
+
+-- Notification settings for admin dashboard
+CREATE TABLE notification_settings (
+    id INTEGER PRIMARY KEY DEFAULT 1,
+    email_enabled BOOLEAN DEFAULT FALSE,
+    email_recipients TEXT[] DEFAULT '{}',
+    slack_enabled BOOLEAN DEFAULT FALSE,
+    slack_webhook TEXT,
+    sms_enabled BOOLEAN DEFAULT FALSE,
+    sms_recipients TEXT[] DEFAULT '{}',
+    thresholds JSONB NOT NULL DEFAULT '{}',
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    CONSTRAINT single_row CHECK (id = 1)
+);
+
 -- Indexes for performance
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_username ON users(username);
@@ -109,6 +140,12 @@ CREATE INDEX idx_social_accounts_provider_social_id ON social_accounts(provider,
 CREATE INDEX idx_audit_logs_user_id ON audit_logs(user_id);
 CREATE INDEX idx_audit_logs_timestamp ON audit_logs(timestamp);
 CREATE INDEX idx_audit_logs_action ON audit_logs(action);
+CREATE INDEX idx_alerts_type ON alerts(type);
+CREATE INDEX idx_alerts_severity ON alerts(severity);
+CREATE INDEX idx_alerts_source ON alerts(source);
+CREATE INDEX idx_alerts_is_active ON alerts(is_active);
+CREATE INDEX idx_alerts_is_resolved ON alerts(is_resolved);
+CREATE INDEX idx_alerts_created_at ON alerts(created_at);
 
 -- Triggers for updated_at timestamps
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -126,4 +163,10 @@ CREATE TRIGGER update_roles_updated_at BEFORE UPDATE ON roles
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_social_accounts_updated_at BEFORE UPDATE ON social_accounts
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_alerts_updated_at BEFORE UPDATE ON alerts
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_notification_settings_updated_at BEFORE UPDATE ON notification_settings
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
