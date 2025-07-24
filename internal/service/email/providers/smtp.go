@@ -7,16 +7,16 @@ import (
 	"net/smtp"
 	"strings"
 
-	"github.com/steve-mir/go-auth-system/internal/service/email"
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
 )
 
 // SMTPProvider implements email sending via SMTP
 type SMTPProvider struct {
-	config *email.SMTPConfig
+	config *interfaces.SMTPConfig
 }
 
 // NewSMTPProvider creates a new SMTP provider
-func NewSMTPProvider(config *email.SMTPConfig) (*SMTPProvider, error) {
+func NewSMTPProvider(config *interfaces.SMTPConfig) (*SMTPProvider, error) {
 	if config == nil {
 		return nil, fmt.Errorf("SMTP config is required")
 	}
@@ -27,7 +27,7 @@ func NewSMTPProvider(config *email.SMTPConfig) (*SMTPProvider, error) {
 }
 
 // SendEmail sends an email via SMTP
-func (p *SMTPProvider) SendEmail(ctx context.Context, req *email.SendEmailRequest) error {
+func (p *SMTPProvider) SendEmail(ctx context.Context, req *interfaces.SendEmailRequest) error {
 	// Build message
 	message, err := p.buildMessage(req)
 	if err != nil {
@@ -38,7 +38,7 @@ func (p *SMTPProvider) SendEmail(ctx context.Context, req *email.SendEmailReques
 	addr := fmt.Sprintf("%s:%d", p.config.Host, p.config.Port)
 
 	var client *smtp.Client
-	var conn interface{}
+	// var conn interface{}
 
 	if p.config.TLS {
 		// Direct TLS connection
@@ -139,12 +139,12 @@ func (p *SMTPProvider) GetName() string {
 }
 
 // GetType returns the provider type
-func (p *SMTPProvider) GetType() email.EmailProvider {
-	return email.ProviderSMTP
+func (p *SMTPProvider) GetType() interfaces.EmailProvider {
+	return interfaces.ProviderSMTP
 }
 
 // buildMessage builds the email message
-func (p *SMTPProvider) buildMessage(req *email.SendEmailRequest) (string, error) {
+func (p *SMTPProvider) buildMessage(req *interfaces.SendEmailRequest) (string, error) {
 	var message strings.Builder
 
 	// Headers

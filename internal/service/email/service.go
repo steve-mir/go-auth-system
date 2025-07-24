@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
 )
 
 // Service implements the EmailService interface
@@ -53,7 +54,7 @@ func NewService(
 }
 
 // SendEmail sends a single email
-func (s *Service) SendEmail(ctx context.Context, req *SendEmailRequest) error {
+func (s *Service) SendEmail(ctx context.Context, req *interfaces.SendEmailRequest) error {
 	// Validate request
 	if err := s.validateEmailRequest(req); err != nil {
 		return fmt.Errorf("invalid email request: %w", err)
@@ -72,10 +73,10 @@ func (s *Service) SendEmail(ctx context.Context, req *SendEmailRequest) error {
 	}
 
 	// Queue email for sending
-	queueItem := &EmailQueue{
+	queueItem := &interfaces.EmailQueue{
 		ID:          emailID,
 		Request:     req,
-		Status:      StatusPending,
+		Status:      interfaces.StatusPending,
 		Provider:    s.config.DefaultProvider,
 		Attempts:    0,
 		MaxAttempts: s.config.Retry.MaxRetries,
@@ -126,7 +127,7 @@ func (s *Service) SendBulkEmails(ctx context.Context, req *BulkEmailRequest) err
 
 // Pre-made template methods
 func (s *Service) SendWelcomeEmail(ctx context.Context, to, name string) error {
-	return s.SendEmail(ctx, &SendEmailRequest{
+	return s.SendEmail(ctx, &interfaces.SendEmailRequest{
 		To:         []string{to},
 		TemplateID: DefaultPrebuiltTemplates().Welcome,
 		Variables: map[string]string{
@@ -136,7 +137,7 @@ func (s *Service) SendWelcomeEmail(ctx context.Context, to, name string) error {
 }
 
 func (s *Service) SendVerificationEmail(ctx context.Context, to, name, token string) error {
-	return s.SendEmail(ctx, &SendEmailRequest{
+	return s.SendEmail(ctx, &interfaces.SendEmailRequest{
 		To:         []string{to},
 		TemplateID: DefaultPrebuiltTemplates().Verification,
 		Variables: map[string]string{
@@ -148,7 +149,7 @@ func (s *Service) SendVerificationEmail(ctx context.Context, to, name, token str
 }
 
 func (s *Service) SendPasswordResetEmail(ctx context.Context, to, name, token string) error {
-	return s.SendEmail(ctx, &SendEmailRequest{
+	return s.SendEmail(ctx, &interfaces.SendEmailRequest{
 		To:         []string{to},
 		TemplateID: DefaultPrebuiltTemplates().PasswordReset,
 		Variables: map[string]string{
@@ -160,7 +161,7 @@ func (s *Service) SendPasswordResetEmail(ctx context.Context, to, name, token st
 }
 
 func (s *Service) SendLoginNotificationEmail(ctx context.Context, to, name, location, device string) error {
-	return s.SendEmail(ctx, &SendEmailRequest{
+	return s.SendEmail(ctx, &interfaces.SendEmailRequest{
 		To:         []string{to},
 		TemplateID: DefaultPrebuiltTemplates().LoginNotification,
 		Variables: map[string]string{
@@ -173,7 +174,7 @@ func (s *Service) SendLoginNotificationEmail(ctx context.Context, to, name, loca
 }
 
 func (s *Service) SendMFACodeEmail(ctx context.Context, to, name, code string) error {
-	return s.SendEmail(ctx, &SendEmailRequest{
+	return s.SendEmail(ctx, &interfaces.SendEmailRequest{
 		To:         []string{to},
 		TemplateID: DefaultPrebuiltTemplates().MFACode,
 		Variables: map[string]string{
@@ -184,7 +185,7 @@ func (s *Service) SendMFACodeEmail(ctx context.Context, to, name, code string) e
 }
 
 func (s *Service) SendAccountLockedEmail(ctx context.Context, to, name string) error {
-	return s.SendEmail(ctx, &SendEmailRequest{
+	return s.SendEmail(ctx, &interfaces.SendEmailRequest{
 		To:         []string{to},
 		TemplateID: DefaultPrebuiltTemplates().AccountLocked,
 		Variables: map[string]string{
@@ -194,7 +195,7 @@ func (s *Service) SendAccountLockedEmail(ctx context.Context, to, name string) e
 }
 
 func (s *Service) SendPasswordChangedEmail(ctx context.Context, to, name string) error {
-	return s.SendEmail(ctx, &SendEmailRequest{
+	return s.SendEmail(ctx, &interfaces.SendEmailRequest{
 		To:         []string{to},
 		TemplateID: DefaultPrebuiltTemplates().PasswordChanged,
 		Variables: map[string]string{
@@ -279,24 +280,24 @@ func (s *Service) initializeProviders() error {
 
 func (s *Service) createProvider(name string, config *ProviderConfig) (Provider, error) {
 	switch config.Type {
-	case ProviderSMTP:
+	case interfaces.ProviderSMTP:
 		return NewSMTPProvider(config.SMTP)
-	case ProviderSendGrid:
+	case interfaces.ProviderSendGrid:
 		return NewSendGridProvider(config.SendGrid)
-	case ProviderMailgun:
+	case interfaces.ProviderMailgun:
 		return NewMailgunProvider(config.Mailgun)
-	case ProviderSES:
+	case interfaces.ProviderSES:
 		return NewSESProvider(config.SES)
-	case ProviderPostmark:
+	case interfaces.ProviderPostmark:
 		return NewPostmarkProvider(config.Postmark)
-	case ProviderResend:
+	case interfaces.ProviderResend:
 		return NewResendProvider(config.Resend)
 	default:
 		return nil, fmt.Errorf("unsupported provider type: %s", config.Type)
 	}
 }
 
-func (s *Service) validateEmailRequest(req *SendEmailRequest) error {
+func (s *Service) validateEmailRequest(req *interfaces.SendEmailRequest) error {
 	if len(req.To) == 0 {
 		return fmt.Errorf("no recipients specified")
 	}
@@ -312,7 +313,7 @@ func (s *Service) validateEmailRequest(req *SendEmailRequest) error {
 	return nil
 }
 
-func (s *Service) processTemplate(ctx context.Context, req *SendEmailRequest) error {
+func (s *Service) processTemplate(ctx context.Context, req *interfaces.SendEmailRequest) error {
 	template, err := s.templates.GetByID(ctx, req.TemplateID)
 	if err != nil {
 		return fmt.Errorf("template not found: %w", err)
@@ -348,7 +349,7 @@ func (s *Service) ensureMetadata(metadata map[string]string) map[string]string {
 	return metadata
 }
 
-func (s *Service) sendEmailNow(ctx context.Context, queueItem *EmailQueue) error {
+func (s *Service) sendEmailNow(ctx context.Context, queueItem *interfaces.EmailQueue) error {
 	provider, exists := s.providers[string(queueItem.Provider)]
 	if !exists {
 		// Fallback to default provider
@@ -364,7 +365,7 @@ func (s *Service) sendEmailNow(ctx context.Context, queueItem *EmailQueue) error
 
 	err := provider.SendEmail(ctx, queueItem.Request)
 	if err != nil {
-		queueItem.Status = StatusFailed
+		queueItem.Status = interfaces.StatusFailed
 		queueItem.Error = err.Error()
 		queueItem.Attempts++
 		queueItem.UpdatedAt = time.Now()
@@ -373,14 +374,14 @@ func (s *Service) sendEmailNow(ctx context.Context, queueItem *EmailQueue) error
 		if s.config.Retry.Enabled && queueItem.Attempts < queueItem.MaxAttempts {
 			nextRetry := time.Now().Add(s.calculateRetryDelay(queueItem.Attempts))
 			queueItem.NextRetry = &nextRetry
-			queueItem.Status = StatusPending
+			queueItem.Status = interfaces.StatusPending
 		}
 
 		s.queue.Update(ctx, queueItem)
 		return err
 	}
 
-	queueItem.Status = StatusSent
+	queueItem.Status = interfaces.StatusSent
 	queueItem.UpdatedAt = time.Now()
 	s.queue.Update(ctx, queueItem)
 

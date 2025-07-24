@@ -168,11 +168,13 @@ func (suite *OAuthIntegrationTestSuite) SetupSuite() {
 	suite.server = NewServer(
 		cfg,
 		middlewareManager,
+		nil,
+		nil,
 		nil, // authService not needed for OAuth tests
 		nil, // userService not needed for OAuth tests
 		nil, // roleService not needed for OAuth tests
 		nil, // adminService not needed for OAuth tests
-		nil, // healthService not needed for OAuth tests
+		nil, // healthService not needed for OAuth tests,
 		suite.mockSSO,
 	)
 

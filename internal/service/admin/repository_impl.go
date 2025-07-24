@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/steve-mir/go-auth-system/internal/interfaces"
+
 	"github.com/steve-mir/go-auth-system/internal/repository/postgres"
 	sqlc "github.com/steve-mir/go-auth-system/internal/repository/postgres/db"
 )
@@ -17,7 +18,7 @@ type PostgresSessionRepository struct {
 }
 
 // NewPostgresSessionRepository creates a new PostgreSQL session repository
-func NewPostgresSessionRepository(db *postgres.DB, store *sqlc.Store) SessionRepository {
+func NewPostgresSessionRepository(db *postgres.DB, store *sqlc.Store) interfaces.SessionRepository {
 	return &PostgresSessionRepository{
 		db:    db,
 		store: store,
@@ -133,7 +134,7 @@ type PostgresAlertRepository struct {
 }
 
 // NewPostgresAlertRepository creates a new PostgreSQL alert repository
-func NewPostgresAlertRepository(db *postgres.DB, store *sqlc.Store) AlertRepository {
+func NewPostgresAlertRepository(db *postgres.DB, store *sqlc.Store) interfaces.AlertRepository {
 	return &PostgresAlertRepository{
 		db:    db,
 		store: store,
@@ -195,7 +196,7 @@ func (r *PostgresAlertRepository) GetActiveAlerts(ctx context.Context) ([]interf
 }
 
 // GetAlerts retrieves alerts with pagination and filtering
-func (r *PostgresAlertRepository) GetAlerts(ctx context.Context, req *GetAlertsRequest) ([]interfaces.Alert, int64, error) {
+func (r *PostgresAlertRepository) GetAlerts(ctx context.Context, req *interfaces.GetAlertsRequest) ([]interfaces.Alert, int64, error) {
 	// TODO: Implement actual database query with filtering using SQLC
 	alerts, err := r.GetActiveAlerts(ctx)
 	if err != nil {
@@ -267,7 +268,7 @@ type PostgresNotificationRepository struct {
 }
 
 // NewPostgresNotificationRepository creates a new PostgreSQL notification repository
-func NewPostgresNotificationRepository(db *postgres.DB, store *sqlc.Store) NotificationRepository {
+func NewPostgresNotificationRepository(db *postgres.DB, store *sqlc.Store) interfaces.NotificationRepository {
 	return &PostgresNotificationRepository{
 		db:    db,
 		store: store,

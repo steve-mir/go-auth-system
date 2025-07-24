@@ -106,7 +106,7 @@ func (r *PostgresUserRepository) UpdateUser(ctx context.Context, user *UpdateUse
 
 	// Set optional fields
 	if user.Email != "" {
-		params.Email = pgtype.Text{String: user.Email, Valid: true}
+		params.Email = user.Email
 	}
 	if user.Username != "" {
 		params.Username = pgtype.Text{String: user.Username, Valid: true}

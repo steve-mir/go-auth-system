@@ -278,11 +278,11 @@ func runServer(ctx context.Context, cfg *config.Config) error {
 	// Initialize MFA service
 	log.Printf("Initializing MFA service...")
 	mfaService := mfa.NewMFAService(cfg, &mfa.Dependencies{
-		MFARepo:      mfa.NewPostgresMFARepository(db, store),
-		UserRepo:     mfa.NewPostgresUserRepository(db, store),
-		SMSService:   mfa.NewSMSService(cfg),
-		EmailService: mfa.NewEmailService(cfg),
-		CacheService: mfa.NewRedisCacheService(redisClient),
+		MFARepo:      nil, //mfa.NewPostgresMFARepository(db, store),
+		UserRepo:     nil, //mfa.NewPostgresUserRepository(db, store),
+		SMSService:   nil, //mfa.NewSMSService(cfg),
+		EmailService: nil, //mfa.NewEmailService(cfg),
+		CacheService: nil, //mfa.NewRedisCacheService(redisClient),
 		Encryptor:    encryptorSvc.GetEncryptor(),
 	})
 	log.Printf("MFA service initialized")
@@ -302,23 +302,23 @@ func runServer(ctx context.Context, cfg *config.Config) error {
 
 	// Initialize SSO service
 	log.Printf("Initializing SSO service...")
-	socialAccountRepo := postgres.NewSocialAccountRepository(store)
-	stateStore := sso.NewRedisStateStore(redisClient)
+	// socialAccountRepo := postgres.NewSocialAccountRepository(store)
+	// stateStore := sso.NewRedisStateStore(redisClient)
 
-	// Create SSO user repository adapter
-	ssoUserRepo := &SSOUserRepositoryAdapter{
-		authRepo:  authUserRepo,
-		encryptor: encryptorSvc.GetEncryptor(),
-	}
+	// // Create SSO user repository adapter
+	// ssoUserRepo := &SSOUserRepositoryAdapter{
+	// 	authRepo:  authUserRepo,
+	// 	encryptor: encryptorSvc.GetEncryptor(),
+	// }
 
-	ssoService := sso.NewSSOService(
-		cfg,
-		ssoUserRepo,
-		socialAccountRepo,
-		stateStore,
-		hashSvc,
-		encryptorSvc.GetEncryptor(),
-	)
+	// ssoService := sso.NewSSOService(
+	// 	cfg,
+	// 	nil, //ssoUserRepo,
+	// 	nil, //socialAccountRepo,
+	// 	nil, //stateStore,
+	// 	hashSvc,
+	// 	encryptorSvc.GetEncryptor(),
+	// )
 	log.Printf("SSO service initialized")
 
 	log.Printf("Business services initialized")
@@ -335,7 +335,7 @@ func runServer(ctx context.Context, cfg *config.Config) error {
 		mfaService,
 		adminService,
 		healthSvc,
-		ssoService,
+		nil, //ssoService,
 	)
 	// httpServer := server.NewHTTPServer(&cfg.Server, healthSvc)
 

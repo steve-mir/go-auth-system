@@ -59,8 +59,13 @@ func (s *Server) setupTOTPHandler(c *gin.Context) {
 		s.unauthorizedResponse(c, "User ID not found in context")
 		return
 	}
+	req := mfa.SetupTOTPRequest{
+		UserID: userID,
+		// AccountName: "",
+		// Issuer: "",
+	}
 
-	result, err := s.mfaService.SetupTOTP(ctx, userID)
+	result, err := s.mfaService.SetupTOTP(ctx, &req)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -191,7 +196,7 @@ func (s *Server) setupSMSHandler(c *gin.Context) {
 
 	req.UserID = userID
 
-	err := s.mfaService.SetupSMS(ctx, &req)
+	_, err := s.mfaService.SetupSMS(ctx, &req)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -495,8 +500,12 @@ func (s *Server) generateBackupCodesHandler(c *gin.Context) {
 		s.unauthorizedResponse(c, "User ID not found in context")
 		return
 	}
+	req := mfa.GenerateBackupCodesRequest{
+		UserID: userID,
+		// ConfigID: "", TODO:
+	}
 
-	codes, err := s.mfaService.GenerateBackupCodes(ctx, userID)
+	codes, err := s.mfaService.GenerateBackupCodes(ctx, &req)
 	duration := time.Since(start)
 
 	if err != nil {
@@ -510,7 +519,7 @@ func (s *Server) generateBackupCodesHandler(c *gin.Context) {
 	if s.monitoring != nil {
 		s.trackSecurityEvent(ctx, "backup_codes_generated", "high", map[string]interface{}{
 			"user_id":    userID,
-			"code_count": len(codes),
+			"code_count": len(codes.BackupCodes),
 			"duration":   duration.Milliseconds(),
 			"ip":         c.ClientIP(),
 		})

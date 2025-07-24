@@ -240,6 +240,12 @@ func (s *Server) parseUUIDParam(c *gin.Context, paramName string) (string, bool)
 	}
 
 	return paramStr, true
+	// uidStr, err := uuid.Parse(paramStr)
+	// if err != nil {
+	// 	return "", false
+	// }
+
+	// return uidStr.String(), true
 }
 
 // sanitizeInput performs basic input sanitization

@@ -1,43 +1,45 @@
 package email
 
 import (
+	"github.com/steve-mir/go-auth-system/internal/config"
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
 	"github.com/steve-mir/go-auth-system/internal/service/email/providers"
 )
 
 // NewSMTPProvider creates a new SMTP provider
-func NewSMTPProvider(config *SMTPConfig) (Provider, error) {
+func NewSMTPProvider(config *interfaces.SMTPConfig) (Provider, error) {
 	return providers.NewSMTPProvider(config)
 }
 
 // NewSendGridProvider creates a new SendGrid provider
-func NewSendGridProvider(config *SendGridConfig) (Provider, error) {
+func NewSendGridProvider(config *interfaces.SendGridConfig) (Provider, error) {
 	return providers.NewSendGridProvider(config)
 }
 
 // NewMailgunProvider creates a new Mailgun provider
-func NewMailgunProvider(config *MailgunConfig) (Provider, error) {
+func NewMailgunProvider(config *interfaces.MailgunConfig) (Provider, error) {
 	return providers.NewMailgunProvider(config)
 }
 
 // NewSESProvider creates a new AWS SES provider
-func NewSESProvider(config *SESConfig) (Provider, error) {
+func NewSESProvider(config *interfaces.SESConfig) (Provider, error) {
 	return providers.NewSESProvider(config)
 }
 
 // NewPostmarkProvider creates a new Postmark provider
-func NewPostmarkProvider(config *PostmarkConfig) (Provider, error) {
+func NewPostmarkProvider(config *interfaces.PostmarkConfig) (Provider, error) {
 	return providers.NewPostmarkProvider(config)
 }
 
 // NewResendProvider creates a new Resend provider
-func NewResendProvider(config *ResendConfig) (Provider, error) {
+func NewResendProvider(config *interfaces.ResendConfig) (Provider, error) {
 	return providers.NewResendProvider(config)
 }
 
 // ConvertConfigToEmailConfig converts the main config to email service config
-func ConvertConfigToEmailConfig(cfg *EmailServiceConfig) *EmailConfig {
+func ConvertConfigToEmailConfig(cfg *config.EmailServiceConfig) *EmailConfig {
 	emailConfig := &EmailConfig{
-		DefaultProvider: EmailProvider(cfg.DefaultProvider),
+		DefaultProvider: interfaces.EmailProvider(cfg.DefaultProvider),
 		Providers:       make(map[string]ProviderConfig),
 		Templates: TemplateConfig{
 			DefaultFrom:     cfg.Templates.DefaultFrom,
@@ -70,14 +72,14 @@ func ConvertConfigToEmailConfig(cfg *EmailServiceConfig) *EmailConfig {
 	// Convert providers
 	for name, providerCfg := range cfg.Providers {
 		emailProviderConfig := ProviderConfig{
-			Type:     EmailProvider(providerCfg.Type),
+			Type:     interfaces.EmailProvider(providerCfg.Type),
 			Enabled:  providerCfg.Enabled,
 			Priority: providerCfg.Priority,
 		}
 
 		// Convert provider-specific configs
 		if providerCfg.SMTP != nil {
-			emailProviderConfig.SMTP = &SMTPConfig{
+			emailProviderConfig.SMTP = &interfaces.SMTPConfig{
 				Host:       providerCfg.SMTP.Host,
 				Port:       providerCfg.SMTP.Port,
 				Username:   providerCfg.SMTP.Username,
@@ -89,13 +91,13 @@ func ConvertConfigToEmailConfig(cfg *EmailServiceConfig) *EmailConfig {
 		}
 
 		if providerCfg.SendGrid != nil {
-			emailProviderConfig.SendGrid = &SendGridConfig{
+			emailProviderConfig.SendGrid = &interfaces.SendGridConfig{
 				APIKey: providerCfg.SendGrid.APIKey,
 			}
 		}
 
 		if providerCfg.Mailgun != nil {
-			emailProviderConfig.Mailgun = &MailgunConfig{
+			emailProviderConfig.Mailgun = &interfaces.MailgunConfig{
 				APIKey: providerCfg.Mailgun.APIKey,
 				Domain: providerCfg.Mailgun.Domain,
 				Region: providerCfg.Mailgun.Region,
@@ -103,7 +105,7 @@ func ConvertConfigToEmailConfig(cfg *EmailServiceConfig) *EmailConfig {
 		}
 
 		if providerCfg.SES != nil {
-			emailProviderConfig.SES = &SESConfig{
+			emailProviderConfig.SES = &interfaces.SESConfig{
 				Region:          providerCfg.SES.Region,
 				AccessKeyID:     providerCfg.SES.AccessKeyID,
 				SecretAccessKey: providerCfg.SES.SecretAccessKey,
@@ -112,13 +114,13 @@ func ConvertConfigToEmailConfig(cfg *EmailServiceConfig) *EmailConfig {
 		}
 
 		if providerCfg.Postmark != nil {
-			emailProviderConfig.Postmark = &PostmarkConfig{
+			emailProviderConfig.Postmark = &interfaces.PostmarkConfig{
 				APIKey: providerCfg.Postmark.APIKey,
 			}
 		}
 
 		if providerCfg.Resend != nil {
-			emailProviderConfig.Resend = &ResendConfig{
+			emailProviderConfig.Resend = &interfaces.ResendConfig{
 				APIKey: providerCfg.Resend.APIKey,
 			}
 		}

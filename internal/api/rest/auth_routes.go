@@ -74,12 +74,12 @@ func (s *Server) registerHandler(c *gin.Context) {
 
 	// Track successful registration
 	if s.monitoring != nil {
-		s.trackAuthEvent(ctx, "register", resp.UserID, true, duration, map[string]interface{}{
+		s.trackAuthEvent(ctx, "register", resp.UserID.String(), true, duration, map[string]interface{}{
 			"email":    resp.Email,
 			"username": req.Username,
 			"ip":       ipAddress,
 		})
-		s.trackUserEvent(ctx, "created", resp.UserID, map[string]interface{}{
+		s.trackUserEvent(ctx, "created", resp.UserID.String(), map[string]interface{}{
 			"email":    resp.Email,
 			"username": req.Username,
 			"method":   "registration",
@@ -158,13 +158,13 @@ func (s *Server) loginHandler(c *gin.Context) {
 
 	// Track successful login
 	if s.monitoring != nil {
-		s.trackAuthEvent(ctx, "login", resp.UserID, true, duration, map[string]interface{}{
+		s.trackAuthEvent(ctx, "login", resp.UserID.String(), true, duration, map[string]interface{}{
 			"email":      resp.Email,
 			"username":   resp.Username,
 			"ip":         ipAddress,
 			"user_agent": userAgent,
 		})
-		s.trackUserEvent(ctx, "login", resp.UserID, map[string]interface{}{
+		s.trackUserEvent(ctx, "login", resp.UserID.String(), map[string]interface{}{
 			"email":      resp.Email,
 			"username":   resp.Username,
 			"ip":         ipAddress,

@@ -6,19 +6,20 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
 )
 
 // Helper functions to make audit logging easier to use
 
 // LogUserLogin logs a successful user login event
-func LogUserLogin(ctx context.Context, service AuditService, userID uuid.UUID, ipAddr *netip.Addr, userAgent string, metadata map[string]interface{}) error {
+func LogUserLogin(ctx context.Context, service interfaces.AuditService, userID uuid.UUID, ipAddr *netip.Addr, userAgent string, metadata map[string]interface{}) error {
 	if metadata == nil {
 		metadata = make(map[string]interface{})
 	}
 	metadata["success"] = true
 	metadata["timestamp"] = time.Now().Unix()
 
-	event := AuditEvent{
+	event := interfaces.AuditEvent{
 		UserID:       userID,
 		Action:       ActionUserLogin,
 		ResourceType: ResourceTypeUser,
@@ -32,7 +33,7 @@ func LogUserLogin(ctx context.Context, service AuditService, userID uuid.UUID, i
 }
 
 // LogUserLoginFailed logs a failed user login attempt
-func LogUserLoginFailed(ctx context.Context, service AuditService, userID uuid.UUID, ipAddr *netip.Addr, userAgent string, reason string, metadata map[string]interface{}) error {
+func LogUserLoginFailed(ctx context.Context, service interfaces.AuditService, userID uuid.UUID, ipAddr *netip.Addr, userAgent string, reason string, metadata map[string]interface{}) error {
 	if metadata == nil {
 		metadata = make(map[string]interface{})
 	}
@@ -40,7 +41,7 @@ func LogUserLoginFailed(ctx context.Context, service AuditService, userID uuid.U
 	metadata["failure_reason"] = reason
 	metadata["timestamp"] = time.Now().Unix()
 
-	event := AuditEvent{
+	event := interfaces.AuditEvent{
 		UserID:       userID,
 		Action:       ActionUserLoginFailed,
 		ResourceType: ResourceTypeUser,
@@ -54,13 +55,13 @@ func LogUserLoginFailed(ctx context.Context, service AuditService, userID uuid.U
 }
 
 // LogUserLogout logs a user logout event
-func LogUserLogout(ctx context.Context, service AuditService, userID uuid.UUID, ipAddr *netip.Addr, userAgent string, sessionDuration time.Duration) error {
+func LogUserLogout(ctx context.Context, service interfaces.AuditService, userID uuid.UUID, ipAddr *netip.Addr, userAgent string, sessionDuration time.Duration) error {
 	metadata := map[string]interface{}{
 		"session_duration": sessionDuration.String(),
 		"timestamp":        time.Now().Unix(),
 	}
 
-	event := AuditEvent{
+	event := interfaces.AuditEvent{
 		UserID:       userID,
 		Action:       ActionUserLogout,
 		ResourceType: ResourceTypeUser,
@@ -74,13 +75,13 @@ func LogUserLogout(ctx context.Context, service AuditService, userID uuid.UUID, 
 }
 
 // LogUserRegistration logs a user registration event
-func LogUserRegistration(ctx context.Context, service AuditService, userID uuid.UUID, ipAddr *netip.Addr, userAgent string, email string) error {
+func LogUserRegistration(ctx context.Context, service interfaces.AuditService, userID uuid.UUID, ipAddr *netip.Addr, userAgent string, email string) error {
 	metadata := map[string]interface{}{
 		"email":     email,
 		"timestamp": time.Now().Unix(),
 	}
 
-	event := AuditEvent{
+	event := interfaces.AuditEvent{
 		UserID:       userID,
 		Action:       ActionUserRegister,
 		ResourceType: ResourceTypeUser,
@@ -94,13 +95,13 @@ func LogUserRegistration(ctx context.Context, service AuditService, userID uuid.
 }
 
 // LogPasswordChange logs a password change event
-func LogPasswordChange(ctx context.Context, service AuditService, userID uuid.UUID, ipAddr *netip.Addr, userAgent string, method string) error {
+func LogPasswordChange(ctx context.Context, service interfaces.AuditService, userID uuid.UUID, ipAddr *netip.Addr, userAgent string, method string) error {
 	metadata := map[string]interface{}{
 		"change_method": method, // "self_service", "admin_reset", "forced_reset"
 		"timestamp":     time.Now().Unix(),
 	}
 
-	event := AuditEvent{
+	event := interfaces.AuditEvent{
 		UserID:       userID,
 		Action:       ActionUserPasswordChange,
 		ResourceType: ResourceTypeUser,
@@ -114,7 +115,7 @@ func LogPasswordChange(ctx context.Context, service AuditService, userID uuid.UU
 }
 
 // LogRoleAssignment logs a role assignment event
-func LogRoleAssignment(ctx context.Context, service AuditService, adminUserID, targetUserID, roleID uuid.UUID, roleName string, ipAddr *netip.Addr, userAgent string) error {
+func LogRoleAssignment(ctx context.Context, service interfaces.AuditService, adminUserID, targetUserID, roleID uuid.UUID, roleName string, ipAddr *netip.Addr, userAgent string) error {
 	metadata := map[string]interface{}{
 		"target_user_id": targetUserID.String(),
 		"role_name":      roleName,
@@ -122,7 +123,7 @@ func LogRoleAssignment(ctx context.Context, service AuditService, adminUserID, t
 		"timestamp":      time.Now().Unix(),
 	}
 
-	event := AuditEvent{
+	event := interfaces.AuditEvent{
 		UserID:       adminUserID,
 		Action:       ActionRoleAssign,
 		ResourceType: ResourceTypeRole,
@@ -136,13 +137,13 @@ func LogRoleAssignment(ctx context.Context, service AuditService, adminUserID, t
 }
 
 // LogMFASetup logs an MFA setup event
-func LogMFASetup(ctx context.Context, service AuditService, userID uuid.UUID, mfaMethod string, ipAddr *netip.Addr, userAgent string) error {
+func LogMFASetup(ctx context.Context, service interfaces.AuditService, userID uuid.UUID, mfaMethod string, ipAddr *netip.Addr, userAgent string) error {
 	metadata := map[string]interface{}{
 		"mfa_method": mfaMethod, // "totp", "sms", "email", "webauthn"
 		"timestamp":  time.Now().Unix(),
 	}
 
-	event := AuditEvent{
+	event := interfaces.AuditEvent{
 		UserID:       userID,
 		Action:       ActionMFAEnable,
 		ResourceType: ResourceTypeMFA,
@@ -156,7 +157,7 @@ func LogMFASetup(ctx context.Context, service AuditService, userID uuid.UUID, mf
 }
 
 // LogSuspiciousActivity logs a suspicious activity event
-func LogSuspiciousActivity(ctx context.Context, service AuditService, userID uuid.UUID, activityType string, riskScore int, ipAddr *netip.Addr, userAgent string, details map[string]interface{}) error {
+func LogSuspiciousActivity(ctx context.Context, service interfaces.AuditService, userID uuid.UUID, activityType string, riskScore int, ipAddr *netip.Addr, userAgent string, details map[string]interface{}) error {
 	metadata := map[string]interface{}{
 		"activity_type": activityType,
 		"risk_score":    riskScore,
@@ -168,7 +169,7 @@ func LogSuspiciousActivity(ctx context.Context, service AuditService, userID uui
 		metadata[k] = v
 	}
 
-	event := AuditEvent{
+	event := interfaces.AuditEvent{
 		UserID:       userID,
 		Action:       ActionSuspiciousActivity,
 		ResourceType: ResourceTypeSystem,
@@ -181,14 +182,14 @@ func LogSuspiciousActivity(ctx context.Context, service AuditService, userID uui
 }
 
 // LogTokenGeneration logs a token generation event
-func LogTokenGeneration(ctx context.Context, service AuditService, userID uuid.UUID, tokenType string, expiresIn int64, ipAddr *netip.Addr, userAgent string) error {
+func LogTokenGeneration(ctx context.Context, service interfaces.AuditService, userID uuid.UUID, tokenType string, expiresIn int64, ipAddr *netip.Addr, userAgent string) error {
 	metadata := map[string]interface{}{
 		"token_type": tokenType, // "access", "refresh"
 		"expires_in": expiresIn,
 		"timestamp":  time.Now().Unix(),
 	}
 
-	event := AuditEvent{
+	event := interfaces.AuditEvent{
 		UserID:       userID,
 		Action:       ActionTokenGenerate,
 		ResourceType: ResourceTypeToken,
@@ -201,7 +202,7 @@ func LogTokenGeneration(ctx context.Context, service AuditService, userID uuid.U
 }
 
 // LogAdminAction logs an administrative action
-func LogAdminAction(ctx context.Context, service AuditService, adminUserID uuid.UUID, action, resourceType, resourceID string, ipAddr *netip.Addr, userAgent string, details map[string]interface{}) error {
+func LogAdminAction(ctx context.Context, service interfaces.AuditService, adminUserID uuid.UUID, action, resourceType, resourceID string, ipAddr *netip.Addr, userAgent string, details map[string]interface{}) error {
 	metadata := map[string]interface{}{
 		"admin_user_id": adminUserID.String(),
 		"timestamp":     time.Now().Unix(),
@@ -212,7 +213,7 @@ func LogAdminAction(ctx context.Context, service AuditService, adminUserID uuid.
 		metadata[k] = v
 	}
 
-	event := AuditEvent{
+	event := interfaces.AuditEvent{
 		UserID:       adminUserID,
 		Action:       action,
 		ResourceType: resourceType,
@@ -226,7 +227,7 @@ func LogAdminAction(ctx context.Context, service AuditService, adminUserID uuid.
 }
 
 // LogRateLimitExceeded logs a rate limit exceeded event
-func LogRateLimitExceeded(ctx context.Context, service AuditService, userID uuid.UUID, limitType string, currentCount, maxCount int, ipAddr *netip.Addr, userAgent string) error {
+func LogRateLimitExceeded(ctx context.Context, service interfaces.AuditService, userID uuid.UUID, limitType string, currentCount, maxCount int, ipAddr *netip.Addr, userAgent string) error {
 	metadata := map[string]interface{}{
 		"limit_type":    limitType, // "login_attempts", "api_requests", "password_resets"
 		"current_count": currentCount,
@@ -234,7 +235,7 @@ func LogRateLimitExceeded(ctx context.Context, service AuditService, userID uuid
 		"timestamp":     time.Now().Unix(),
 	}
 
-	event := AuditEvent{
+	event := interfaces.AuditEvent{
 		UserID:       userID,
 		Action:       ActionRateLimitExceeded,
 		ResourceType: ResourceTypeSystem,
@@ -247,14 +248,14 @@ func LogRateLimitExceeded(ctx context.Context, service AuditService, userID uuid
 }
 
 // LogAccountLockout logs an account lockout event
-func LogAccountLockout(ctx context.Context, service AuditService, userID uuid.UUID, reason string, duration time.Duration, ipAddr *netip.Addr, userAgent string) error {
+func LogAccountLockout(ctx context.Context, service interfaces.AuditService, userID uuid.UUID, reason string, duration time.Duration, ipAddr *netip.Addr, userAgent string) error {
 	metadata := map[string]interface{}{
 		"lockout_reason":   reason, // "failed_attempts", "suspicious_activity", "admin_action"
 		"lockout_duration": duration.String(),
 		"timestamp":        time.Now().Unix(),
 	}
 
-	event := AuditEvent{
+	event := interfaces.AuditEvent{
 		UserID:       userID,
 		Action:       ActionAccountLockout,
 		ResourceType: ResourceTypeUser,
@@ -268,14 +269,14 @@ func LogAccountLockout(ctx context.Context, service AuditService, userID uuid.UU
 }
 
 // LogSessionCreation logs a session creation event
-func LogSessionCreation(ctx context.Context, service AuditService, userID, sessionID uuid.UUID, ipAddr *netip.Addr, userAgent string, expiresAt time.Time) error {
+func LogSessionCreation(ctx context.Context, service interfaces.AuditService, userID, sessionID uuid.UUID, ipAddr *netip.Addr, userAgent string, expiresAt time.Time) error {
 	metadata := map[string]interface{}{
 		"session_id": sessionID.String(),
 		"expires_at": expiresAt.Unix(),
 		"timestamp":  time.Now().Unix(),
 	}
 
-	event := AuditEvent{
+	event := interfaces.AuditEvent{
 		UserID:       userID,
 		Action:       ActionSessionCreate,
 		ResourceType: ResourceTypeSession,
@@ -289,7 +290,7 @@ func LogSessionCreation(ctx context.Context, service AuditService, userID, sessi
 }
 
 // LogConfigurationChange logs a configuration change event
-func LogConfigurationChange(ctx context.Context, service AuditService, adminUserID uuid.UUID, configKey string, oldValue, newValue interface{}, ipAddr *netip.Addr, userAgent string) error {
+func LogConfigurationChange(ctx context.Context, service interfaces.AuditService, adminUserID uuid.UUID, configKey string, oldValue, newValue interface{}, ipAddr *netip.Addr, userAgent string) error {
 	metadata := map[string]interface{}{
 		"config_key": configKey,
 		"old_value":  oldValue,
@@ -298,7 +299,7 @@ func LogConfigurationChange(ctx context.Context, service AuditService, adminUser
 		"timestamp":  time.Now().Unix(),
 	}
 
-	event := AuditEvent{
+	event := interfaces.AuditEvent{
 		UserID:       adminUserID,
 		Action:       ActionAdminConfigUpdate,
 		ResourceType: ResourceTypeConfig,

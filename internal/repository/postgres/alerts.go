@@ -8,11 +8,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
 	"github.com/steve-mir/go-auth-system/internal/repository/postgres/db"
-	"github.com/steve-mir/go-auth-system/internal/service/admin"
 )
 
-// AlertRepository implements the admin.AlertRepository interface using SQLC
+// AlertRepository implements the interfaces.AlertRepository interface using SQLC
 type AlertRepository struct {
 	queries *db.Queries
 }
@@ -25,7 +25,7 @@ func NewAlertRepository(queries *db.Queries) *AlertRepository {
 }
 
 // CreateAlert creates a new alert
-func (r *AlertRepository) CreateAlert(ctx context.Context, alert *admin.Alert) error {
+func (r *AlertRepository) CreateAlert(ctx context.Context, alert *interfaces.Alert) error {
 	metadataJSON, err := json.Marshal(alert.Metadata)
 	if err != nil {
 		return fmt.Errorf("failed to marshal metadata: %w", err)
@@ -54,7 +54,7 @@ func (r *AlertRepository) CreateAlert(ctx context.Context, alert *admin.Alert) e
 }
 
 // GetAlertByID retrieves an alert by ID
-func (r *AlertRepository) GetAlertByID(ctx context.Context, alertID uuid.UUID) (*admin.Alert, error) {
+func (r *AlertRepository) GetAlertByID(ctx context.Context, alertID uuid.UUID) (*interfaces.Alert, error) {
 	dbAlert, err := r.queries.GetAlertByID(ctx, alertID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get alert: %w", err)
@@ -64,13 +64,13 @@ func (r *AlertRepository) GetAlertByID(ctx context.Context, alertID uuid.UUID) (
 }
 
 // GetActiveAlerts retrieves all active alerts
-func (r *AlertRepository) GetActiveAlerts(ctx context.Context) ([]admin.Alert, error) {
+func (r *AlertRepository) GetActiveAlerts(ctx context.Context) ([]interfaces.Alert, error) {
 	dbAlerts, err := r.queries.GetActiveAlerts(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get active alerts: %w", err)
 	}
 
-	alerts := make([]admin.Alert, len(dbAlerts))
+	alerts := make([]interfaces.Alert, len(dbAlerts))
 	for i, dbAlert := range dbAlerts {
 		alert, err := r.convertDBAlertToAdmin(&dbAlert)
 		if err != nil {
@@ -83,7 +83,7 @@ func (r *AlertRepository) GetActiveAlerts(ctx context.Context) ([]admin.Alert, e
 }
 
 // GetAlerts retrieves alerts with pagination and filtering
-func (r *AlertRepository) GetAlerts(ctx context.Context, req *admin.GetAlertsRequest) ([]admin.Alert, int64, error) {
+func (r *AlertRepository) GetAlerts(ctx context.Context, req *interfaces.GetAlertsRequest) ([]interfaces.Alert, int64, error) {
 	// Get total count
 	countParams := db.CountAlertsParams{
 		Column1: req.Type,
@@ -114,7 +114,7 @@ func (r *AlertRepository) GetAlerts(ctx context.Context, req *admin.GetAlertsReq
 		return nil, 0, fmt.Errorf("failed to get alerts: %w", err)
 	}
 
-	alerts := make([]admin.Alert, len(dbAlerts))
+	alerts := make([]interfaces.Alert, len(dbAlerts))
 	for i, dbAlert := range dbAlerts {
 		alert, err := r.convertDBAlertToAdmin(&dbAlert)
 		if err != nil {
@@ -127,7 +127,7 @@ func (r *AlertRepository) GetAlerts(ctx context.Context, req *admin.GetAlertsReq
 }
 
 // UpdateAlert updates an existing alert
-func (r *AlertRepository) UpdateAlert(ctx context.Context, alert *admin.Alert) error {
+func (r *AlertRepository) UpdateAlert(ctx context.Context, alert *interfaces.Alert) error {
 	metadataJSON, err := json.Marshal(alert.Metadata)
 	if err != nil {
 		return fmt.Errorf("failed to marshal metadata: %w", err)
@@ -170,7 +170,7 @@ func (r *AlertRepository) DeleteAlert(ctx context.Context, alertID uuid.UUID) er
 }
 
 // GetAlertsByType retrieves alerts by type
-func (r *AlertRepository) GetAlertsByType(ctx context.Context, alertType string) ([]admin.Alert, error) {
+func (r *AlertRepository) GetAlertsByType(ctx context.Context, alertType string) ([]interfaces.Alert, error) {
 	// Use GetAlerts with type filter since GetAlertsByType is not generated
 	params := db.GetAlertsParams{
 		Column1: alertType,
@@ -187,7 +187,7 @@ func (r *AlertRepository) GetAlertsByType(ctx context.Context, alertType string)
 		return nil, fmt.Errorf("failed to get alerts by type: %w", err)
 	}
 
-	alerts := make([]admin.Alert, len(dbAlerts))
+	alerts := make([]interfaces.Alert, len(dbAlerts))
 	for i, dbAlert := range dbAlerts {
 		alert, err := r.convertDBAlertToAdmin(&dbAlert)
 		if err != nil {
@@ -200,13 +200,13 @@ func (r *AlertRepository) GetAlertsByType(ctx context.Context, alertType string)
 }
 
 // GetAlertsBySeverity retrieves alerts by severity
-func (r *AlertRepository) GetAlertsBySeverity(ctx context.Context, severity string) ([]admin.Alert, error) {
+func (r *AlertRepository) GetAlertsBySeverity(ctx context.Context, severity string) ([]interfaces.Alert, error) {
 	dbAlerts, err := r.queries.GetAlertsBySeverity(ctx, severity)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get alerts by severity: %w", err)
 	}
 
-	alerts := make([]admin.Alert, len(dbAlerts))
+	alerts := make([]interfaces.Alert, len(dbAlerts))
 	for i, dbAlert := range dbAlerts {
 		alert, err := r.convertDBAlertToAdmin(&dbAlert)
 		if err != nil {
@@ -235,8 +235,8 @@ func (r *AlertRepository) MarkAlertResolved(ctx context.Context, alertID uuid.UU
 }
 
 // convertDBAlertToAdmin converts a database alert to admin alert
-func (r *AlertRepository) convertDBAlertToAdmin(dbAlert *db.Alert) (*admin.Alert, error) {
-	alert := &admin.Alert{
+func (r *AlertRepository) convertDBAlertToAdmin(dbAlert *db.Alert) (*interfaces.Alert, error) {
+	alert := &interfaces.Alert{
 		ID:         dbAlert.ID,
 		Type:       dbAlert.Type,
 		Severity:   dbAlert.Severity,

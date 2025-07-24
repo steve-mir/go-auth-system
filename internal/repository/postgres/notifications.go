@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
 	"github.com/steve-mir/go-auth-system/internal/repository/postgres/db"
-	"github.com/steve-mir/go-auth-system/internal/service/admin"
 )
 
 // NotificationRepository implements the admin.NotificationRepository interface using SQLC
@@ -23,14 +23,14 @@ func NewNotificationRepository(queries *db.Queries) *NotificationRepository {
 }
 
 // GetNotificationSettings retrieves notification settings
-func (r *NotificationRepository) GetNotificationSettings(ctx context.Context) (*admin.NotificationSettings, error) {
+func (r *NotificationRepository) GetNotificationSettings(ctx context.Context) (*interfaces.NotificationSettings, error) {
 	dbSettings, err := r.queries.GetNotificationSettings(ctx)
 	if err != nil {
 		// Return default settings if none exist
 		return r.getDefaultNotificationSettings(), nil
 	}
 
-	settings := &admin.NotificationSettings{
+	settings := &interfaces.NotificationSettings{
 		EmailEnabled:    dbSettings.EmailEnabled.Bool,
 		EmailRecipients: dbSettings.EmailRecipients,
 		SlackEnabled:    dbSettings.SlackEnabled.Bool,
@@ -54,7 +54,7 @@ func (r *NotificationRepository) GetNotificationSettings(ctx context.Context) (*
 }
 
 // UpdateNotificationSettings updates notification settings
-func (r *NotificationRepository) UpdateNotificationSettings(ctx context.Context, req *admin.UpdateNotificationSettingsRequest) error {
+func (r *NotificationRepository) UpdateNotificationSettings(ctx context.Context, req *interfaces.UpdateNotificationSettingsRequest) error {
 	// First, get current settings
 	currentSettings, err := r.GetNotificationSettings(ctx)
 	if err != nil {
@@ -110,7 +110,7 @@ func (r *NotificationRepository) UpdateNotificationSettings(ctx context.Context,
 }
 
 // CreateNotificationSettings creates initial notification settings
-func (r *NotificationRepository) CreateNotificationSettings(ctx context.Context, settings *admin.NotificationSettings) error {
+func (r *NotificationRepository) CreateNotificationSettings(ctx context.Context, settings *interfaces.NotificationSettings) error {
 	thresholdsJSON, err := json.Marshal(settings.Thresholds)
 	if err != nil {
 		return fmt.Errorf("failed to marshal thresholds: %w", err)
@@ -135,8 +135,8 @@ func (r *NotificationRepository) CreateNotificationSettings(ctx context.Context,
 }
 
 // getDefaultNotificationSettings returns default notification settings
-func (r *NotificationRepository) getDefaultNotificationSettings() *admin.NotificationSettings {
-	return &admin.NotificationSettings{
+func (r *NotificationRepository) getDefaultNotificationSettings() *interfaces.NotificationSettings {
+	return &interfaces.NotificationSettings{
 		EmailEnabled:    false,
 		EmailRecipients: []string{},
 		SlackEnabled:    false,
@@ -148,8 +148,8 @@ func (r *NotificationRepository) getDefaultNotificationSettings() *admin.Notific
 }
 
 // getDefaultThresholds returns default notification thresholds
-func (r *NotificationRepository) getDefaultThresholds() admin.NotificationThresholds {
-	return admin.NotificationThresholds{
+func (r *NotificationRepository) getDefaultThresholds() interfaces.NotificationThresholds {
+	return interfaces.NotificationThresholds{
 		FailedLoginRate:     10.0, // 10% failed login rate
 		ErrorRate:           5.0,  // 5% error rate
 		ResponseTime:        1000, // 1000ms response time

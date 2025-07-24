@@ -7,17 +7,17 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/steve-mir/go-auth-system/internal/service/email"
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
 )
 
 // SendGridProvider implements email sending via SendGrid API
 type SendGridProvider struct {
-	config *email.SendGridConfig
+	config *interfaces.SendGridConfig
 	client *http.Client
 }
 
 // NewSendGridProvider creates a new SendGrid provider
-func NewSendGridProvider(config *email.SendGridConfig) (*SendGridProvider, error) {
+func NewSendGridProvider(config *interfaces.SendGridConfig) (*SendGridProvider, error) {
 	if config == nil || config.APIKey == "" {
 		return nil, fmt.Errorf("SendGrid API key is required")
 	}
@@ -29,7 +29,7 @@ func NewSendGridProvider(config *email.SendGridConfig) (*SendGridProvider, error
 }
 
 // SendEmail sends an email via SendGrid API
-func (p *SendGridProvider) SendEmail(ctx context.Context, req *email.SendEmailRequest) error {
+func (p *SendGridProvider) SendEmail(ctx context.Context, req *interfaces.SendEmailRequest) error {
 	payload := p.buildSendGridPayload(req)
 
 	jsonData, err := json.Marshal(payload)
@@ -86,8 +86,8 @@ func (p *SendGridProvider) GetName() string {
 }
 
 // GetType returns the provider type
-func (p *SendGridProvider) GetType() email.EmailProvider {
-	return email.ProviderSendGrid
+func (p *SendGridProvider) GetType() interfaces.EmailProvider {
+	return interfaces.ProviderSendGrid
 }
 
 // SendGrid API payload structures
@@ -123,7 +123,7 @@ type sendGridAttachment struct {
 	ContentID   string `json:"content_id,omitempty"`
 }
 
-func (p *SendGridProvider) buildSendGridPayload(req *email.SendEmailRequest) *sendGridPayload {
+func (p *SendGridProvider) buildSendGridPayload(req *interfaces.SendEmailRequest) *sendGridPayload {
 	payload := &sendGridPayload{
 		Subject: req.Subject,
 	}

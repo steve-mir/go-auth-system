@@ -3,6 +3,8 @@ package email
 import (
 	"context"
 	"time"
+
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
 )
 
 // EmailService defines the interface for email operations
@@ -57,9 +59,9 @@ type SendEmailRequest struct {
 
 // BulkEmailRequest represents a bulk email request
 type BulkEmailRequest struct {
-	Emails       []*SendEmailRequest `json:"emails"`
-	BatchSize    int                 `json:"batch_size,omitempty"`
-	DelayBetween time.Duration       `json:"delay_between,omitempty"`
+	Emails       []*interfaces.SendEmailRequest `json:"emails"`
+	BatchSize    int                            `json:"batch_size,omitempty"`
+	DelayBetween time.Duration                  `json:"delay_between,omitempty"`
 }
 
 // EmailAttachment represents an email attachment
@@ -101,15 +103,15 @@ type TemplateFilter struct {
 
 // EmailStatus represents the status of a sent email
 type EmailStatus struct {
-	ID          string            `json:"id"`
-	Status      DeliveryStatus    `json:"status"`
-	SentAt      *time.Time        `json:"sent_at,omitempty"`
-	DeliveredAt *time.Time        `json:"delivered_at,omitempty"`
-	OpenedAt    *time.Time        `json:"opened_at,omitempty"`
-	ClickedAt   *time.Time        `json:"clicked_at,omitempty"`
-	BouncedAt   *time.Time        `json:"bounced_at,omitempty"`
-	Error       string            `json:"error,omitempty"`
-	Metadata    map[string]string `json:"metadata,omitempty"`
+	ID          string                    `json:"id"`
+	Status      interfaces.DeliveryStatus `json:"status"`
+	SentAt      *time.Time                `json:"sent_at,omitempty"`
+	DeliveredAt *time.Time                `json:"delivered_at,omitempty"`
+	OpenedAt    *time.Time                `json:"opened_at,omitempty"`
+	ClickedAt   *time.Time                `json:"clicked_at,omitempty"`
+	BouncedAt   *time.Time                `json:"bounced_at,omitempty"`
+	Error       string                    `json:"error,omitempty"`
+	Metadata    map[string]string         `json:"metadata,omitempty"`
 }
 
 // EmailAnalytics represents email analytics data
@@ -144,27 +146,15 @@ const (
 	PriorityUrgent EmailPriority = "urgent"
 )
 
-// DeliveryStatus represents email delivery status
-type DeliveryStatus string
+// // DeliveryStatus represents email delivery status
+// type DeliveryStatus string
 
-const (
-	StatusPending   DeliveryStatus = "pending"
-	StatusSent      DeliveryStatus = "sent"
-	StatusDelivered DeliveryStatus = "delivered"
-	StatusOpened    DeliveryStatus = "opened"
-	StatusClicked   DeliveryStatus = "clicked"
-	StatusBounced   DeliveryStatus = "bounced"
-	StatusFailed    DeliveryStatus = "failed"
-)
-
-// EmailProvider represents different email providers
-type EmailProvider string
-
-const (
-	ProviderSMTP     EmailProvider = "smtp"
-	ProviderSendGrid EmailProvider = "sendgrid"
-	ProviderMailgun  EmailProvider = "mailgun"
-	ProviderSES      EmailProvider = "ses"
-	ProviderPostmark EmailProvider = "postmark"
-	ProviderResend   EmailProvider = "resend"
-)
+// const (
+// 	StatusPending   DeliveryStatus = "pending"
+// 	StatusSent      DeliveryStatus = "sent"
+// 	StatusDelivered DeliveryStatus = "delivered"
+// 	StatusOpened    DeliveryStatus = "opened"
+// 	StatusClicked   DeliveryStatus = "clicked"
+// 	StatusBounced   DeliveryStatus = "bounced"
+// 	StatusFailed    DeliveryStatus = "failed"
+// )

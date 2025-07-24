@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
 )
 
 // service implements the AuditService interface
@@ -25,8 +26,8 @@ func NewService(repo AuditRepository, logger *slog.Logger) AuditService {
 }
 
 // LogEvent logs an audit event with structured logging and database persistence
-func convertAuditEventToCreateAuditLogParams(event AuditEvent) CreateAuditLogParams {
-	return CreateAuditLogParams{
+func convertAuditEventToCreateAuditLogParams(event interfaces.AuditEvent) interfaces.CreateAuditLogParams {
+	return interfaces.CreateAuditLogParams{
 		UserID:       event.UserID,
 		Action:       event.Action,
 		ResourceType: event.ResourceType,
@@ -38,9 +39,9 @@ func convertAuditEventToCreateAuditLogParams(event AuditEvent) CreateAuditLogPar
 }
 
 // LogEvent logs an audit event with structured logging and database persistence
-func (s *service) LogEvent(ctx context.Context, event AuditEvent) error {
+func (s *service) LogEvent(ctx context.Context, event interfaces.AuditEvent) error {
 	// Convert metadata to JSON
-	metadataJSON, err := event.ToJSON()
+	metadataJSON, err := ToJSON(event.Metadata)
 	if err != nil {
 		s.logger.Error("Failed to marshal audit event metadata",
 			"error", err,
@@ -75,7 +76,7 @@ func (s *service) LogEvent(ctx context.Context, event AuditEvent) error {
 }
 
 // GetUserAuditLogs retrieves audit logs for a specific user with pagination
-func (s *service) GetUserAuditLogs(ctx context.Context, userID uuid.UUID, req GetAuditLogsRequest) (*GetAuditLogsResponse, error) {
+func (s *service) GetUserAuditLogs(ctx context.Context, userID uuid.UUID, req interfaces.GetAuditLogsRequest) (*interfaces.GetAuditLogsResponse, error) {
 	// Validate pagination parameters
 	if err := s.validatePaginationRequest(req); err != nil {
 		return nil, err
@@ -99,7 +100,7 @@ func (s *service) GetUserAuditLogs(ctx context.Context, userID uuid.UUID, req Ge
 		return nil, fmt.Errorf("failed to count user audit logs: %w", err)
 	}
 
-	return &GetAuditLogsResponse{
+	return &interfaces.GetAuditLogsResponse{
 		AuditLogs:  logs,
 		TotalCount: totalCount,
 		Limit:      req.Limit,
@@ -108,7 +109,7 @@ func (s *service) GetUserAuditLogs(ctx context.Context, userID uuid.UUID, req Ge
 }
 
 // GetAuditLogsByAction retrieves audit logs filtered by action with pagination
-func (s *service) GetAuditLogsByAction(ctx context.Context, action string, req GetAuditLogsRequest) (*GetAuditLogsResponse, error) {
+func (s *service) GetAuditLogsByAction(ctx context.Context, action string, req interfaces.GetAuditLogsRequest) (*interfaces.GetAuditLogsResponse, error) {
 	// Validate pagination parameters
 	if err := s.validatePaginationRequest(req); err != nil {
 		return nil, err
@@ -132,7 +133,7 @@ func (s *service) GetAuditLogsByAction(ctx context.Context, action string, req G
 		return nil, fmt.Errorf("failed to count audit logs by action: %w", err)
 	}
 
-	return &GetAuditLogsResponse{
+	return &interfaces.GetAuditLogsResponse{
 		AuditLogs:  logs,
 		TotalCount: totalCount,
 		Limit:      req.Limit,
@@ -141,7 +142,7 @@ func (s *service) GetAuditLogsByAction(ctx context.Context, action string, req G
 }
 
 // GetAuditLogsByResource retrieves audit logs for a specific resource with pagination
-func (s *service) GetAuditLogsByResource(ctx context.Context, resourceType, resourceID string, req GetAuditLogsRequest) (*GetAuditLogsResponse, error) {
+func (s *service) GetAuditLogsByResource(ctx context.Context, resourceType, resourceID string, req interfaces.GetAuditLogsRequest) (*interfaces.GetAuditLogsResponse, error) {
 	// Validate pagination parameters
 	if err := s.validatePaginationRequest(req); err != nil {
 		return nil, err
@@ -166,7 +167,7 @@ func (s *service) GetAuditLogsByResource(ctx context.Context, resourceType, reso
 		return nil, fmt.Errorf("failed to count audit logs: %w", err)
 	}
 
-	return &GetAuditLogsResponse{
+	return &interfaces.GetAuditLogsResponse{
 		AuditLogs:  logs,
 		TotalCount: totalCount,
 		Limit:      req.Limit,
@@ -175,7 +176,7 @@ func (s *service) GetAuditLogsByResource(ctx context.Context, resourceType, reso
 }
 
 // GetAuditLogsByTimeRange retrieves audit logs within a time range with pagination
-func (s *service) GetAuditLogsByTimeRange(ctx context.Context, startTime, endTime time.Time, req GetAuditLogsRequest) (*GetAuditLogsResponse, error) {
+func (s *service) GetAuditLogsByTimeRange(ctx context.Context, startTime, endTime time.Time, req interfaces.GetAuditLogsRequest) (*interfaces.GetAuditLogsResponse, error) {
 	// Validate time range
 	if startTime.After(endTime) {
 		return nil, fmt.Errorf("start time cannot be after end time")
@@ -205,7 +206,7 @@ func (s *service) GetAuditLogsByTimeRange(ctx context.Context, startTime, endTim
 		return nil, fmt.Errorf("failed to count audit logs: %w", err)
 	}
 
-	return &GetAuditLogsResponse{
+	return &interfaces.GetAuditLogsResponse{
 		AuditLogs:  logs,
 		TotalCount: totalCount,
 		Limit:      req.Limit,
@@ -214,7 +215,7 @@ func (s *service) GetAuditLogsByTimeRange(ctx context.Context, startTime, endTim
 }
 
 // GetRecentAuditLogs retrieves the most recent audit logs with pagination
-func (s *service) GetRecentAuditLogs(ctx context.Context, req GetAuditLogsRequest) (*GetAuditLogsResponse, error) {
+func (s *service) GetRecentAuditLogs(ctx context.Context, req interfaces.GetAuditLogsRequest) (*interfaces.GetAuditLogsResponse, error) {
 	// Validate pagination parameters
 	if err := s.validatePaginationRequest(req); err != nil {
 		return nil, err
@@ -236,7 +237,7 @@ func (s *service) GetRecentAuditLogs(ctx context.Context, req GetAuditLogsReques
 		return nil, fmt.Errorf("failed to count audit logs: %w", err)
 	}
 
-	return &GetAuditLogsResponse{
+	return &interfaces.GetAuditLogsResponse{
 		AuditLogs:  logs,
 		TotalCount: totalCount,
 		Limit:      req.Limit,
@@ -245,7 +246,7 @@ func (s *service) GetRecentAuditLogs(ctx context.Context, req GetAuditLogsReques
 }
 
 // GetAuditLogByID retrieves a specific audit log by ID
-func (s *service) GetAuditLogByID(ctx context.Context, id uuid.UUID) (*AuditLog, error) {
+func (s *service) GetAuditLogByID(ctx context.Context, id uuid.UUID) (*interfaces.AuditLog, error) {
 	auditLog, err := s.repo.GetAuditLogByID(ctx, id)
 	if err != nil {
 		s.logger.Error("Failed to get audit log by ID",
@@ -312,7 +313,7 @@ func (s *service) CleanupOldLogs(ctx context.Context, olderThan time.Time) error
 }
 
 // validatePaginationRequest validates pagination parameters
-func (s *service) validatePaginationRequest(req GetAuditLogsRequest) error {
+func (s *service) validatePaginationRequest(req interfaces.GetAuditLogsRequest) error {
 	if req.Limit <= 0 {
 		return fmt.Errorf("limit must be greater than 0")
 	}
@@ -326,7 +327,7 @@ func (s *service) validatePaginationRequest(req GetAuditLogsRequest) error {
 }
 
 // logStructuredEvent logs the audit event with structured logging for monitoring
-func (s *service) logStructuredEvent(event AuditEvent, auditLogID uuid.UUID) {
+func (s *service) logStructuredEvent(event interfaces.AuditEvent, auditLogID uuid.UUID) {
 	logAttrs := []slog.Attr{
 		slog.String("audit_log_id", auditLogID.String()),
 		slog.String("user_id", event.UserID.String()),

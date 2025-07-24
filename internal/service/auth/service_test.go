@@ -34,6 +34,10 @@ func (m *mockUserRepository) GetUserByEmail(ctx context.Context, email string) (
 	}
 	return args.Get(0).(*UserData), args.Error(1)
 }
+func (m *mockUserRepository) UpdateUser(ctx context.Context, user *UpdateUserData) error {
+	// TODO:
+	return nil
+}
 
 func (m *mockUserRepository) GetUserByUsername(ctx context.Context, username string) (*UserData, error) {
 	args := m.Called(ctx, username)

@@ -4,16 +4,16 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/steve-mir/go-auth-system/internal/service/email"
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
 )
 
 // ResendProvider implements email sending via Resend API
 type ResendProvider struct {
-	config *email.ResendConfig
+	config *interfaces.ResendConfig
 }
 
 // NewResendProvider creates a new Resend provider
-func NewResendProvider(config *email.ResendConfig) (*ResendProvider, error) {
+func NewResendProvider(config *interfaces.ResendConfig) (*ResendProvider, error) {
 	if config == nil || config.APIKey == "" {
 		return nil, fmt.Errorf("Resend API key is required")
 	}
@@ -24,7 +24,7 @@ func NewResendProvider(config *email.ResendConfig) (*ResendProvider, error) {
 }
 
 // SendEmail sends an email via Resend API
-func (p *ResendProvider) SendEmail(ctx context.Context, req *email.SendEmailRequest) error {
+func (p *ResendProvider) SendEmail(ctx context.Context, req *interfaces.SendEmailRequest) error {
 	// TODO: Implement Resend API integration
 	return fmt.Errorf("Resend provider not yet implemented")
 }
@@ -41,6 +41,6 @@ func (p *ResendProvider) GetName() string {
 }
 
 // GetType returns the provider type
-func (p *ResendProvider) GetType() email.EmailProvider {
-	return email.ProviderResend
+func (p *ResendProvider) GetType() interfaces.EmailProvider {
+	return interfaces.ProviderResend
 }

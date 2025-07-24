@@ -184,7 +184,7 @@ func (s *Server) getAllUserSessionsHandler(c *gin.Context) {
 		return
 	}
 
-	s.paginatedResponse(c, http.StatusOK, response.Sessions, s.convertPaginationInfo(&response.Pagination))
+	s.paginatedResponse(c, http.StatusOK, response.Sessions, s.convertPaginationMeta(&response.Pagination))
 }
 
 // deleteUserSessionHandler deletes a specific user session
@@ -290,8 +290,8 @@ func (s *Server) getAuditLogsHandler(c *gin.Context) {
 	}
 
 	req := &interfaces.GetAuditLogsRequest{
-		Page:         page,
-		Limit:        limit,
+		Page:         int32(page),
+		Limit:        int32(limit),
 		UserID:       userID,
 		Action:       action,
 		ResourceType: resourceType,
@@ -307,7 +307,7 @@ func (s *Server) getAuditLogsHandler(c *gin.Context) {
 		return
 	}
 
-	s.paginatedResponse(c, http.StatusOK, response.Logs, s.convertPaginationInfo(&response.Pagination))
+	s.paginatedResponse(c, http.StatusOK, response.AuditLogs, s.convertPaginationInfo(response))
 }
 
 // getAuditEventsHandler returns audit events with filtering
@@ -340,7 +340,7 @@ func (s *Server) getAuditEventsHandler(c *gin.Context) {
 		return
 	}
 
-	s.paginatedResponse(c, http.StatusOK, response.Events, s.convertPaginationInfo(&response.Pagination))
+	s.paginatedResponse(c, http.StatusOK, response.Events, s.convertPaginationMeta(&response.Pagination))
 }
 
 // Configuration handlers
@@ -546,14 +546,39 @@ func (s *Server) updateNotificationSettingsHandler(c *gin.Context) {
 
 // Helper methods
 
+// // convertPaginationInfo converts interfaces.PaginationInfo to PaginationInfo
+// func (s *Server) convertPaginationInfo(info *interfaces.PaginationInfo) *PaginationInfo {
+// 	return &PaginationInfo{
+// 		Page:       info.Page,
+// 		Limit:      info.Limit,
+// 		Total:      info.Total,
+// 		TotalPages: info.TotalPages,
+// 		HasNext:    info.HasNext,
+// 		HasPrev:    info.HasPrev,
+// 	}
+// }
+
 // convertPaginationInfo converts interfaces.PaginationInfo to PaginationInfo
-func (s *Server) convertPaginationInfo(info *interfaces.PaginationInfo) *PaginationInfo {
-	return &PaginationInfo{
+func (s *Server) convertPaginationMeta(info *interfaces.PaginationInfo) *PaginationMeta {
+	return &PaginationMeta{
 		Page:       info.Page,
 		Limit:      info.Limit,
 		Total:      info.Total,
 		TotalPages: info.TotalPages,
 		HasNext:    info.HasNext,
 		HasPrev:    info.HasPrev,
+	}
+}
+
+// convertPaginationInfo converts interfaces.PaginationInfo to PaginationInfo
+func (s *Server) convertPaginationInfo(info *interfaces.GetAuditLogsResponse) *PaginationMeta {
+	// info.AuditLogs
+	return &PaginationMeta{
+		Page:       int(info.Offset),
+		Limit:      int(info.Limit),
+		Total:      info.TotalCount,
+		TotalPages: int(info.TotalCount),
+		// 	HasNext:    info.HasNext,
+		// 	HasPrev:    info.HasPrev,
 	}
 }

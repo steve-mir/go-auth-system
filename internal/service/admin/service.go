@@ -11,7 +11,6 @@ import (
 	"github.com/steve-mir/go-auth-system/internal/errors"
 	"github.com/steve-mir/go-auth-system/internal/interfaces"
 	"github.com/steve-mir/go-auth-system/internal/monitoring"
-	"github.com/steve-mir/go-auth-system/internal/service/audit"
 )
 
 // Service implements the AdminService interface
@@ -19,14 +18,14 @@ type Service struct {
 	config            *config.Config
 	userService       interfaces.UserService
 	roleService       interfaces.RoleService
-	auditService      audit.AuditService
+	auditService      interfaces.AuditService
 	monitoringService *monitoring.Service
 	startTime         time.Time
 
 	// Repositories for direct database access
-	sessionRepo      SessionRepository
-	alertRepo        AlertRepository
-	notificationRepo NotificationRepository
+	sessionRepo      interfaces.SessionRepository
+	alertRepo        interfaces.AlertRepository
+	notificationRepo interfaces.NotificationRepository
 }
 
 // Dependencies represents the dependencies for the admin service
@@ -34,11 +33,11 @@ type Dependencies struct {
 	Config            *config.Config
 	UserService       interfaces.UserService
 	RoleService       interfaces.RoleService
-	AuditService      audit.AuditService // TODO: Move to interfaces
+	AuditService      interfaces.AuditService // TODO: Move to interfaces
 	MonitoringService *monitoring.Service
-	SessionRepo       SessionRepository      // TODO: Move to interfaces
-	AlertRepo         AlertRepository        // TODO: Move to interfaces
-	NotificationRepo  NotificationRepository // TODO: Move to interfaces
+	SessionRepo       interfaces.SessionRepository // TODO: Move to interfaces
+	AlertRepo         interfaces.AlertRepository
+	NotificationRepo  interfaces.NotificationRepository
 }
 
 // NewService creates a new admin service
@@ -466,12 +465,12 @@ func (s *Service) GetAuditLogs(ctx context.Context, req *interfaces.GetAuditLogs
 	}
 
 	// Convert admin request to audit service request
-	auditReq := audit.GetAuditLogsRequest{
+	auditReq := interfaces.GetAuditLogsRequest{
 		Limit:  int32(req.Limit),
 		Offset: int32((req.Page - 1) * req.Limit),
 	}
 
-	var auditResp *audit.GetAuditLogsResponse
+	var auditResp *interfaces.GetAuditLogsResponse
 	var err error
 
 	// Route to appropriate audit service method based on filters
@@ -494,20 +493,20 @@ func (s *Service) GetAuditLogs(ctx context.Context, req *interfaces.GetAuditLogs
 	}
 
 	// Convert audit service response to admin response
-	logs := make([]interfaces.AuditLog, len(auditResp.AuditLogs))
+	logs := make([]*interfaces.AuditLog, len(auditResp.AuditLogs))
 	for i, log := range auditResp.AuditLogs {
-		var ipAddress string
-		if log.IPAddress != nil {
-			ipAddress = log.IPAddress.String()
-		}
+		// var ipAddress string
+		// if log.IPAddress != nil {
+		// 	ipAddress = log.IPAddress.String()
+		// }
 
-		logs[i] = interfaces.AuditLog{
+		logs[i] = &interfaces.AuditLog{
 			ID:           log.ID,
 			UserID:       log.UserID,
 			Action:       log.Action,
 			ResourceType: log.ResourceType,
 			ResourceID:   log.ResourceID,
-			IPAddress:    ipAddress,
+			IPAddress:    log.IPAddress, //ipAddress,
 			UserAgent:    log.UserAgent,
 			Metadata:     log.Metadata,
 			Timestamp:    log.Timestamp,
@@ -517,15 +516,18 @@ func (s *Service) GetAuditLogs(ctx context.Context, req *interfaces.GetAuditLogs
 	totalPages := int((auditResp.TotalCount + int64(req.Limit) - 1) / int64(req.Limit))
 
 	return &interfaces.GetAuditLogsResponse{
-		Logs: logs,
-		Pagination: interfaces.PaginationInfo{
-			Page:       req.Page,
-			Limit:      req.Limit,
-			Total:      auditResp.TotalCount,
-			TotalPages: totalPages,
-			HasNext:    req.Page < totalPages,
-			HasPrev:    req.Page > 1,
-		},
+		AuditLogs:  logs,
+		Limit:      req.Limit,
+		Offset:     int32((req.Page - 1) * req.Limit),
+		TotalCount: int64(totalPages),
+		// Pagination: interfaces.PaginationInfo{
+		// 	Page:       req.Page,
+		// 	Limit:      req.Limit,
+		// 	Total:      auditResp.TotalCount,
+		// 	TotalPages: totalPages,
+		// 	HasNext:    req.Page < totalPages,
+		// 	HasPrev:    req.Page > 1,
+		// },
 	}, nil
 }
 

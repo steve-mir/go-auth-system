@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
 	"github.com/steve-mir/go-auth-system/internal/repository/postgres/db"
 )
 
@@ -31,7 +32,7 @@ func ExampleUsage() {
 	userID := uuid.New()
 	ipAddr := netip.MustParseAddr("192.168.1.100")
 
-	loginEvent := AuditEvent{
+	loginEvent := interfaces.AuditEvent{
 		UserID:       userID,
 		Action:       ActionUserLogin,
 		ResourceType: ResourceTypeUser,
@@ -52,7 +53,7 @@ func ExampleUsage() {
 	}
 
 	// Example 2: Log a failed login attempt
-	failedLoginEvent := AuditEvent{
+	failedLoginEvent := interfaces.AuditEvent{
 		UserID:       userID,
 		Action:       ActionUserLoginFailed,
 		ResourceType: ResourceTypeUser,
@@ -75,7 +76,7 @@ func ExampleUsage() {
 	adminUserID := uuid.New()
 	roleID := uuid.New()
 
-	roleAssignEvent := AuditEvent{
+	roleAssignEvent := interfaces.AuditEvent{
 		UserID:       adminUserID, // The admin who performed the action
 		Action:       ActionRoleAssign,
 		ResourceType: ResourceTypeRole,
@@ -96,7 +97,7 @@ func ExampleUsage() {
 	}
 
 	// Example 4: Log MFA setup
-	mfaSetupEvent := AuditEvent{
+	mfaSetupEvent := interfaces.AuditEvent{
 		UserID:       userID,
 		Action:       ActionMFAEnable,
 		ResourceType: ResourceTypeMFA,
@@ -116,7 +117,7 @@ func ExampleUsage() {
 	}
 
 	// Example 5: Log suspicious activity
-	suspiciousEvent := AuditEvent{
+	suspiciousEvent := interfaces.AuditEvent{
 		UserID:       userID,
 		Action:       ActionSuspiciousActivity,
 		ResourceType: ResourceTypeSystem,
@@ -138,7 +139,7 @@ func ExampleUsage() {
 
 	// Example 6: Query audit logs
 	// Get recent audit logs for a user
-	req := GetAuditLogsRequest{
+	req := interfaces.GetAuditLogsRequest{
 		Limit:  10,
 		Offset: 0,
 	}
@@ -189,7 +190,7 @@ func ExampleIntegrationWithAuthService(auditService AuditService, userID uuid.UU
 	ctx := context.Background()
 
 	// Log successful login
-	loginEvent := AuditEvent{
+	loginEvent := interfaces.AuditEvent{
 		UserID:       userID,
 		Action:       ActionUserLogin,
 		ResourceType: ResourceTypeUser,
@@ -206,7 +207,7 @@ func ExampleIntegrationWithAuthService(auditService AuditService, userID uuid.UU
 	auditService.LogEvent(ctx, loginEvent)
 
 	// Log token generation
-	tokenEvent := AuditEvent{
+	tokenEvent := interfaces.AuditEvent{
 		UserID:       userID,
 		Action:       ActionTokenGenerate,
 		ResourceType: ResourceTypeToken,
@@ -229,7 +230,7 @@ func ExampleBatchAuditLogging(auditService AuditService) {
 	ipAddr := netip.MustParseAddr("10.0.0.1")
 
 	// Create multiple events that might happen during a user session
-	events := []AuditEvent{
+	events := []interfaces.AuditEvent{
 		{
 			UserID:       userID,
 			Action:       ActionUserLogin,

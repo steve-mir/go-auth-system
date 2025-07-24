@@ -44,18 +44,18 @@ type CreateAuditLogParams struct {
 }
 
 // GetAuditLogsRequest represents a request for retrieving audit logs with pagination
-type GetAuditLogsRequest struct {
-	Limit  int32 `json:"limit"`
-	Offset int32 `json:"offset"`
-}
+// type GetAuditLogsRequest struct {
+// 	Limit  int32 `json:"limit"`
+// 	Offset int32 `json:"offset"`
+// }
 
 // GetAuditLogsResponse represents a response containing audit logs with pagination info
-type GetAuditLogsResponse struct {
-	AuditLogs  []*AuditLog `json:"audit_logs"`
-	TotalCount int64       `json:"total_count"`
-	Limit      int32       `json:"limit"`
-	Offset     int32       `json:"offset"`
-}
+// type GetAuditLogsResponse struct {
+// 	AuditLogs  []*AuditLog `json:"audit_logs"`
+// 	TotalCount int64       `json:"total_count"`
+// 	Limit      int32       `json:"limit"`
+// 	Offset     int32       `json:"offset"`
+// }
 
 // AuditAction constants for common audit actions
 const (
@@ -114,19 +114,36 @@ const (
 	ResourceTypeSystem  = "system"
 )
 
+// // ToJSON converts metadata map to JSON bytes
+// func (e *AuditEvent) ToJSON() (json.RawMessage, error) {
+// 	if e.Metadata == nil {
+// 		return json.RawMessage("{}"), nil
+// 	}
+// 	return json.Marshal(e.Metadata)
+// }
+
+// // FromJSON converts JSON bytes to metadata map
+// func (a *AuditLog) FromJSON(data json.RawMessage) error {
+// 	if len(data) == 0 || string(data) == "{}" {
+// 		a.Metadata = make(map[string]interface{})
+// 		return nil
+// 	}
+// 	return json.Unmarshal(data, &a.Metadata)
+// }
+
 // ToJSON converts metadata map to JSON bytes
-func (e *AuditEvent) ToJSON() (json.RawMessage, error) {
-	if e.Metadata == nil {
+func ToJSON(metadata map[string]interface{}) (json.RawMessage, error) {
+	if metadata == nil {
 		return json.RawMessage("{}"), nil
 	}
-	return json.Marshal(e.Metadata)
+	return json.Marshal(metadata)
 }
 
 // FromJSON converts JSON bytes to metadata map
-func (a *AuditLog) FromJSON(data json.RawMessage) error {
+func FromJSON(data json.RawMessage, metadata map[string]interface{}) error {
 	if len(data) == 0 || string(data) == "{}" {
-		a.Metadata = make(map[string]interface{})
+		metadata = make(map[string]interface{})
 		return nil
 	}
-	return json.Unmarshal(data, &a.Metadata)
+	return json.Unmarshal(data, &metadata)
 }

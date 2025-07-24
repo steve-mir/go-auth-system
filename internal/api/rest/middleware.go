@@ -138,37 +138,3 @@ func (s *Server) roleAuthorizationMiddleware(requiredRoles ...string) gin.Handle
 		c.Next()
 	}
 }
-
-// getUserContext extracts user information from gin context
-func (s *Server) getUserContext(c *gin.Context) (userID, email, username string, roles []string) {
-	if id, exists := c.Get("user_id"); exists {
-		userID, _ = id.(string)
-	}
-	if e, exists := c.Get("user_email"); exists {
-		email, _ = e.(string)
-	}
-	if u, exists := c.Get("user_username"); exists {
-		username, _ = u.(string)
-	}
-	if r, exists := c.Get("user_roles"); exists {
-		roles, _ = r.([]string)
-	}
-	return
-}
-
-// getClientInfo extracts client information from request
-func (s *Server) getClientInfo(c *gin.Context) (ipAddress, userAgent string) {
-	// Get IP address (consider X-Forwarded-For for load balancers)
-	ipAddress = c.ClientIP()
-	if forwarded := c.GetHeader("X-Forwarded-For"); forwarded != "" {
-		// Take the first IP in the chain
-		if idx := strings.Index(forwarded, ","); idx != -1 {
-			ipAddress = strings.TrimSpace(forwarded[:idx])
-		} else {
-			ipAddress = strings.TrimSpace(forwarded)
-		}
-	}
-
-	userAgent = c.GetHeader("User-Agent")
-	return
-}

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -20,60 +21,60 @@ type MockAuditRepository struct {
 	mock.Mock
 }
 
-func (m *MockAuditRepository) CreateAuditLog(ctx context.Context, params CreateAuditLogParams) (*AuditLog, error) {
+func (m *MockAuditRepository) CreateAuditLog(ctx context.Context, params interfaces.CreateAuditLogParams) (*interfaces.AuditLog, error) {
 	args := m.Called(ctx, params)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*AuditLog), args.Error(1)
+	return args.Get(0).(*interfaces.AuditLog), args.Error(1)
 }
 
-func (m *MockAuditRepository) GetAuditLogByID(ctx context.Context, id uuid.UUID) (*AuditLog, error) {
+func (m *MockAuditRepository) GetAuditLogByID(ctx context.Context, id uuid.UUID) (*interfaces.AuditLog, error) {
 	args := m.Called(ctx, id)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*AuditLog), args.Error(1)
+	return args.Get(0).(*interfaces.AuditLog), args.Error(1)
 }
 
-func (m *MockAuditRepository) GetUserAuditLogs(ctx context.Context, userID uuid.UUID, limit, offset int32) ([]*AuditLog, error) {
+func (m *MockAuditRepository) GetUserAuditLogs(ctx context.Context, userID uuid.UUID, limit, offset int32) ([]*interfaces.AuditLog, error) {
 	args := m.Called(ctx, userID, limit, offset)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*AuditLog), args.Error(1)
+	return args.Get(0).([]*interfaces.AuditLog), args.Error(1)
 }
 
-func (m *MockAuditRepository) GetAuditLogsByAction(ctx context.Context, action string, limit, offset int32) ([]*AuditLog, error) {
+func (m *MockAuditRepository) GetAuditLogsByAction(ctx context.Context, action string, limit, offset int32) ([]*interfaces.AuditLog, error) {
 	args := m.Called(ctx, action, limit, offset)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*AuditLog), args.Error(1)
+	return args.Get(0).([]*interfaces.AuditLog), args.Error(1)
 }
 
-func (m *MockAuditRepository) GetAuditLogsByResource(ctx context.Context, resourceType, resourceID string, limit, offset int32) ([]*AuditLog, error) {
+func (m *MockAuditRepository) GetAuditLogsByResource(ctx context.Context, resourceType, resourceID string, limit, offset int32) ([]*interfaces.AuditLog, error) {
 	args := m.Called(ctx, resourceType, resourceID, limit, offset)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*AuditLog), args.Error(1)
+	return args.Get(0).([]*interfaces.AuditLog), args.Error(1)
 }
 
-func (m *MockAuditRepository) GetAuditLogsByTimeRange(ctx context.Context, startTime, endTime time.Time, limit, offset int32) ([]*AuditLog, error) {
+func (m *MockAuditRepository) GetAuditLogsByTimeRange(ctx context.Context, startTime, endTime time.Time, limit, offset int32) ([]*interfaces.AuditLog, error) {
 	args := m.Called(ctx, startTime, endTime, limit, offset)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*AuditLog), args.Error(1)
+	return args.Get(0).([]*interfaces.AuditLog), args.Error(1)
 }
 
-func (m *MockAuditRepository) GetRecentAuditLogs(ctx context.Context, limit, offset int32) ([]*AuditLog, error) {
+func (m *MockAuditRepository) GetRecentAuditLogs(ctx context.Context, limit, offset int32) ([]*interfaces.AuditLog, error) {
 	args := m.Called(ctx, limit, offset)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*AuditLog), args.Error(1)
+	return args.Get(0).([]*interfaces.AuditLog), args.Error(1)
 }
 
 func (m *MockAuditRepository) CountAuditLogs(ctx context.Context) (int64, error) {
@@ -115,7 +116,7 @@ func TestService_LogEvent(t *testing.T) {
 	userID := uuid.New()
 	ipAddr := netip.MustParseAddr("192.168.1.1")
 
-	event := AuditEvent{
+	event := interfaces.AuditEvent{
 		UserID:       userID,
 		Action:       ActionUserLogin,
 		ResourceType: ResourceTypeUser,
@@ -140,7 +141,7 @@ func TestService_LogEvent(t *testing.T) {
 		Timestamp:    time.Now(),
 	}
 
-	mockRepo.On("CreateAuditLog", ctx, mock.MatchedBy(func(params CreateAuditLogParams) bool {
+	mockRepo.On("CreateAuditLog", ctx, mock.MatchedBy(func(params interfaces.CreateAuditLogParams) bool {
 		return params.UserID == userID &&
 			params.Action == ActionUserLogin &&
 			params.ResourceType == ResourceTypeUser &&
@@ -162,7 +163,7 @@ func TestService_LogEvent_MetadataError(t *testing.T) {
 	userID := uuid.New()
 
 	// Create an event with metadata that can't be marshaled to JSON
-	event := AuditEvent{
+	event := interfaces.AuditEvent{
 		UserID: userID,
 		Action: ActionUserLogin,
 		Metadata: map[string]interface{}{
@@ -183,12 +184,12 @@ func TestService_GetUserAuditLogs(t *testing.T) {
 
 	ctx := context.Background()
 	userID := uuid.New()
-	req := GetAuditLogsRequest{
+	req := interfaces.GetAuditLogsRequest{
 		Limit:  10,
 		Offset: 0,
 	}
 
-	expectedLogs := []*AuditLog{
+	expectedLogs := []*interfaces.AuditLog{
 		{
 			ID:        uuid.New(),
 			UserID:    userID,
@@ -221,32 +222,32 @@ func TestService_GetUserAuditLogs_InvalidPagination(t *testing.T) {
 
 	tests := []struct {
 		name string
-		req  GetAuditLogsRequest
+		req  interfaces.GetAuditLogsRequest
 	}{
 		{
 			name: "zero limit",
-			req: GetAuditLogsRequest{
+			req: interfaces.GetAuditLogsRequest{
 				Limit:  0,
 				Offset: 0,
 			},
 		},
 		{
 			name: "negative limit",
-			req: GetAuditLogsRequest{
+			req: interfaces.GetAuditLogsRequest{
 				Limit:  -1,
 				Offset: 0,
 			},
 		},
 		{
 			name: "limit too large",
-			req: GetAuditLogsRequest{
+			req: interfaces.GetAuditLogsRequest{
 				Limit:  1001,
 				Offset: 0,
 			},
 		},
 		{
 			name: "negative offset",
-			req: GetAuditLogsRequest{
+			req: interfaces.GetAuditLogsRequest{
 				Limit:  10,
 				Offset: -1,
 			},
@@ -270,12 +271,12 @@ func TestService_GetAuditLogsByAction(t *testing.T) {
 
 	ctx := context.Background()
 	action := ActionUserLogin
-	req := GetAuditLogsRequest{
+	req := interfaces.GetAuditLogsRequest{
 		Limit:  10,
 		Offset: 0,
 	}
 
-	expectedLogs := []*AuditLog{
+	expectedLogs := []*interfaces.AuditLog{
 		{
 			ID:        uuid.New(),
 			UserID:    uuid.New(),
@@ -304,12 +305,12 @@ func TestService_GetAuditLogsByTimeRange(t *testing.T) {
 	ctx := context.Background()
 	startTime := time.Now().Add(-24 * time.Hour)
 	endTime := time.Now()
-	req := GetAuditLogsRequest{
+	req := interfaces.GetAuditLogsRequest{
 		Limit:  10,
 		Offset: 0,
 	}
 
-	expectedLogs := []*AuditLog{
+	expectedLogs := []*interfaces.AuditLog{
 		{
 			ID:        uuid.New(),
 			UserID:    uuid.New(),
@@ -337,7 +338,7 @@ func TestService_GetAuditLogsByTimeRange_InvalidRange(t *testing.T) {
 	ctx := context.Background()
 	startTime := time.Now()
 	endTime := time.Now().Add(-1 * time.Hour) // end time before start time
-	req := GetAuditLogsRequest{
+	req := interfaces.GetAuditLogsRequest{
 		Limit:  10,
 		Offset: 0,
 	}
@@ -409,12 +410,12 @@ func TestService_CleanupOldLogs(t *testing.T) {
 func TestAuditEvent_ToJSON(t *testing.T) {
 	tests := []struct {
 		name     string
-		event    AuditEvent
+		event    interfaces.AuditEvent
 		expected string
 	}{
 		{
 			name: "with metadata",
-			event: AuditEvent{
+			event: interfaces.AuditEvent{
 				Metadata: map[string]interface{}{
 					"key1": "value1",
 					"key2": 123,
@@ -424,14 +425,14 @@ func TestAuditEvent_ToJSON(t *testing.T) {
 		},
 		{
 			name:     "nil metadata",
-			event:    AuditEvent{},
+			event:    interfaces.AuditEvent{},
 			expected: `{}`,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := tt.event.ToJSON()
+			result, err := ToJSON(tt.event.Metadata)
 
 			require.NoError(t, err)
 
@@ -476,7 +477,7 @@ func TestAuditLog_FromJSON(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			auditLog := &AuditLog{}
-			err := auditLog.FromJSON(json.RawMessage(tt.jsonData))
+			err := FromJSON(json.RawMessage(tt.jsonData), auditLog.Metadata)
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, auditLog.Metadata)
@@ -491,12 +492,12 @@ func TestService_validatePaginationRequest(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		req     GetAuditLogsRequest
+		req     interfaces.GetAuditLogsRequest
 		wantErr bool
 	}{
 		{
 			name: "valid request",
-			req: GetAuditLogsRequest{
+			req: interfaces.GetAuditLogsRequest{
 				Limit:  10,
 				Offset: 0,
 			},
@@ -504,7 +505,7 @@ func TestService_validatePaginationRequest(t *testing.T) {
 		},
 		{
 			name: "zero limit",
-			req: GetAuditLogsRequest{
+			req: interfaces.GetAuditLogsRequest{
 				Limit:  0,
 				Offset: 0,
 			},
@@ -512,7 +513,7 @@ func TestService_validatePaginationRequest(t *testing.T) {
 		},
 		{
 			name: "negative limit",
-			req: GetAuditLogsRequest{
+			req: interfaces.GetAuditLogsRequest{
 				Limit:  -1,
 				Offset: 0,
 			},
@@ -520,7 +521,7 @@ func TestService_validatePaginationRequest(t *testing.T) {
 		},
 		{
 			name: "limit too large",
-			req: GetAuditLogsRequest{
+			req: interfaces.GetAuditLogsRequest{
 				Limit:  1001,
 				Offset: 0,
 			},
@@ -528,7 +529,7 @@ func TestService_validatePaginationRequest(t *testing.T) {
 		},
 		{
 			name: "negative offset",
-			req: GetAuditLogsRequest{
+			req: interfaces.GetAuditLogsRequest{
 				Limit:  10,
 				Offset: -1,
 			},

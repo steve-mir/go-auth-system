@@ -7,24 +7,24 @@ import (
 	"sync"
 	"time"
 
-	"github.com/steve-mir/go-auth-system/internal/service/email"
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
 )
 
 // MemoryTemplateRepository implements TemplateRepository using in-memory storage
 type MemoryTemplateRepository struct {
-	templates map[string]*email.EmailTemplate
+	templates map[string]*interfaces.EmailTemplate
 	mu        sync.RWMutex
 }
 
 // NewMemoryTemplateRepository creates a new in-memory template repository
 func NewMemoryTemplateRepository() *MemoryTemplateRepository {
 	return &MemoryTemplateRepository{
-		templates: make(map[string]*email.EmailTemplate),
+		templates: make(map[string]*interfaces.EmailTemplate),
 	}
 }
 
 // Create creates a new email template
-func (r *MemoryTemplateRepository) Create(ctx context.Context, template *email.EmailTemplate) error {
+func (r *MemoryTemplateRepository) Create(ctx context.Context, template *interfaces.EmailTemplate) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -37,12 +37,12 @@ func (r *MemoryTemplateRepository) Create(ctx context.Context, template *email.E
 }
 
 // Update updates an existing email template
-func (r *MemoryTemplateRepository) Update(ctx context.Context, template *email.EmailTemplate) error {
+func (r *MemoryTemplateRepository) Update(ctx context.Context, template *interfaces.EmailTemplate) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	if _, exists := r.templates[template.ID]; !exists {
-		return email.ErrTemplateNotFound
+		return interfaces.ErrTemplateNotFound
 	}
 
 	r.templates[template.ID] = template
@@ -50,13 +50,13 @@ func (r *MemoryTemplateRepository) Update(ctx context.Context, template *email.E
 }
 
 // GetByID retrieves a template by ID
-func (r *MemoryTemplateRepository) GetByID(ctx context.Context, id string) (*email.EmailTemplate, error) {
+func (r *MemoryTemplateRepository) GetByID(ctx context.Context, id string) (*interfaces.EmailTemplate, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
 	template, exists := r.templates[id]
 	if !exists {
-		return nil, email.ErrTemplateNotFound
+		return nil, interfaces.ErrTemplateNotFound
 	}
 
 	return template, nil
@@ -68,7 +68,7 @@ func (r *MemoryTemplateRepository) Delete(ctx context.Context, id string) error 
 	defer r.mu.Unlock()
 
 	if _, exists := r.templates[id]; !exists {
-		return email.ErrTemplateNotFound
+		return interfaces.ErrTemplateNotFound
 	}
 
 	delete(r.templates, id)
@@ -76,11 +76,11 @@ func (r *MemoryTemplateRepository) Delete(ctx context.Context, id string) error 
 }
 
 // List lists templates with optional filtering
-func (r *MemoryTemplateRepository) List(ctx context.Context, filter *email.TemplateFilter) ([]*email.EmailTemplate, error) {
+func (r *MemoryTemplateRepository) List(ctx context.Context, filter *interfaces.TemplateFilter) ([]*interfaces.EmailTemplate, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	var result []*email.EmailTemplate
+	var result []*interfaces.EmailTemplate
 
 	for _, template := range r.templates {
 		if r.matchesFilter(template, filter) {
@@ -101,7 +101,7 @@ func (r *MemoryTemplateRepository) List(ctx context.Context, filter *email.Templ
 	return result, nil
 }
 
-func (r *MemoryTemplateRepository) matchesFilter(template *email.EmailTemplate, filter *email.TemplateFilter) bool {
+func (r *MemoryTemplateRepository) matchesFilter(template *interfaces.EmailTemplate, filter *interfaces.TemplateFilter) bool {
 	if filter == nil {
 		return true
 	}
@@ -150,19 +150,19 @@ func (r *MemoryTemplateRepository) matchesFilter(template *email.EmailTemplate, 
 
 // MemoryQueueRepository implements QueueRepository using in-memory storage
 type MemoryQueueRepository struct {
-	queue map[string]*email.EmailQueue
+	queue map[string]*interfaces.EmailQueue
 	mu    sync.RWMutex
 }
 
 // NewMemoryQueueRepository creates a new in-memory queue repository
 func NewMemoryQueueRepository() *MemoryQueueRepository {
 	return &MemoryQueueRepository{
-		queue: make(map[string]*email.EmailQueue),
+		queue: make(map[string]*interfaces.EmailQueue),
 	}
 }
 
 // Enqueue adds an email to the queue
-func (r *MemoryQueueRepository) Enqueue(ctx context.Context, emailQueue *email.EmailQueue) error {
+func (r *MemoryQueueRepository) Enqueue(ctx context.Context, emailQueue *interfaces.EmailQueue) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -171,15 +171,15 @@ func (r *MemoryQueueRepository) Enqueue(ctx context.Context, emailQueue *email.E
 }
 
 // Dequeue retrieves emails from the queue
-func (r *MemoryQueueRepository) Dequeue(ctx context.Context, limit int) ([]*email.EmailQueue, error) {
+func (r *MemoryQueueRepository) Dequeue(ctx context.Context, limit int) ([]*interfaces.EmailQueue, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	var result []*email.EmailQueue
+	var result []*interfaces.EmailQueue
 	count := 0
 
 	for _, emailQueue := range r.queue {
-		if emailQueue.Status == email.StatusPending && count < limit {
+		if emailQueue.Status == interfaces.StatusPending && count < limit {
 			result = append(result, emailQueue)
 			count++
 		}
@@ -189,7 +189,7 @@ func (r *MemoryQueueRepository) Dequeue(ctx context.Context, limit int) ([]*emai
 }
 
 // Update updates an email in the queue
-func (r *MemoryQueueRepository) Update(ctx context.Context, emailQueue *email.EmailQueue) error {
+func (r *MemoryQueueRepository) Update(ctx context.Context, emailQueue *interfaces.EmailQueue) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -215,7 +215,7 @@ func (r *MemoryQueueRepository) Delete(ctx context.Context, id string) error {
 }
 
 // GetByID retrieves an email from the queue by ID
-func (r *MemoryQueueRepository) GetByID(ctx context.Context, id string) (*email.EmailQueue, error) {
+func (r *MemoryQueueRepository) GetByID(ctx context.Context, id string) (*interfaces.EmailQueue, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -228,15 +228,15 @@ func (r *MemoryQueueRepository) GetByID(ctx context.Context, id string) (*email.
 }
 
 // GetPendingRetries retrieves emails that are ready for retry
-func (r *MemoryQueueRepository) GetPendingRetries(ctx context.Context) ([]*email.EmailQueue, error) {
+func (r *MemoryQueueRepository) GetPendingRetries(ctx context.Context) ([]*interfaces.EmailQueue, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	var result []*email.EmailQueue
+	var result []*interfaces.EmailQueue
 	now := time.Now()
 
 	for _, emailQueue := range r.queue {
-		if emailQueue.Status == email.StatusPending &&
+		if emailQueue.Status == interfaces.StatusPending &&
 			emailQueue.NextRetry != nil &&
 			emailQueue.NextRetry.Before(now) {
 			result = append(result, emailQueue)
@@ -248,16 +248,16 @@ func (r *MemoryQueueRepository) GetPendingRetries(ctx context.Context) ([]*email
 
 // MemoryAnalyticsRepository implements AnalyticsRepository using in-memory storage
 type MemoryAnalyticsRepository struct {
-	statuses map[string]*email.EmailStatus
-	logs     map[string][]*email.EmailLog
+	statuses map[string]*interfaces.EmailStatus
+	logs     map[string][]*interfaces.EmailLog
 	mu       sync.RWMutex
 }
 
 // NewMemoryAnalyticsRepository creates a new in-memory analytics repository
 func NewMemoryAnalyticsRepository() *MemoryAnalyticsRepository {
 	return &MemoryAnalyticsRepository{
-		statuses: make(map[string]*email.EmailStatus),
-		logs:     make(map[string][]*email.EmailLog),
+		statuses: make(map[string]*interfaces.EmailStatus),
+		logs:     make(map[string][]*interfaces.EmailLog),
 	}
 }
 
@@ -267,9 +267,9 @@ func (r *MemoryAnalyticsRepository) RecordEmailSent(ctx context.Context, emailID
 	defer r.mu.Unlock()
 
 	now := time.Now()
-	r.statuses[emailID] = &email.EmailStatus{
+	r.statuses[emailID] = &interfaces.EmailStatus{
 		ID:       emailID,
-		Status:   email.StatusSent,
+		Status:   interfaces.StatusSent,
 		SentAt:   &now,
 		Metadata: metadata,
 	}
@@ -284,7 +284,7 @@ func (r *MemoryAnalyticsRepository) RecordEmailDelivered(ctx context.Context, em
 
 	if status, exists := r.statuses[emailID]; exists {
 		now := time.Now()
-		status.Status = email.StatusDelivered
+		status.Status = interfaces.StatusDelivered
 		status.DeliveredAt = &now
 	}
 
@@ -298,7 +298,7 @@ func (r *MemoryAnalyticsRepository) RecordEmailOpened(ctx context.Context, email
 
 	if status, exists := r.statuses[emailID]; exists {
 		now := time.Now()
-		status.Status = email.StatusOpened
+		status.Status = interfaces.StatusOpened
 		status.OpenedAt = &now
 	}
 
@@ -312,7 +312,7 @@ func (r *MemoryAnalyticsRepository) RecordEmailClicked(ctx context.Context, emai
 
 	if status, exists := r.statuses[emailID]; exists {
 		now := time.Now()
-		status.Status = email.StatusClicked
+		status.Status = interfaces.StatusClicked
 		status.ClickedAt = &now
 	}
 
@@ -326,7 +326,7 @@ func (r *MemoryAnalyticsRepository) RecordEmailBounced(ctx context.Context, emai
 
 	if status, exists := r.statuses[emailID]; exists {
 		now := time.Now()
-		status.Status = email.StatusBounced
+		status.Status = interfaces.StatusBounced
 		status.BouncedAt = &now
 		status.Error = reason
 	}
@@ -335,7 +335,7 @@ func (r *MemoryAnalyticsRepository) RecordEmailBounced(ctx context.Context, emai
 }
 
 // GetEmailStatus retrieves the status of an email
-func (r *MemoryAnalyticsRepository) GetEmailStatus(ctx context.Context, emailID string) (*email.EmailStatus, error) {
+func (r *MemoryAnalyticsRepository) GetEmailStatus(ctx context.Context, emailID string) (*interfaces.EmailStatus, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -348,24 +348,25 @@ func (r *MemoryAnalyticsRepository) GetEmailStatus(ctx context.Context, emailID 
 }
 
 // GetAnalytics retrieves email analytics
-func (r *MemoryAnalyticsRepository) GetAnalytics(ctx context.Context, filter *email.AnalyticsFilter) (*email.EmailAnalytics, error) {
+func (r *MemoryAnalyticsRepository) GetAnalytics(ctx context.Context, filter *interfaces.AnalyticsFilter) (*interfaces.EmailAnalytics, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	analytics := &email.EmailAnalytics{}
+	analytics := &interfaces.EmailAnalytics{}
 
 	for _, status := range r.statuses {
 		if r.matchesAnalyticsFilter(status, filter) {
 			analytics.TotalSent++
 
+			// TODO: Fix
 			switch status.Status {
-			case email.StatusDelivered, email.StatusOpened, email.StatusClicked:
+			case interfaces.StatusDelivered: //, interfaces.StatusOpened, interfaces.StatusClicked:
 				analytics.TotalDelivered++
-			case email.StatusOpened, email.StatusClicked:
+			case interfaces.StatusOpened: //, interfaces.StatusClicked:
 				analytics.TotalOpened++
-			case email.StatusClicked:
+			case interfaces.StatusClicked:
 				analytics.TotalClicked++
-			case email.StatusBounced:
+			case interfaces.StatusBounced:
 				analytics.TotalBounced++
 			}
 		}
@@ -388,7 +389,7 @@ func (r *MemoryAnalyticsRepository) GetAnalytics(ctx context.Context, filter *em
 	return analytics, nil
 }
 
-func (r *MemoryAnalyticsRepository) matchesAnalyticsFilter(status *email.EmailStatus, filter *email.AnalyticsFilter) bool {
+func (r *MemoryAnalyticsRepository) matchesAnalyticsFilter(status *interfaces.EmailStatus, filter *interfaces.AnalyticsFilter) bool {
 	if filter == nil {
 		return true
 	}

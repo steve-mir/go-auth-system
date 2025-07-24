@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
 	"github.com/steve-mir/go-auth-system/internal/repository/postgres/db"
 )
 
@@ -25,7 +26,7 @@ func NewPostgresRepository(queries *db.Queries) AuditRepository {
 }
 
 // CreateAuditLog creates a new audit log entry
-func (r *postgresRepository) CreateAuditLog(ctx context.Context, params CreateAuditLogParams) (*AuditLog, error) {
+func (r *postgresRepository) CreateAuditLog(ctx context.Context, params interfaces.CreateAuditLogParams) (*interfaces.AuditLog, error) {
 	// Convert metadata to JSON
 	var metadataJSON json.RawMessage
 	if params.Metadata != nil {
@@ -75,7 +76,7 @@ func (r *postgresRepository) CreateAuditLog(ctx context.Context, params CreateAu
 }
 
 // GetAuditLogByID retrieves an audit log by ID
-func (r *postgresRepository) GetAuditLogByID(ctx context.Context, id uuid.UUID) (*AuditLog, error) {
+func (r *postgresRepository) GetAuditLogByID(ctx context.Context, id uuid.UUID) (*interfaces.AuditLog, error) {
 	dbAuditLog, err := r.queries.GetAuditLogByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get audit log by ID: %w", err)
@@ -90,7 +91,7 @@ func (r *postgresRepository) GetAuditLogByID(ctx context.Context, id uuid.UUID) 
 }
 
 // GetUserAuditLogs retrieves audit logs for a user with pagination
-func (r *postgresRepository) GetUserAuditLogs(ctx context.Context, userID uuid.UUID, limit, offset int32) ([]*AuditLog, error) {
+func (r *postgresRepository) GetUserAuditLogs(ctx context.Context, userID uuid.UUID, limit, offset int32) ([]*interfaces.AuditLog, error) {
 	params := db.GetUserAuditLogsParams{
 		UserID: userID,
 		Limit:  limit,
@@ -102,7 +103,7 @@ func (r *postgresRepository) GetUserAuditLogs(ctx context.Context, userID uuid.U
 		return nil, fmt.Errorf("failed to get user audit logs: %w", err)
 	}
 
-	auditLogs := make([]*AuditLog, len(dbAuditLogs))
+	auditLogs := make([]*interfaces.AuditLog, len(dbAuditLogs))
 	for i, dbLog := range dbAuditLogs {
 		auditLog, err := r.convertFromDB(dbLog)
 		if err != nil {
@@ -115,7 +116,7 @@ func (r *postgresRepository) GetUserAuditLogs(ctx context.Context, userID uuid.U
 }
 
 // GetAuditLogsByAction retrieves audit logs by action with pagination
-func (r *postgresRepository) GetAuditLogsByAction(ctx context.Context, action string, limit, offset int32) ([]*AuditLog, error) {
+func (r *postgresRepository) GetAuditLogsByAction(ctx context.Context, action string, limit, offset int32) ([]*interfaces.AuditLog, error) {
 	params := db.GetAuditLogsByActionParams{
 		Action: action,
 		Limit:  limit,
@@ -127,7 +128,7 @@ func (r *postgresRepository) GetAuditLogsByAction(ctx context.Context, action st
 		return nil, fmt.Errorf("failed to get audit logs by action: %w", err)
 	}
 
-	auditLogs := make([]*AuditLog, len(dbAuditLogs))
+	auditLogs := make([]*interfaces.AuditLog, len(dbAuditLogs))
 	for i, dbLog := range dbAuditLogs {
 		auditLog, err := r.convertFromDB(dbLog)
 		if err != nil {
@@ -140,7 +141,7 @@ func (r *postgresRepository) GetAuditLogsByAction(ctx context.Context, action st
 }
 
 // GetAuditLogsByResource retrieves audit logs by resource with pagination
-func (r *postgresRepository) GetAuditLogsByResource(ctx context.Context, resourceType, resourceID string, limit, offset int32) ([]*AuditLog, error) {
+func (r *postgresRepository) GetAuditLogsByResource(ctx context.Context, resourceType, resourceID string, limit, offset int32) ([]*interfaces.AuditLog, error) {
 	params := db.GetAuditLogsByResourceParams{
 		ResourceType: pgtype.Text{String: resourceType, Valid: true},
 		ResourceID:   pgtype.Text{String: resourceID, Valid: true},
@@ -153,7 +154,7 @@ func (r *postgresRepository) GetAuditLogsByResource(ctx context.Context, resourc
 		return nil, fmt.Errorf("failed to get audit logs by resource: %w", err)
 	}
 
-	auditLogs := make([]*AuditLog, len(dbAuditLogs))
+	auditLogs := make([]*interfaces.AuditLog, len(dbAuditLogs))
 	for i, dbLog := range dbAuditLogs {
 		auditLog, err := r.convertFromDB(dbLog)
 		if err != nil {
@@ -166,7 +167,7 @@ func (r *postgresRepository) GetAuditLogsByResource(ctx context.Context, resourc
 }
 
 // GetAuditLogsByTimeRange retrieves audit logs within time range with pagination
-func (r *postgresRepository) GetAuditLogsByTimeRange(ctx context.Context, startTime, endTime time.Time, limit, offset int32) ([]*AuditLog, error) {
+func (r *postgresRepository) GetAuditLogsByTimeRange(ctx context.Context, startTime, endTime time.Time, limit, offset int32) ([]*interfaces.AuditLog, error) {
 	params := db.GetAuditLogsByTimeRangeParams{
 		Timestamp:   pgtype.Timestamp{Time: startTime, Valid: true},
 		Timestamp_2: pgtype.Timestamp{Time: endTime, Valid: true},
@@ -179,7 +180,7 @@ func (r *postgresRepository) GetAuditLogsByTimeRange(ctx context.Context, startT
 		return nil, fmt.Errorf("failed to get audit logs by time range: %w", err)
 	}
 
-	auditLogs := make([]*AuditLog, len(dbAuditLogs))
+	auditLogs := make([]*interfaces.AuditLog, len(dbAuditLogs))
 	for i, dbLog := range dbAuditLogs {
 		auditLog, err := r.convertFromDB(dbLog)
 		if err != nil {
@@ -192,7 +193,7 @@ func (r *postgresRepository) GetAuditLogsByTimeRange(ctx context.Context, startT
 }
 
 // GetRecentAuditLogs retrieves recent audit logs with pagination
-func (r *postgresRepository) GetRecentAuditLogs(ctx context.Context, limit, offset int32) ([]*AuditLog, error) {
+func (r *postgresRepository) GetRecentAuditLogs(ctx context.Context, limit, offset int32) ([]*interfaces.AuditLog, error) {
 	params := db.GetRecentAuditLogsParams{
 		Limit:  limit,
 		Offset: offset,
@@ -203,7 +204,7 @@ func (r *postgresRepository) GetRecentAuditLogs(ctx context.Context, limit, offs
 		return nil, fmt.Errorf("failed to get recent audit logs: %w", err)
 	}
 
-	auditLogs := make([]*AuditLog, len(dbAuditLogs))
+	auditLogs := make([]*interfaces.AuditLog, len(dbAuditLogs))
 	for i, dbLog := range dbAuditLogs {
 		auditLog, err := r.convertFromDB(dbLog)
 		if err != nil {
@@ -253,8 +254,8 @@ func (r *postgresRepository) DeleteOldAuditLogs(ctx context.Context, olderThan t
 }
 
 // convertFromDB converts a database audit log to service model
-func (r *postgresRepository) convertFromDB(dbLog db.AuditLog) (*AuditLog, error) {
-	auditLog := &AuditLog{
+func (r *postgresRepository) convertFromDB(dbLog db.AuditLog) (*interfaces.AuditLog, error) {
+	auditLog := &interfaces.AuditLog{
 		ID:     dbLog.ID,
 		UserID: dbLog.UserID,
 		Action: dbLog.Action,

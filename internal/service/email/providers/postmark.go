@@ -4,16 +4,16 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/steve-mir/go-auth-system/internal/service/email"
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
 )
 
 // PostmarkProvider implements email sending via Postmark API
 type PostmarkProvider struct {
-	config *email.PostmarkConfig
+	config *interfaces.PostmarkConfig
 }
 
 // NewPostmarkProvider creates a new Postmark provider
-func NewPostmarkProvider(config *email.PostmarkConfig) (*PostmarkProvider, error) {
+func NewPostmarkProvider(config *interfaces.PostmarkConfig) (*PostmarkProvider, error) {
 	if config == nil || config.APIKey == "" {
 		return nil, fmt.Errorf("Postmark API key is required")
 	}
@@ -24,7 +24,7 @@ func NewPostmarkProvider(config *email.PostmarkConfig) (*PostmarkProvider, error
 }
 
 // SendEmail sends an email via Postmark API
-func (p *PostmarkProvider) SendEmail(ctx context.Context, req *email.SendEmailRequest) error {
+func (p *PostmarkProvider) SendEmail(ctx context.Context, req *interfaces.SendEmailRequest) error {
 	// TODO: Implement Postmark API integration
 	return fmt.Errorf("Postmark provider not yet implemented")
 }
@@ -41,6 +41,6 @@ func (p *PostmarkProvider) GetName() string {
 }
 
 // GetType returns the provider type
-func (p *PostmarkProvider) GetType() email.EmailProvider {
-	return email.ProviderPostmark
+func (p *PostmarkProvider) GetType() interfaces.EmailProvider {
+	return interfaces.ProviderPostmark
 }

@@ -5,30 +5,31 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
 )
 
 // AuditService defines the interface for audit logging operations
 type AuditService interface {
 	// LogEvent logs an audit event with the provided details
-	LogEvent(ctx context.Context, event AuditEvent) error
+	LogEvent(ctx context.Context, event interfaces.AuditEvent) error
 
 	// GetUserAuditLogs retrieves audit logs for a specific user with pagination
-	GetUserAuditLogs(ctx context.Context, userID uuid.UUID, req GetAuditLogsRequest) (*GetAuditLogsResponse, error)
+	GetUserAuditLogs(ctx context.Context, userID uuid.UUID, req interfaces.GetAuditLogsRequest) (*interfaces.GetAuditLogsResponse, error)
 
 	// GetAuditLogsByAction retrieves audit logs filtered by action with pagination
-	GetAuditLogsByAction(ctx context.Context, action string, req GetAuditLogsRequest) (*GetAuditLogsResponse, error)
+	GetAuditLogsByAction(ctx context.Context, action string, req interfaces.GetAuditLogsRequest) (*interfaces.GetAuditLogsResponse, error)
 
 	// GetAuditLogsByResource retrieves audit logs for a specific resource with pagination
-	GetAuditLogsByResource(ctx context.Context, resourceType, resourceID string, req GetAuditLogsRequest) (*GetAuditLogsResponse, error)
+	GetAuditLogsByResource(ctx context.Context, resourceType, resourceID string, req interfaces.GetAuditLogsRequest) (*interfaces.GetAuditLogsResponse, error)
 
 	// GetAuditLogsByTimeRange retrieves audit logs within a time range with pagination
-	GetAuditLogsByTimeRange(ctx context.Context, startTime, endTime time.Time, req GetAuditLogsRequest) (*GetAuditLogsResponse, error)
+	GetAuditLogsByTimeRange(ctx context.Context, startTime, endTime time.Time, req interfaces.GetAuditLogsRequest) (*interfaces.GetAuditLogsResponse, error)
 
 	// GetRecentAuditLogs retrieves the most recent audit logs with pagination
-	GetRecentAuditLogs(ctx context.Context, req GetAuditLogsRequest) (*GetAuditLogsResponse, error)
+	GetRecentAuditLogs(ctx context.Context, req interfaces.GetAuditLogsRequest) (*interfaces.GetAuditLogsResponse, error)
 
 	// GetAuditLogByID retrieves a specific audit log by ID
-	GetAuditLogByID(ctx context.Context, id uuid.UUID) (*AuditLog, error)
+	GetAuditLogByID(ctx context.Context, id uuid.UUID) (*interfaces.AuditLog, error)
 
 	// CountAuditLogs returns the total count of audit logs
 	CountAuditLogs(ctx context.Context) (int64, error)
@@ -46,25 +47,25 @@ type AuditService interface {
 // AuditRepository defines the interface for audit data access
 type AuditRepository interface {
 	// CreateAuditLog creates a new audit log entry
-	CreateAuditLog(ctx context.Context, params CreateAuditLogParams) (*AuditLog, error)
+	CreateAuditLog(ctx context.Context, params interfaces.CreateAuditLogParams) (*interfaces.AuditLog, error)
 
 	// GetAuditLogByID retrieves an audit log by ID
-	GetAuditLogByID(ctx context.Context, id uuid.UUID) (*AuditLog, error)
+	GetAuditLogByID(ctx context.Context, id uuid.UUID) (*interfaces.AuditLog, error)
 
 	// GetUserAuditLogs retrieves audit logs for a user with pagination
-	GetUserAuditLogs(ctx context.Context, userID uuid.UUID, limit, offset int32) ([]*AuditLog, error)
+	GetUserAuditLogs(ctx context.Context, userID uuid.UUID, limit, offset int32) ([]*interfaces.AuditLog, error)
 
 	// GetAuditLogsByAction retrieves audit logs by action with pagination
-	GetAuditLogsByAction(ctx context.Context, action string, limit, offset int32) ([]*AuditLog, error)
+	GetAuditLogsByAction(ctx context.Context, action string, limit, offset int32) ([]*interfaces.AuditLog, error)
 
 	// GetAuditLogsByResource retrieves audit logs by resource with pagination
-	GetAuditLogsByResource(ctx context.Context, resourceType, resourceID string, limit, offset int32) ([]*AuditLog, error)
+	GetAuditLogsByResource(ctx context.Context, resourceType, resourceID string, limit, offset int32) ([]*interfaces.AuditLog, error)
 
 	// GetAuditLogsByTimeRange retrieves audit logs within time range with pagination
-	GetAuditLogsByTimeRange(ctx context.Context, startTime, endTime time.Time, limit, offset int32) ([]*AuditLog, error)
+	GetAuditLogsByTimeRange(ctx context.Context, startTime, endTime time.Time, limit, offset int32) ([]*interfaces.AuditLog, error)
 
 	// GetRecentAuditLogs retrieves recent audit logs with pagination
-	GetRecentAuditLogs(ctx context.Context, limit, offset int32) ([]*AuditLog, error)
+	GetRecentAuditLogs(ctx context.Context, limit, offset int32) ([]*interfaces.AuditLog, error)
 
 	// CountAuditLogs returns total count of audit logs
 	CountAuditLogs(ctx context.Context) (int64, error)

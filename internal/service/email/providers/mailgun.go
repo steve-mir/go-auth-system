@@ -4,16 +4,16 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/steve-mir/go-auth-system/internal/service/email"
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
 )
 
 // MailgunProvider implements email sending via Mailgun API
 type MailgunProvider struct {
-	config *email.MailgunConfig
+	config *interfaces.MailgunConfig
 }
 
 // NewMailgunProvider creates a new Mailgun provider
-func NewMailgunProvider(config *email.MailgunConfig) (*MailgunProvider, error) {
+func NewMailgunProvider(config *interfaces.MailgunConfig) (*MailgunProvider, error) {
 	if config == nil || config.APIKey == "" {
 		return nil, fmt.Errorf("Mailgun API key is required")
 	}
@@ -24,7 +24,7 @@ func NewMailgunProvider(config *email.MailgunConfig) (*MailgunProvider, error) {
 }
 
 // SendEmail sends an email via Mailgun API
-func (p *MailgunProvider) SendEmail(ctx context.Context, req *email.SendEmailRequest) error {
+func (p *MailgunProvider) SendEmail(ctx context.Context, req *interfaces.SendEmailRequest) error {
 	// TODO: Implement Mailgun API integration
 	return fmt.Errorf("Mailgun provider not yet implemented")
 }
@@ -41,6 +41,6 @@ func (p *MailgunProvider) GetName() string {
 }
 
 // GetType returns the provider type
-func (p *MailgunProvider) GetType() email.EmailProvider {
-	return email.ProviderMailgun
+func (p *MailgunProvider) GetType() interfaces.EmailProvider {
+	return interfaces.ProviderMailgun
 }

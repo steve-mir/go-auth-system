@@ -2,10 +2,47 @@ package interfaces
 
 import (
 	"context"
+	"net/netip"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+// AuditService defines the interface for audit logging operations
+type AuditService interface {
+	// LogEvent logs an audit event with the provided details
+	LogEvent(ctx context.Context, event AuditEvent) error
+
+	// GetUserAuditLogs retrieves audit logs for a specific user with pagination
+	GetUserAuditLogs(ctx context.Context, userID uuid.UUID, req GetAuditLogsRequest) (*GetAuditLogsResponse, error)
+
+	// GetAuditLogsByAction retrieves audit logs filtered by action with pagination
+	GetAuditLogsByAction(ctx context.Context, action string, req GetAuditLogsRequest) (*GetAuditLogsResponse, error)
+
+	// GetAuditLogsByResource retrieves audit logs for a specific resource with pagination
+	GetAuditLogsByResource(ctx context.Context, resourceType, resourceID string, req GetAuditLogsRequest) (*GetAuditLogsResponse, error)
+
+	// GetAuditLogsByTimeRange retrieves audit logs within a time range with pagination
+	GetAuditLogsByTimeRange(ctx context.Context, startTime, endTime time.Time, req GetAuditLogsRequest) (*GetAuditLogsResponse, error)
+
+	// GetRecentAuditLogs retrieves the most recent audit logs with pagination
+	GetRecentAuditLogs(ctx context.Context, req GetAuditLogsRequest) (*GetAuditLogsResponse, error)
+
+	// GetAuditLogByID retrieves a specific audit log by ID
+	GetAuditLogByID(ctx context.Context, id uuid.UUID) (*AuditLog, error)
+
+	// CountAuditLogs returns the total count of audit logs
+	CountAuditLogs(ctx context.Context) (int64, error)
+
+	// CountUserAuditLogs returns the count of audit logs for a specific user
+	CountUserAuditLogs(ctx context.Context, userID uuid.UUID) (int64, error)
+
+	// CountAuditLogsByAction returns the count of audit logs for a specific action
+	CountAuditLogsByAction(ctx context.Context, action string) (int64, error)
+
+	// CleanupOldLogs removes audit logs older than the specified time
+	CleanupOldLogs(ctx context.Context, olderThan time.Time) error
+}
 
 // UserService interface - extracted from user package
 type UserService interface {
@@ -38,6 +75,51 @@ type RoleService interface {
 	GetEffectivePermissions(ctx context.Context, userID uuid.UUID) ([]Permission, error)
 	CheckResourceAccess(ctx context.Context, userID uuid.UUID, resource string, actions []string) (map[string]bool, error)
 	ValidateRoleHierarchy(ctx context.Context, userID uuid.UUID, requiredRole string) (bool, error)
+}
+
+// SessionRepository defines the interface for session data access
+type SessionRepository interface {
+	GetAllSessions(ctx context.Context, req *GetSessionsRequest) ([]UserSession, int64, error)
+	DeleteSession(ctx context.Context, sessionID uuid.UUID) error
+	GetSessionByID(ctx context.Context, sessionID uuid.UUID) (*UserSession, error)
+	GetUserSessions(ctx context.Context, userID uuid.UUID) ([]UserSession, error)
+	DeleteUserSessions(ctx context.Context, userID uuid.UUID) error
+	GetActiveSessionsCount(ctx context.Context) (int64, error)
+	CleanupExpiredSessions(ctx context.Context) error
+}
+
+// GetAlertsRequest represents a request to get alerts with filtering
+type GetAlertsRequest struct {
+	Page      int       `json:"page" validate:"omitempty,gte=1"`
+	Limit     int       `json:"limit" validate:"omitempty,gte=1,lte=100"`
+	Type      string    `json:"type,omitempty"`
+	Source    string    `json:"source,omitempty"`
+	Severity  string    `json:"severity,omitempty"`
+	IsActive  *bool     `json:"is_active,omitempty"`
+	StartTime time.Time `json:"start_time,omitempty"`
+	EndTime   time.Time `json:"end_time,omitempty"`
+	SortBy    string    `json:"sort_by,omitempty"`
+	SortOrder string    `json:"sort_order,omitempty"`
+}
+
+// AlertRepository defines the interface for alert data access
+type AlertRepository interface {
+	CreateAlert(ctx context.Context, alert *Alert) error
+	GetAlertByID(ctx context.Context, alertID uuid.UUID) (*Alert, error)
+	GetActiveAlerts(ctx context.Context) ([]Alert, error)
+	GetAlerts(ctx context.Context, req *GetAlertsRequest) ([]Alert, int64, error)
+	UpdateAlert(ctx context.Context, alert *Alert) error
+	DeleteAlert(ctx context.Context, alertID uuid.UUID) error
+	GetAlertsByType(ctx context.Context, alertType string) ([]Alert, error)
+	GetAlertsBySeverity(ctx context.Context, severity string) ([]Alert, error)
+	MarkAlertResolved(ctx context.Context, alertID uuid.UUID) error
+}
+
+// NotificationRepository defines the interface for notification settings data access
+type NotificationRepository interface {
+	GetNotificationSettings(ctx context.Context) (*NotificationSettings, error)
+	UpdateNotificationSettings(ctx context.Context, req *UpdateNotificationSettingsRequest) error
+	CreateNotificationSettings(ctx context.Context, settings *NotificationSettings) error
 }
 
 // EmailService defines the interface for email operations
@@ -341,10 +423,16 @@ type BulkRoleAssignRequest struct {
 	Reason  string      `json:"reason,omitempty"`
 }
 
+//	type GetAuditLogsRequest struct {
+//		Limit  int32 `json:"limit"`
+//		Offset int32 `json:"offset"`
+//	}
+//
 // GetAuditLogsRequest represents a request to get audit logs
 type GetAuditLogsRequest struct {
-	Page         int       `json:"page" validate:"omitempty,gte=1"`
-	Limit        int       `json:"limit" validate:"omitempty,gte=1,lte=100"`
+	Page         int32     `json:"page" validate:"omitempty,gte=1"`
+	Limit        int32     `json:"limit" validate:"omitempty,gte=1,lte=100"`
+	Offset       int32     `json:"offset"`
 	UserID       string    `json:"user_id,omitempty"`
 	Action       string    `json:"action,omitempty"`
 	ResourceType string    `json:"resource_type,omitempty"`
@@ -355,9 +443,16 @@ type GetAuditLogsRequest struct {
 }
 
 // GetAuditLogsResponse represents the response for getting audit logs
+//
+//	type GetAuditLogsResponse struct {
+//		Logs       []AuditLog     `json:"logs"`
+//		Pagination PaginationInfo `json:"pagination"`
+//	}
 type GetAuditLogsResponse struct {
-	Logs       []AuditLog     `json:"logs"`
-	Pagination PaginationInfo `json:"pagination"`
+	AuditLogs  []*AuditLog `json:"audit_logs"`
+	TotalCount int64       `json:"total_count"`
+	Limit      int32       `json:"limit"`
+	Offset     int32       `json:"offset"`
 }
 
 // AuditLog represents an audit log entry
@@ -367,7 +462,7 @@ type AuditLog struct {
 	Action       string                 `json:"action"`
 	ResourceType string                 `json:"resource_type,omitempty"`
 	ResourceID   string                 `json:"resource_id,omitempty"`
-	IPAddress    string                 `json:"ip_address,omitempty"`
+	IPAddress    *netip.Addr            `json:"ip_address,omitempty"`
 	UserAgent    string                 `json:"user_agent,omitempty"`
 	Metadata     map[string]interface{} `json:"metadata,omitempty"`
 	Timestamp    time.Time              `json:"timestamp"`
@@ -388,12 +483,41 @@ type GetAuditEventsResponse struct {
 	Pagination PaginationInfo `json:"pagination"`
 }
 
+// CreateAuditLogParams represents parameters for creating an audit log
+type CreateAuditLogParams struct {
+	UserID       uuid.UUID              `json:"user_id"`
+	Action       string                 `json:"action"`
+	ResourceType string                 `json:"resource_type,omitempty"`
+	ResourceID   string                 `json:"resource_id,omitempty"`
+	IPAddress    *netip.Addr            `json:"ip_address,omitempty"`
+	UserAgent    string                 `json:"user_agent,omitempty"`
+	Metadata     map[string]interface{} `json:"metadata,omitempty"`
+}
+
 // AuditEvent represents an audit event summary
 type AuditEvent struct {
-	EventType string    `json:"event_type"`
-	Count     int64     `json:"count"`
-	LastSeen  time.Time `json:"last_seen"`
+	EventType    string                 `json:"event_type"`
+	Count        int64                  `json:"count"`
+	LastSeen     time.Time              `json:"last_seen"`
+	Metadata     map[string]interface{} `json:"metadata,omitempty"`
+	UserID       uuid.UUID              `json:"user_id"`
+	Action       string                 `json:"action"`
+	ResourceType string                 `json:"resource_type,omitempty"`
+	ResourceID   string                 `json:"resource_id,omitempty"`
+	IPAddress    *netip.Addr            `json:"ip_address,omitempty"`
+	UserAgent    string                 `json:"user_agent,omitempty"`
 }
+
+// AuditEvent represents an event to be logged in the audit trail
+// type AuditEvent struct {
+// 	UserID       uuid.UUID              `json:"user_id"`
+// 	Action       string                 `json:"action"`
+// 	ResourceType string                 `json:"resource_type,omitempty"`
+// 	ResourceID   string                 `json:"resource_id,omitempty"`
+// 	IPAddress    *netip.Addr            `json:"ip_address,omitempty"`
+// 	UserAgent    string                 `json:"user_agent,omitempty"`
+// 	Metadata     map[string]interface{} `json:"metadata,omitempty"`
+// }
 
 // ConfigurationResponse represents the current configuration
 type ConfigurationResponse struct {
