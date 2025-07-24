@@ -1,0 +1,465 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Go Auth System - Comprehensive Monitoring",
+    "tags": ["go-auth-system", "authentication", "monitoring"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "System Overview",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up{job=\"go-auth-system\"}",
+            "legendFormat": "System Status"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "green", "value": 1}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "HTTP Request Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{job=\"go-auth-system\"}[5m])",
+            "legendFormat": "{{method}} {{endpoint}}"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Requests/sec",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 6, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "HTTP Response Status Codes",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum by (status_code) (rate(http_requests_total{job=\"go-auth-system\"}[5m]))",
+            "legendFormat": "{{status_code}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0}
+      },
+      {
+        "id": 4,
+        "title": "Authentication Metrics",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(auth_attempts_total{job=\"go-auth-system\"}[5m])",
+            "legendFormat": "{{method}} - {{result}}"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Attempts/sec",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 5,
+        "title": "Authentication Success Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(auth_successes_total{job=\"go-auth-system\"}[5m]) / rate(auth_attempts_total{job=\"go-auth-system\"}[5m]) * 100",
+            "legendFormat": "Success Rate %"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 70},
+                {"color": "green", "value": 90}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 8}
+      },
+      {
+        "id": 6,
+        "title": "MFA Metrics",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(mfa_attempts_total{job=\"go-auth-system\"}[5m])",
+            "legendFormat": "{{method}} - Attempts"
+          },
+          {
+            "expr": "rate(mfa_successes_total{job=\"go-auth-system\"}[5m])",
+            "legendFormat": "{{method}} - Successes"
+          },
+          {
+            "expr": "rate(mfa_failures_total{job=\"go-auth-system\"}[5m])",
+            "legendFormat": "{{method}} - Failures"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Events/sec",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 18, "y": 8}
+      },
+      {
+        "id": 7,
+        "title": "Database Performance",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(database_query_duration_seconds_bucket{job=\"go-auth-system\"}[5m]))",
+            "legendFormat": "95th percentile"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(database_query_duration_seconds_bucket{job=\"go-auth-system\"}[5m]))",
+            "legendFormat": "50th percentile"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Duration (seconds)",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+      },
+      {
+        "id": 8,
+        "title": "Database Connections",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "database_connections{job=\"go-auth-system\",state=\"active\"}",
+            "legendFormat": "Active"
+          },
+          {
+            "expr": "database_connections{job=\"go-auth-system\",state=\"idle\"}",
+            "legendFormat": "Idle"
+          },
+          {
+            "expr": "database_connections{job=\"go-auth-system\",state=\"max\"}",
+            "legendFormat": "Max"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Connections",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+      },
+      {
+        "id": 9,
+        "title": "Cache Performance",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(cache_hits_total{job=\"go-auth-system\"}[5m])",
+            "legendFormat": "{{cache_type}} - Hits"
+          },
+          {
+            "expr": "rate(cache_misses_total{job=\"go-auth-system\"}[5m])",
+            "legendFormat": "{{cache_type}} - Misses"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Operations/sec",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24}
+      },
+      {
+        "id": 10,
+        "title": "Cache Hit Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(cache_hits_total{job=\"go-auth-system\"}[5m]) / (rate(cache_hits_total{job=\"go-auth-system\"}[5m]) + rate(cache_misses_total{job=\"go-auth-system\"}[5m])) * 100",
+            "legendFormat": "Hit Rate %"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 70},
+                {"color": "green", "value": 90}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 24}
+      },
+      {
+        "id": 11,
+        "title": "Error Rate by Category",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(errors_total{job=\"go-auth-system\"}[5m])",
+            "legendFormat": "{{category}} - {{severity}}"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Errors/sec",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 18, "y": 24}
+      },
+      {
+        "id": 12,
+        "title": "Active Sessions",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "active_sessions{job=\"go-auth-system\"}",
+            "legendFormat": "{{session_type}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 0, "y": 32}
+      },
+      {
+        "id": 13,
+        "title": "User Activity",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(user_registrations_total{job=\"go-auth-system\"}[5m])",
+            "legendFormat": "Registrations"
+          },
+          {
+            "expr": "rate(user_logins_total{job=\"go-auth-system\"}[5m])",
+            "legendFormat": "Logins"
+          },
+          {
+            "expr": "rate(user_logouts_total{job=\"go-auth-system\"}[5m])",
+            "legendFormat": "Logouts"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Events/sec",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 6, "y": 32}
+      },
+      {
+        "id": 14,
+        "title": "Rate Limiting",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(rate_limit_hits_total{job=\"go-auth-system\"}[5m])",
+            "legendFormat": "{{limiter_type}} - Hits"
+          },
+          {
+            "expr": "rate(rate_limit_blocks_total{job=\"go-auth-system\"}[5m])",
+            "legendFormat": "{{limiter_type}} - Blocks"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Events/sec",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 18, "y": 32}
+      },
+      {
+        "id": 15,
+        "title": "Security Events",
+        "type": "logs",
+        "targets": [
+          {
+            "expr": "{job=\"go-auth-system\"} |= \"security_event\"",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "showTime": true,
+          "showLabels": false,
+          "showCommonLabels": false,
+          "wrapLogMessage": false,
+          "prettifyLogMessage": false,
+          "enableLogDetails": true,
+          "dedupStrategy": "none",
+          "sortOrder": "Descending"
+        },
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 40}
+      },
+      {
+        "id": 16,
+        "title": "Top Errors",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "topk(10, sum by (error_message) (rate(errors_total{job=\"go-auth-system\"}[5m])))",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true,
+                "__name__": true,
+                "job": true
+              },
+              "renameByName": {
+                "error_message": "Error Message",
+                "Value": "Rate (errors/sec)"
+              }
+            }
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 48}
+      },
+      {
+        "id": 17,
+        "title": "Response Time Distribution",
+        "type": "heatmap",
+        "targets": [
+          {
+            "expr": "sum(rate(http_duration_seconds_bucket{job=\"go-auth-system\"}[5m])) by (le)",
+            "format": "heatmap",
+            "legendFormat": "{{le}}"
+          }
+        ],
+        "heatmap": {
+          "xAxis": {
+            "show": true
+          },
+          "yAxis": {
+            "show": true,
+            "logBase": 1,
+            "min": "auto",
+            "max": "auto"
+          },
+          "yBucketBound": "auto"
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 48}
+      },
+      {
+        "id": 18,
+        "title": "System Health Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "system_health{job=\"go-auth-system\"}",
+            "legendFormat": "{{component}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "green", "value": 1}
+              ]
+            },
+            "mappings": [
+              {
+                "options": {
+                  "0": {"text": "Unhealthy"},
+                  "1": {"text": "Healthy"}
+                },
+                "type": "value"
+              }
+            ]
+          }
+        },
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 56}
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "instance",
+          "type": "query",
+          "query": "label_values(up{job=\"go-auth-system\"}, instance)",
+          "refresh": 1,
+          "includeAll": true,
+          "multi": true
+        },
+        {
+          "name": "method",
+          "type": "query",
+          "query": "label_values(http_requests_total{job=\"go-auth-system\"}, method)",
+          "refresh": 1,
+          "includeAll": true,
+          "multi": true
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "name": "Deployments",
+          "datasource": "prometheus",
+          "expr": "changes(up{job=\"go-auth-system\"}[1m]) > 0",
+          "titleFormat": "Deployment",
+          "textFormat": "Service restarted"
+        }
+      ]
+    }
+  }
+}

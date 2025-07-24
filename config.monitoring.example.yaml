@@ -1,0 +1,379 @@
+# Go Auth System - Comprehensive Monitoring Configuration Example
+# This file demonstrates how to configure the monitoring system for optimal performance
+
+# Server configuration
+server:
+  host: "0.0.0.0"
+  port: 8080
+  environment: "production"
+  read_timeout: "30s"
+  write_timeout: "30s"
+  idle_timeout: "120s"
+
+# External services configuration
+external:
+  # Monitoring configuration
+  monitoring:
+    enabled: true
+    prometheus:
+      enabled: true
+      port: 9090
+      path: "/metrics"
+  
+  # Logging configuration
+  logging:
+    level: "info"           # debug, info, warn, error
+    format: "json"          # json, text
+    output: "stdout"        # stdout, stderr, or file path
+    enable_tracing: true
+    enable_correlation: true
+    service_name: "go-auth-system"
+    service_version: "1.0.0"
+
+# Detailed monitoring configuration
+monitoring:
+  # Error tracking configuration
+  error_tracker:
+    enabled: true
+    max_errors: 10000                    # Maximum errors to keep in memory
+    retention_period: "24h"              # How long to keep errors
+    alerting_enabled: true               # Enable automatic alerting
+    alert_buffer: 100                    # Alert channel buffer size
+    default_severity: "medium"           # Default error severity
+    enable_stack_trace: true             # Include stack traces
+    enable_grouping: true                # Group similar errors
+
+  # Log aggregation configuration
+  log_aggregator:
+    enabled: true
+    max_entries: 100000                  # Maximum log entries to keep
+    retention_period: "7d"               # Log retention period
+    aggregation_levels: ["minute", "hour", "day"]
+    pattern_detection: true              # Detect log patterns
+    metrics_enabled: true                # Generate metrics from logs
+
+  # Distributed tracing configuration
+  tracing:
+    enabled: true
+    service_name: "go-auth-system"
+    service_version: "1.0.0"
+    sample_rate: 0.1                     # Sample 10% of requests (adjust for production)
+
+# Database configuration (affects monitoring)
+database:
+  host: "localhost"
+  port: 5432
+  name: "go_auth_system"
+  user: "postgres"
+  password: "password"
+  ssl_mode: "disable"
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: "1h"
+  conn_max_idle_time: "30m"
+
+# Redis configuration (affects monitoring)
+redis:
+  host: "localhost"
+  port: 6379
+  db: 0
+  password: ""
+  max_retries: 3
+  pool_size: 10
+  min_idle_conns: 5
+  dial_timeout: "5s"
+  read_timeout: "3s"
+  write_timeout: "3s"
+  pool_timeout: "4s"
+  idle_timeout: "5m"
+
+# Security configuration (affects monitoring)
+security:
+  rate_limit:
+    enabled: true
+    requests_per_min: 100
+    burst_size: 10
+    window_size: "1m"
+  
+  password_hash:
+    algorithm: "argon2"
+    memory: 65536
+    iterations: 3
+    parallelism: 2
+    salt_length: 16
+    key_length: 32
+  
+  token:
+    type: "jwt"
+    secret: "your-secret-key-here"
+    access_token_duration: "15m"
+    refresh_token_duration: "7d"
+
+# Features configuration (affects monitoring)
+features:
+  mfa:
+    enabled: true
+    totp:
+      enabled: true
+      issuer: "Go Auth System"
+    sms:
+      enabled: true
+      provider: "twilio"
+    email:
+      enabled: true
+      provider: "smtp"
+    webauthn:
+      enabled: true
+      rp_display_name: "Go Auth System"
+      rp_id: "localhost"
+      rp_origin: ["http://localhost:8080"]
+  
+  admin_dashboard:
+    enabled: true
+    path: "/admin"
+  
+  audit_logging:
+    enabled: true
+    retention_period: "90d"
+
+# Example Prometheus configuration for scraping metrics
+# Save this as prometheus.yml
+prometheus_config: |
+  global:
+    scrape_interval: 15s
+    evaluation_interval: 15s
+
+  rule_files:
+    - "go-auth-system-alerts.yml"
+
+  scrape_configs:
+    - job_name: 'go-auth-system'
+      static_configs:
+        - targets: ['localhost:9090']
+      scrape_interval: 5s
+      metrics_path: /metrics
+      honor_labels: true
+
+  alerting:
+    alertmanagers:
+      - static_configs:
+          - targets:
+            - alertmanager:9093
+
+# Example alert rules for Prometheus
+# Save this as go-auth-system-alerts.yml
+alert_rules: |
+  groups:
+    - name: go-auth-system-alerts
+      rules:
+        # High error rate alert
+        - alert: HighErrorRate
+          expr: rate(errors_total{job="go-auth-system"}[5m]) > 0.1
+          for: 2m
+          labels:
+            severity: warning
+            service: go-auth-system
+          annotations:
+            summary: "High error rate detected in Go Auth System"
+            description: "Error rate is {{ $value | humanize }} errors/sec for the last 5 minutes"
+
+        # Authentication failure alert
+        - alert: HighAuthFailureRate
+          expr: rate(auth_failures_total{job="go-auth-system"}[5m]) > 0.5
+          for: 1m
+          labels:
+            severity: critical
+            service: go-auth-system
+          annotations:
+            summary: "High authentication failure rate"
+            description: "Authentication failure rate is {{ $value | humanize }} failures/sec"
+
+        # Database connection alert
+        - alert: DatabaseConnectionHigh
+          expr: database_connections{job="go-auth-system",state="active"} / database_connections{job="go-auth-system",state="max"} > 0.8
+          for: 5m
+          labels:
+            severity: warning
+            service: go-auth-system
+          annotations:
+            summary: "Database connection pool usage high"
+            description: "{{ $value | humanizePercentage }} of database connections are in use"
+
+        # Cache hit rate alert
+        - alert: LowCacheHitRate
+          expr: rate(cache_hits_total{job="go-auth-system"}[5m]) / (rate(cache_hits_total{job="go-auth-system"}[5m]) + rate(cache_misses_total{job="go-auth-system"}[5m])) < 0.7
+          for: 10m
+          labels:
+            severity: warning
+            service: go-auth-system
+          annotations:
+            summary: "Low cache hit rate"
+            description: "Cache hit rate is {{ $value | humanizePercentage }} for the last 10 minutes"
+
+        # High response time alert
+        - alert: HighResponseTime
+          expr: histogram_quantile(0.95, rate(http_duration_seconds_bucket{job="go-auth-system"}[5m])) > 1.0
+          for: 5m
+          labels:
+            severity: warning
+            service: go-auth-system
+          annotations:
+            summary: "High response time detected"
+            description: "95th percentile response time is {{ $value | humanizeDuration }} for the last 5 minutes"
+
+        # Service down alert
+        - alert: ServiceDown
+          expr: up{job="go-auth-system"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            service: go-auth-system
+          annotations:
+            summary: "Go Auth System service is down"
+            description: "Go Auth System has been down for more than 1 minute"
+
+        # High memory usage alert
+        - alert: HighMemoryUsage
+          expr: process_resident_memory_bytes{job="go-auth-system"} / 1024 / 1024 > 500
+          for: 5m
+          labels:
+            severity: warning
+            service: go-auth-system
+          annotations:
+            summary: "High memory usage"
+            description: "Memory usage is {{ $value | humanize }}MB"
+
+        # MFA failure spike alert
+        - alert: MFAFailureSpike
+          expr: rate(mfa_failures_total{job="go-auth-system"}[5m]) > 0.2
+          for: 2m
+          labels:
+            severity: warning
+            service: go-auth-system
+          annotations:
+            summary: "MFA failure rate spike detected"
+            description: "MFA failure rate is {{ $value | humanize }} failures/sec"
+
+# Example Grafana datasource configuration
+grafana_datasource: |
+  apiVersion: 1
+  datasources:
+    - name: Prometheus
+      type: prometheus
+      access: proxy
+      url: http://prometheus:9090
+      isDefault: true
+      editable: true
+
+# Docker Compose example for complete monitoring stack
+docker_compose_monitoring: |
+  version: '3.8'
+  services:
+    go-auth-system:
+      build: .
+      ports:
+        - "8080:8080"
+        - "9090:9090"  # Metrics port
+      environment:
+        - CONFIG_PATH=/app/config.yaml
+      volumes:
+        - ./config.monitoring.example.yaml:/app/config.yaml
+      depends_on:
+        - postgres
+        - redis
+
+    prometheus:
+      image: prom/prometheus:latest
+      ports:
+        - "9091:9090"
+      volumes:
+        - ./prometheus.yml:/etc/prometheus/prometheus.yml
+        - ./go-auth-system-alerts.yml:/etc/prometheus/go-auth-system-alerts.yml
+      command:
+        - '--config.file=/etc/prometheus/prometheus.yml'
+        - '--storage.tsdb.path=/prometheus'
+        - '--web.console.libraries=/etc/prometheus/console_libraries'
+        - '--web.console.templates=/etc/prometheus/consoles'
+        - '--web.enable-lifecycle'
+
+    grafana:
+      image: grafana/grafana:latest
+      ports:
+        - "3000:3000"
+      environment:
+        - GF_SECURITY_ADMIN_PASSWORD=admin
+      volumes:
+        - grafana-storage:/var/lib/grafana
+        - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+        - ./grafana/datasources:/etc/grafana/provisioning/datasources
+
+    alertmanager:
+      image: prom/alertmanager:latest
+      ports:
+        - "9093:9093"
+      volumes:
+        - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml
+
+    postgres:
+      image: postgres:15
+      environment:
+        POSTGRES_DB: go_auth_system
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: password
+      ports:
+        - "5432:5432"
+      volumes:
+        - postgres-data:/var/lib/postgresql/data
+
+    redis:
+      image: redis:7-alpine
+      ports:
+        - "6379:6379"
+      volumes:
+        - redis-data:/data
+
+  volumes:
+    grafana-storage:
+    postgres-data:
+    redis-data:
+
+# Environment-specific configurations
+environments:
+  development:
+    monitoring:
+      tracing:
+        sample_rate: 1.0  # Trace all requests in development
+      error_tracker:
+        enable_stack_trace: true
+      log_aggregator:
+        retention_period: "1d"
+    external:
+      logging:
+        level: "debug"
+
+  staging:
+    monitoring:
+      tracing:
+        sample_rate: 0.5  # Trace 50% of requests in staging
+      error_tracker:
+        retention_period: "48h"
+      log_aggregator:
+        retention_period: "3d"
+    external:
+      logging:
+        level: "info"
+
+  production:
+    monitoring:
+      tracing:
+        sample_rate: 0.1  # Trace 10% of requests in production
+      error_tracker:
+        max_errors: 50000
+        retention_period: "7d"
+      log_aggregator:
+        max_entries: 500000
+        retention_period: "30d"
+    external:
+      logging:
+        level: "warn"
+        output: "/var/log/go-auth-system/app.log"

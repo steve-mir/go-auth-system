@@ -1,515 +1,410 @@
 package rest
 
 import (
-	"log"
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/steve-mir/go-auth-system/internal/monitoring"
 )
 
-// setupOAuthRoutes configures OAuth social authentication routes
+// setupOAuthRoutes configures OAuth/SSO routes
 func (s *Server) setupOAuthRoutes(group *gin.RouterGroup) {
+	// OAuth routes
 	oauth := group.Group("/oauth")
 	{
-		oauth.GET("/:provider", s.oauthInitiateHandler)
-		oauth.GET("/:provider/callback", s.oauthCallbackHandler)
-		oauth.POST("/link/:provider", s.requireAuth(), s.linkSocialAccountHandler)
-		oauth.DELETE("/unlink/:provider", s.requireAuth(), s.unlinkSocialAccountHandler)
-		oauth.GET("/linked", s.requireAuth(), s.getLinkedAccountsHandler)
+		oauth.GET("/:provider/login", s.withMonitoring("oauth_login", s.oauthLoginHandler))
+		oauth.GET("/:provider/callback", s.withMonitoring("oauth_callback", s.oauthCallbackHandler))
+		oauth.DELETE("/:provider/unlink", s.withMonitoring("oauth_unlink", s.oauthUnlinkHandler))
+		oauth.GET("/accounts", s.withMonitoring("oauth_accounts", s.getLinkedAccountsHandler))
 	}
 
-	// SAML 2.0 routes
+	// SAML routes
 	saml := group.Group("/saml")
 	{
-		saml.GET("/metadata", s.samlMetadataHandler)
-		saml.POST("/login", s.samlInitiateHandler)
-		saml.POST("/acs", s.samlAssertionConsumerHandler)
-		saml.POST("/slo", s.samlSingleLogoutHandler)
+		saml.GET("/metadata", s.withMonitoring("saml_metadata", s.samlMetadataHandler))
+		saml.POST("/login", s.withMonitoring("saml_login", s.samlLoginHandler))
+		saml.POST("/callback", s.withMonitoring("saml_callback", s.samlCallbackHandler))
 	}
 
-	// OpenID Connect routes
+	// OIDC routes
 	oidc := group.Group("/oidc")
 	{
-		oidc.GET("/:provider", s.oidcInitiateHandler)
-		oidc.GET("/:provider/callback", s.oidcCallbackHandler)
-		oidc.POST("/token/validate", s.oidcValidateTokenHandler)
-		oidc.POST("/token/refresh", s.oidcRefreshTokenHandler)
+		oidc.GET("/:provider/login", s.withMonitoring("oidc_login", s.oidcLoginHandler))
+		oidc.GET("/:provider/callback", s.withMonitoring("oidc_callback", s.oidcCallbackHandler))
+		oidc.POST("/:provider/refresh", s.withMonitoring("oidc_refresh", s.oidcRefreshHandler))
 	}
 }
 
-// oauthInitiateHandler initiates OAuth flow
-func (s *Server) oauthInitiateHandler(c *gin.Context) {
-	provider := c.Param("provider")
+// OAuth handlers
 
-	// Validate provider
-	if !isValidProvider(provider) {
-		s.errorResponse(c, http.StatusBadRequest, "INVALID_PROVIDER", "Invalid OAuth provider", gin.H{
-			"provider":        provider,
-			"valid_providers": []string{"google", "facebook", "github"},
-		})
-		return
+func (s *Server) oauthLoginHandler(c *gin.Context) {
+	ctx := c.Request.Context()
+	start := time.Now()
+
+	provider := c.Param("provider")
+	state := c.Query("state")
+
+	if state == "" {
+		state = generateRequestID()
 	}
 
-	// Generate OAuth URL
-	authURL, err := s.ssoService.GetOAuthURL(c.Request.Context(), provider, "")
+	url, err := s.ssoService.GetOAuthURL(ctx, provider, state)
+	duration := time.Since(start)
+
 	if err != nil {
+		if s.monitoring != nil {
+			s.trackError(ctx, err, monitoring.ErrorCategoryService, "oauth_login", "sso")
+			s.trackSecurityEvent(ctx, "oauth_login_failed", "medium", map[string]interface{}{
+				"provider": provider,
+				"error":    err.Error(),
+				"ip":       c.ClientIP(),
+			})
+		}
 		s.handleServiceError(c, err)
 		return
 	}
 
-	s.successResponse(c, http.StatusOK, gin.H{
-		"auth_url": authURL,
+	if s.monitoring != nil {
+		s.trackSecurityEvent(ctx, "oauth_login_initiated", "low", map[string]interface{}{
+			"provider": provider,
+			"state":    state,
+			"duration": duration.Milliseconds(),
+			"ip":       c.ClientIP(),
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"url":      url,
 		"provider": provider,
+		"state":    state,
 	})
 }
 
-// oauthCallbackHandler handles OAuth callback
 func (s *Server) oauthCallbackHandler(c *gin.Context) {
+	ctx := c.Request.Context()
+	start := time.Now()
+
 	provider := c.Param("provider")
 	code := c.Query("code")
 	state := c.Query("state")
 
-	// Validate parameters
-	if code == "" {
-		s.errorResponse(c, http.StatusBadRequest, "MISSING_CODE", "Authorization code is required", nil)
-		return
-	}
+	result, err := s.ssoService.HandleOAuthCallback(ctx, provider, code, state)
+	duration := time.Since(start)
 
-	if state == "" {
-		s.errorResponse(c, http.StatusBadRequest, "MISSING_STATE", "State parameter is required", nil)
-		return
-	}
-
-	// Handle OAuth callback
-	result, err := s.ssoService.HandleOAuthCallback(c.Request.Context(), provider, code, state)
 	if err != nil {
+		if s.monitoring != nil {
+			s.trackError(ctx, err, monitoring.ErrorCategoryService, "oauth_callback", "sso")
+			s.trackSecurityEvent(ctx, "oauth_callback_failed", "high", map[string]interface{}{
+				"provider": provider,
+				"error":    err.Error(),
+				"ip":       c.ClientIP(),
+			})
+		}
 		s.handleServiceError(c, err)
 		return
 	}
 
-	// If this is a new user, we might want to redirect to a welcome page
-	// If this is an existing user, redirect to the main application
-
-	// For API response, return the authentication result
-	s.successResponse(c, http.StatusOK, gin.H{
-		"user_id":       result.UserID,
-		"email":         result.Email,
-		"name":          result.Name,
-		"provider":      result.Provider,
-		"is_new_user":   result.IsNewUser,
-		"access_token":  result.AccessToken,
-		"refresh_token": result.RefreshToken,
-		"expires_at":    result.ExpiresAt,
-		"metadata":      result.Metadata,
-	})
-}
-
-// linkSocialAccountHandler links a social account to the current user
-func (s *Server) linkSocialAccountHandler(c *gin.Context) {
-	provider := c.Param("provider")
-
-	// Get user ID from context (set by auth middleware)
-	userID, exists := c.Get("user_id")
-	if !exists {
-		s.errorResponse(c, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated", nil)
-		return
-	}
-
-	userIDStr, ok := userID.(string)
-	if !ok {
-		s.errorResponse(c, http.StatusInternalServerError, "INVALID_USER_ID", "Invalid user ID format", nil)
-		return
-	}
-	log.Println("UserIDStr", userIDStr)
-
-	// Validate provider
-	if !isValidProvider(provider) {
-		s.errorResponse(c, http.StatusBadRequest, "INVALID_PROVIDER", "Invalid OAuth provider", gin.H{
-			"provider":        provider,
-			"valid_providers": []string{"google", "facebook", "github"},
+	if s.monitoring != nil {
+		s.trackAuthEvent(ctx, "oauth_login", result.UserID, true, duration, map[string]interface{}{
+			"provider":    provider,
+			"email":       result.Email,
+			"is_new_user": result.IsNewUser,
 		})
-		return
-	}
-
-	// Generate OAuth URL for linking
-	authURL, err := s.ssoService.GetOAuthURL(c.Request.Context(), provider, "")
-	if err != nil {
-		s.handleServiceError(c, err)
-		return
-	}
-
-	s.successResponse(c, http.StatusOK, gin.H{
-		"auth_url": authURL,
-		"provider": provider,
-		"message":  "Complete OAuth flow to link account",
-	})
-}
-
-// unlinkSocialAccountHandler unlinks a social account from the current user
-func (s *Server) unlinkSocialAccountHandler(c *gin.Context) {
-	provider := c.Param("provider")
-
-	// Get user ID from context (set by auth middleware)
-	userID, exists := c.Get("user_id")
-	if !exists {
-		s.errorResponse(c, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated", nil)
-		return
-	}
-
-	userIDStr, ok := userID.(string)
-	if !ok {
-		s.errorResponse(c, http.StatusInternalServerError, "INVALID_USER_ID", "Invalid user ID format", nil)
-		return
-	}
-
-	// Validate provider
-	if !isValidProvider(provider) {
-		s.errorResponse(c, http.StatusBadRequest, "INVALID_PROVIDER", "Invalid OAuth provider", gin.H{
-			"provider":        provider,
-			"valid_providers": []string{"google", "facebook", "github"},
+		s.trackSecurityEvent(ctx, "oauth_login_success", "low", map[string]interface{}{
+			"provider":    provider,
+			"user_id":     result.UserID,
+			"email":       result.Email,
+			"is_new_user": result.IsNewUser,
+			"duration":    duration.Milliseconds(),
+			"ip":          c.ClientIP(),
 		})
+	}
+
+	s.successResponse(c, http.StatusOK, result)
+}
+
+func (s *Server) oauthUnlinkHandler(c *gin.Context) {
+	ctx := c.Request.Context()
+	start := time.Now()
+
+	provider := c.Param("provider")
+	userID, _, _, _ := s.getUserContext(c)
+
+	if userID == "" {
+		s.unauthorizedResponse(c, "User ID not found in context")
 		return
 	}
 
-	// Unlink social account
-	err := s.ssoService.UnlinkSocialAccount(c.Request.Context(), userIDStr, provider)
+	err := s.ssoService.UnlinkSocialAccount(ctx, userID, provider)
+	duration := time.Since(start)
+
 	if err != nil {
+		if s.monitoring != nil {
+			s.trackError(ctx, err, monitoring.ErrorCategoryService, "oauth_unlink", "sso")
+		}
 		s.handleServiceError(c, err)
 		return
 	}
 
+	if s.monitoring != nil {
+		s.trackSecurityEvent(ctx, "oauth_account_unlinked", "medium", map[string]interface{}{
+			"provider": provider,
+			"user_id":  userID,
+			"duration": duration.Milliseconds(),
+			"ip":       c.ClientIP(),
+		})
+	}
+
 	s.successResponse(c, http.StatusOK, gin.H{
-		"message":  "Social account unlinked successfully",
-		"provider": provider,
+		"message": fmt.Sprintf("%s account unlinked successfully", provider),
 	})
 }
 
-// getLinkedAccountsHandler returns all linked social accounts for the current user
 func (s *Server) getLinkedAccountsHandler(c *gin.Context) {
-	// Get user ID from context (set by auth middleware)
-	userID, exists := c.Get("user_id")
-	if !exists {
-		s.errorResponse(c, http.StatusUnauthorized, "UNAUTHORIZED", "User not authenticated", nil)
+	ctx := c.Request.Context()
+	start := time.Now()
+
+	userID, _, _, _ := s.getUserContext(c)
+	if userID == "" {
+		s.unauthorizedResponse(c, "User ID not found in context")
 		return
 	}
 
-	userIDStr, ok := userID.(string)
-	if !ok {
-		s.errorResponse(c, http.StatusInternalServerError, "INVALID_USER_ID", "Invalid user ID format", nil)
-		return
-	}
+	accounts, err := s.ssoService.GetLinkedAccounts(ctx, userID)
+	duration := time.Since(start)
 
-	// Get linked accounts
-	accounts, err := s.ssoService.GetLinkedAccounts(c.Request.Context(), userIDStr)
 	if err != nil {
+		if s.monitoring != nil {
+			s.trackError(ctx, err, monitoring.ErrorCategoryService, "get_linked_accounts", "sso")
+		}
 		s.handleServiceError(c, err)
 		return
+	}
+
+	if s.monitoring != nil {
+		s.trackUserEvent(ctx, "linked_accounts_accessed", userID, map[string]interface{}{
+			"account_count": len(accounts),
+			"duration":      duration.Milliseconds(),
+		})
 	}
 
 	s.successResponse(c, http.StatusOK, gin.H{
 		"accounts": accounts,
-		"count":    len(accounts),
 	})
 }
 
-// SAML 2.0 handlers
+// SAML handlers
 
-// samlMetadataHandler returns SAML Service Provider metadata
 func (s *Server) samlMetadataHandler(c *gin.Context) {
-	metadata, err := s.ssoService.GetSAMLMetadata(c.Request.Context())
+	ctx := c.Request.Context()
+
+	metadata, err := s.ssoService.GetSAMLMetadata(ctx)
 	if err != nil {
+		if s.monitoring != nil {
+			s.trackError(ctx, err, monitoring.ErrorCategoryService, "saml_metadata", "sso")
+		}
 		s.handleServiceError(c, err)
 		return
 	}
 
-	c.Header("Content-Type", "application/samlmetadata+xml")
-	c.Data(http.StatusOK, "application/samlmetadata+xml", metadata)
+	c.Data(http.StatusOK, "application/xml", metadata)
 }
 
-// samlInitiateHandler initiates SAML authentication
-func (s *Server) samlInitiateHandler(c *gin.Context) {
+func (s *Server) samlLoginHandler(c *gin.Context) {
+	ctx := c.Request.Context()
+
 	var req struct {
 		IDPEntityID string `json:"idp_entity_id" binding:"required"`
 		RelayState  string `json:"relay_state,omitempty"`
 	}
 
-	if err := c.ShouldBindJSON(&req); err != nil {
-		s.errorResponse(c, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request format", gin.H{
-			"error": err.Error(),
+	if !s.bindAndValidate(c, &req) {
+		return
+	}
+
+	result, err := s.ssoService.InitiateSAMLLogin(ctx, req.IDPEntityID, req.RelayState)
+	if err != nil {
+		if s.monitoring != nil {
+			s.trackError(ctx, err, monitoring.ErrorCategoryService, "saml_login", "sso")
+		}
+		s.handleServiceError(c, err)
+		return
+	}
+
+	if s.monitoring != nil {
+		s.trackSecurityEvent(ctx, "saml_login_initiated", "low", map[string]interface{}{
+			"idp_entity_id": req.IDPEntityID,
+			"relay_state":   req.RelayState,
+			"ip":            c.ClientIP(),
 		})
-		return
 	}
 
-	// Initiate SAML login
-	authRequest, err := s.ssoService.InitiateSAMLLogin(c.Request.Context(), req.IDPEntityID, req.RelayState)
-	if err != nil {
-		s.handleServiceError(c, err)
-		return
-	}
-
-	s.successResponse(c, http.StatusOK, gin.H{
-		"auth_url":      authRequest.URL,
-		"request_id":    authRequest.ID,
-		"relay_state":   authRequest.RelayState,
-		"idp_entity_id": authRequest.IDPEntityID,
-		"created_at":    authRequest.CreatedAt,
-	})
+	s.successResponse(c, http.StatusOK, result)
 }
 
-// samlAssertionConsumerHandler handles SAML assertion consumer service (ACS)
-func (s *Server) samlAssertionConsumerHandler(c *gin.Context) {
-	// SAML responses can come as form data or JSON
-	var samlResponse, relayState string
-
-	// Try to get from form data first (standard SAML POST binding)
-	if c.Request.Header.Get("Content-Type") == "application/x-www-form-urlencoded" {
-		samlResponse = c.PostForm("SAMLResponse")
-		relayState = c.PostForm("RelayState")
-	} else {
-		// Try JSON format
-		var req struct {
-			SAMLResponse string `json:"saml_response" binding:"required"`
-			RelayState   string `json:"relay_state,omitempty"`
-		}
-
-		if err := c.ShouldBindJSON(&req); err != nil {
-			s.errorResponse(c, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request format", gin.H{
-				"error": err.Error(),
-			})
-			return
-		}
-
-		samlResponse = req.SAMLResponse
-		relayState = req.RelayState
-	}
-
-	if samlResponse == "" {
-		s.errorResponse(c, http.StatusBadRequest, "MISSING_SAML_RESPONSE", "SAML response is required", nil)
-		return
-	}
-
-	// Handle SAML response
-	result, err := s.ssoService.HandleSAMLResponse(c.Request.Context(), samlResponse, relayState)
-	if err != nil {
-		s.handleServiceError(c, err)
-		return
-	}
-
-	// Return authentication result
-	s.successResponse(c, http.StatusOK, gin.H{
-		"user_id":       result.UserID,
-		"email":         result.Email,
-		"name":          result.Name,
-		"name_id":       result.NameID,
-		"session_index": result.SessionIndex,
-		"idp_entity_id": result.IDPEntityID,
-		"is_new_user":   result.IsNewUser,
-		"attributes":    result.Attributes,
-		"expires_at":    result.ExpiresAt,
-	})
-}
-
-// samlSingleLogoutHandler handles SAML Single Logout (SLO)
-func (s *Server) samlSingleLogoutHandler(c *gin.Context) {
-	// This is a placeholder for SAML Single Logout functionality
-	// In a full implementation, this would handle logout requests from IdP
+func (s *Server) samlCallbackHandler(c *gin.Context) {
+	ctx := c.Request.Context()
+	start := time.Now()
 
 	var req struct {
-		SAMLRequest string `json:"saml_request,omitempty"`
-		RelayState  string `json:"relay_state,omitempty"`
+		SAMLResponse string `json:"saml_response" binding:"required"`
+		RelayState   string `json:"relay_state,omitempty"`
 	}
 
-	// Try to get from form data first
-	if c.Request.Header.Get("Content-Type") == "application/x-www-form-urlencoded" {
-		req.SAMLRequest = c.PostForm("SAMLRequest")
-		req.RelayState = c.PostForm("RelayState")
-	} else {
-		// Try JSON format
-		if err := c.ShouldBindJSON(&req); err != nil {
-			s.errorResponse(c, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request format", gin.H{
-				"error": err.Error(),
-			})
-			return
-		}
-	}
-
-	// For now, just acknowledge the logout request
-	s.successResponse(c, http.StatusOK, gin.H{
-		"message":     "Logout request processed",
-		"relay_state": req.RelayState,
-	})
-}
-
-// OpenID Connect handlers
-
-// oidcInitiateHandler initiates OIDC authentication flow
-func (s *Server) oidcInitiateHandler(c *gin.Context) {
-	provider := c.Param("provider")
-
-	// Validate provider
-	if !isValidOIDCProvider(provider) {
-		s.errorResponse(c, http.StatusBadRequest, "INVALID_PROVIDER", "Invalid OIDC provider", gin.H{
-			"provider":        provider,
-			"valid_providers": []string{"oidc"},
-		})
+	if !s.bindAndValidate(c, &req) {
 		return
 	}
 
-	// Get optional nonce from query parameters
-	nonce := c.Query("nonce")
+	result, err := s.ssoService.HandleSAMLResponse(ctx, req.SAMLResponse, req.RelayState)
+	duration := time.Since(start)
 
-	// Generate OIDC authorization URL
-	authURL, err := s.ssoService.GetOIDCAuthURL(c.Request.Context(), provider, "", nonce)
 	if err != nil {
+		if s.monitoring != nil {
+			s.trackError(ctx, err, monitoring.ErrorCategoryService, "saml_callback", "sso")
+			s.trackSecurityEvent(ctx, "saml_callback_failed", "high", map[string]interface{}{
+				"error": err.Error(),
+				"ip":    c.ClientIP(),
+			})
+		}
 		s.handleServiceError(c, err)
 		return
 	}
 
+	if s.monitoring != nil {
+		s.trackAuthEvent(ctx, "saml_login", result.UserID, true, duration, map[string]interface{}{
+			"email":       result.Email,
+			"is_new_user": result.IsNewUser,
+		})
+		s.trackSecurityEvent(ctx, "saml_login_success", "low", map[string]interface{}{
+			"user_id":     result.UserID,
+			"email":       result.Email,
+			"is_new_user": result.IsNewUser,
+			"duration":    duration.Milliseconds(),
+			"ip":          c.ClientIP(),
+		})
+	}
+
+	s.successResponse(c, http.StatusOK, result)
+}
+
+// OIDC handlers
+
+func (s *Server) oidcLoginHandler(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	provider := c.Param("provider")
+	state := c.Query("state")
+	nonce := c.Query("nonce")
+
+	if state == "" {
+		state = generateRequestID()
+	}
+	if nonce == "" {
+		nonce = generateRequestID()
+	}
+
+	url, err := s.ssoService.GetOIDCAuthURL(ctx, provider, state, nonce)
+	if err != nil {
+		if s.monitoring != nil {
+			s.trackError(ctx, err, monitoring.ErrorCategoryService, "oidc_login", "sso")
+		}
+		s.handleServiceError(c, err)
+		return
+	}
+
+	if s.monitoring != nil {
+		s.trackSecurityEvent(ctx, "oidc_login_initiated", "low", map[string]interface{}{
+			"provider": provider,
+			"state":    state,
+			"nonce":    nonce,
+			"ip":       c.ClientIP(),
+		})
+	}
+
 	s.successResponse(c, http.StatusOK, gin.H{
-		"auth_url": authURL,
+		"url":      url,
 		"provider": provider,
+		"state":    state,
+		"nonce":    nonce,
 	})
 }
 
-// oidcCallbackHandler handles OIDC callback
 func (s *Server) oidcCallbackHandler(c *gin.Context) {
+	ctx := c.Request.Context()
+	start := time.Now()
+
 	provider := c.Param("provider")
 	code := c.Query("code")
 	state := c.Query("state")
 
-	// Validate parameters
-	if code == "" {
-		s.errorResponse(c, http.StatusBadRequest, "MISSING_CODE", "Authorization code is required", nil)
-		return
-	}
+	result, err := s.ssoService.HandleOIDCCallback(ctx, provider, code, state)
+	duration := time.Since(start)
 
-	if state == "" {
-		s.errorResponse(c, http.StatusBadRequest, "MISSING_STATE", "State parameter is required", nil)
-		return
-	}
-
-	// Validate provider
-	if !isValidOIDCProvider(provider) {
-		s.errorResponse(c, http.StatusBadRequest, "INVALID_PROVIDER", "Invalid OIDC provider", gin.H{
-			"provider": provider,
-		})
-		return
-	}
-
-	// Handle OIDC callback
-	result, err := s.ssoService.HandleOIDCCallback(c.Request.Context(), provider, code, state)
 	if err != nil {
+		if s.monitoring != nil {
+			s.trackError(ctx, err, monitoring.ErrorCategoryService, "oidc_callback", "sso")
+			s.trackSecurityEvent(ctx, "oidc_callback_failed", "high", map[string]interface{}{
+				"provider": provider,
+				"error":    err.Error(),
+				"ip":       c.ClientIP(),
+			})
+		}
 		s.handleServiceError(c, err)
 		return
 	}
 
-	// Return authentication result
-	s.successResponse(c, http.StatusOK, gin.H{
-		"user_id":       result.UserID,
-		"email":         result.Email,
-		"name":          result.Name,
-		"subject":       result.Subject,
-		"provider":      result.Provider,
-		"is_new_user":   result.IsNewUser,
-		"access_token":  result.AccessToken,
-		"refresh_token": result.RefreshToken,
-		"id_token":      result.IDToken,
-		"expires_at":    result.ExpiresAt,
-		"claims":        result.Claims,
-	})
+	if s.monitoring != nil {
+		s.trackAuthEvent(ctx, "oidc_login", result.UserID, true, duration, map[string]interface{}{
+			"provider":    provider,
+			"email":       result.Email,
+			"is_new_user": result.IsNewUser,
+		})
+		s.trackSecurityEvent(ctx, "oidc_login_success", "low", map[string]interface{}{
+			"provider":    provider,
+			"user_id":     result.UserID,
+			"email":       result.Email,
+			"is_new_user": result.IsNewUser,
+			"duration":    duration.Milliseconds(),
+			"ip":          c.ClientIP(),
+		})
+	}
+
+	s.successResponse(c, http.StatusOK, result)
 }
 
-// oidcValidateTokenHandler validates an OIDC ID token
-func (s *Server) oidcValidateTokenHandler(c *gin.Context) {
+func (s *Server) oidcRefreshHandler(c *gin.Context) {
+	ctx := c.Request.Context()
+	start := time.Now()
+
+	provider := c.Param("provider")
+
 	var req struct {
-		Provider string `json:"provider" binding:"required"`
-		IDToken  string `json:"id_token" binding:"required"`
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		s.errorResponse(c, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request format", gin.H{
-			"error": err.Error(),
-		})
-		return
-	}
-
-	// Validate provider
-	if !isValidOIDCProvider(req.Provider) {
-		s.errorResponse(c, http.StatusBadRequest, "INVALID_PROVIDER", "Invalid OIDC provider", gin.H{
-			"provider": req.Provider,
-		})
-		return
-	}
-
-	// Validate ID token
-	claims, err := s.ssoService.ValidateOIDCIDToken(c.Request.Context(), req.Provider, req.IDToken)
-	if err != nil {
-		s.handleServiceError(c, err)
-		return
-	}
-
-	s.successResponse(c, http.StatusOK, gin.H{
-		"valid":      true,
-		"claims":     claims,
-		"subject":    claims.Subject,
-		"email":      claims.Email,
-		"expires_at": claims.ExpiresAt,
-	})
-}
-
-// oidcRefreshTokenHandler refreshes an OIDC access token
-func (s *Server) oidcRefreshTokenHandler(c *gin.Context) {
-	var req struct {
-		Provider     string `json:"provider" binding:"required"`
 		RefreshToken string `json:"refresh_token" binding:"required"`
 	}
 
-	if err := c.ShouldBindJSON(&req); err != nil {
-		s.errorResponse(c, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request format", gin.H{
-			"error": err.Error(),
-		})
+	if !s.bindAndValidate(c, &req) {
 		return
 	}
 
-	// Validate provider
-	if !isValidOIDCProvider(req.Provider) {
-		s.errorResponse(c, http.StatusBadRequest, "INVALID_PROVIDER", "Invalid OIDC provider", gin.H{
-			"provider": req.Provider,
-		})
-		return
-	}
+	result, err := s.ssoService.RefreshOIDCToken(ctx, provider, req.RefreshToken)
+	duration := time.Since(start)
 
-	// Refresh token
-	tokenResp, err := s.ssoService.RefreshOIDCToken(c.Request.Context(), req.Provider, req.RefreshToken)
 	if err != nil {
+		if s.monitoring != nil {
+			s.trackError(ctx, err, monitoring.ErrorCategoryService, "oidc_refresh", "sso")
+		}
 		s.handleServiceError(c, err)
 		return
 	}
 
-	s.successResponse(c, http.StatusOK, gin.H{
-		"access_token":  tokenResp.AccessToken,
-		"refresh_token": tokenResp.RefreshToken,
-		"id_token":      tokenResp.IDToken,
-		"token_type":    tokenResp.TokenType,
-		"expires_in":    tokenResp.ExpiresIn,
-		"scope":         tokenResp.Scope,
-	})
-}
-
-// isValidProvider checks if the provider is supported
-func isValidProvider(provider string) bool {
-	validProviders := map[string]bool{
-		"google":   true,
-		"facebook": true,
-		"github":   true,
+	if s.monitoring != nil {
+		s.monitoring.RecordTokenEvent(ctx, "refresh", "oidc_token", true, map[string]interface{}{
+			"provider": provider,
+			"duration": duration.Milliseconds(),
+		})
 	}
-	return validProviders[provider]
-}
 
-// isValidOIDCProvider checks if the OIDC provider is supported
-func isValidOIDCProvider(provider string) bool {
-	validProviders := map[string]bool{
-		"oidc": true,
-	}
-	return validProviders[provider]
+	s.successResponse(c, http.StatusOK, result)
 }

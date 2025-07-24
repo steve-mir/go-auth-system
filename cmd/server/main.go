@@ -26,6 +26,7 @@ import (
 	"github.com/steve-mir/go-auth-system/internal/security/token"
 	"github.com/steve-mir/go-auth-system/internal/service/admin"
 	"github.com/steve-mir/go-auth-system/internal/service/auth"
+	"github.com/steve-mir/go-auth-system/internal/service/mfa"
 	"github.com/steve-mir/go-auth-system/internal/service/role"
 	"github.com/steve-mir/go-auth-system/internal/service/sso"
 	"github.com/steve-mir/go-auth-system/internal/service/user"
@@ -274,6 +275,18 @@ func runServer(ctx context.Context, cfg *config.Config) error {
 	// Initialize role service
 	roleService := role.NewService(roleRepo)
 
+	// Initialize MFA service
+	log.Printf("Initializing MFA service...")
+	mfaService := mfa.NewMFAService(cfg, &mfa.Dependencies{
+		MFARepo:      mfa.NewPostgresMFARepository(db, store),
+		UserRepo:     mfa.NewPostgresUserRepository(db, store),
+		SMSService:   mfa.NewSMSService(cfg),
+		EmailService: mfa.NewEmailService(cfg),
+		CacheService: mfa.NewRedisCacheService(redisClient),
+		Encryptor:    encryptorSvc.GetEncryptor(),
+	})
+	log.Printf("MFA service initialized")
+
 	// Initialize admin service
 	adminService := admin.NewService(admin.Dependencies{
 		Config:      cfg,
@@ -315,9 +328,11 @@ func runServer(ctx context.Context, cfg *config.Config) error {
 	httpServer := rest.NewServer(
 		&cfg.Server,
 		middlewareManager,
+		monitoringSvc,
 		authService,
 		userService,
 		roleService,
+		mfaService,
 		adminService,
 		healthSvc,
 		ssoService,
