@@ -70,7 +70,7 @@ func (s *Server) setupTOTPHandler(c *gin.Context) {
 
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "setup_totp", "mfa")
+			s.trackError(ctx, err, monitoring.CategorySystem, "setup_totp", "mfa")
 			s.monitoring.RecordMFAFailure("totp", "setup_failed")
 		}
 		s.handleServiceError(c, err)
@@ -111,7 +111,7 @@ func (s *Server) verifyTOTPHandler(c *gin.Context) {
 
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "verify_totp", "mfa")
+			s.trackError(ctx, err, monitoring.CategorySystem, "verify_totp", "mfa")
 			s.monitoring.RecordMFAFailure("totp", "verification_failed")
 			s.trackSecurityEvent(ctx, "mfa_totp_failed", "high", map[string]interface{}{
 				"user_id": userID,
@@ -153,12 +153,16 @@ func (s *Server) disableTOTPHandler(c *gin.Context) {
 		return
 	}
 
-	err := s.mfaService.DisableTOTP(ctx, userID)
+	req := mfa.DisableMFARequest{
+		UserID: userID,
+		Method: mfa.MethodTOTP,
+	}
+	err := s.mfaService.DisableMFA(ctx, &req)
 	duration := time.Since(start)
 
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "disable_totp", "mfa")
+			s.trackError(ctx, err, monitoring.CategorySystem, "disable_totp", "mfa")
 		}
 		s.handleServiceError(c, err)
 		return
@@ -201,7 +205,7 @@ func (s *Server) setupSMSHandler(c *gin.Context) {
 
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "setup_sms", "mfa")
+			s.trackError(ctx, err, monitoring.CategorySystem, "setup_sms", "mfa")
 			s.monitoring.RecordMFAFailure("sms", "setup_failed")
 		}
 		s.handleServiceError(c, err)
@@ -233,12 +237,16 @@ func (s *Server) sendSMSCodeHandler(c *gin.Context) {
 		return
 	}
 
-	err := s.mfaService.SendSMSCode(ctx, userID)
+	req := mfa.SendSMSCodeRequest{
+		UserID:   userID,
+		ForLogin: true,
+	}
+	_, err := s.mfaService.SendSMSCode(ctx, &req)
 	duration := time.Since(start)
 
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "send_sms_code", "mfa")
+			s.trackError(ctx, err, monitoring.CategorySystem, "send_sms_code", "mfa")
 		}
 		s.handleServiceError(c, err)
 		return
@@ -279,7 +287,7 @@ func (s *Server) verifySMSHandler(c *gin.Context) {
 
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "verify_sms", "mfa")
+			s.trackError(ctx, err, monitoring.CategorySystem, "verify_sms", "mfa")
 			s.monitoring.RecordMFAFailure("sms", "verification_failed")
 		}
 		s.handleServiceError(c, err)
@@ -315,10 +323,14 @@ func (s *Server) disableSMSHandler(c *gin.Context) {
 		return
 	}
 
-	err := s.mfaService.DisableSMS(ctx, userID)
+	req := mfa.DisableMFARequest{
+		UserID: userID,
+		Method: mfa.MethodSMS,
+	}
+	err := s.mfaService.DisableMFA(ctx, &req)
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "disable_sms", "mfa")
+			s.trackError(ctx, err, monitoring.CategorySystem, "disable_sms", "mfa")
 		}
 		s.handleServiceError(c, err)
 		return
@@ -377,10 +389,13 @@ func (s *Server) beginWebAuthnRegistrationHandler(c *gin.Context) {
 		return
 	}
 
-	result, err := s.mfaService.BeginWebAuthnRegistration(ctx, userID)
+	req := mfa.SetupWebAuthnRequest{
+		UserID: userID,
+	}
+	result, err := s.mfaService.SetupWebAuthn(ctx, &req)
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "begin_webauthn_registration", "mfa")
+			s.trackError(ctx, err, monitoring.CategorySystem, "begin_webauthn_registration", "mfa")
 		}
 		s.handleServiceError(c, err)
 		return
@@ -406,19 +421,19 @@ func (s *Server) finishWebAuthnRegistrationHandler(c *gin.Context) {
 		return
 	}
 
-	var req mfa.FinishWebAuthnRegistrationRequest
+	var req mfa.FinishWebAuthnSetupRequest
 	if !s.bindAndValidate(c, &req) {
 		return
 	}
 
 	req.UserID = userID
 
-	result, err := s.mfaService.FinishWebAuthnRegistration(ctx, &req)
+	result, err := s.mfaService.FinishWebAuthnSetup(ctx, &req)
 	duration := time.Since(start)
 
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "finish_webauthn_registration", "mfa")
+			s.trackError(ctx, err, monitoring.CategorySystem, "finish_webauthn_registration", "mfa")
 			s.monitoring.RecordMFAFailure("webauthn", "registration_failed")
 		}
 		s.handleServiceError(c, err)
@@ -467,10 +482,15 @@ func (s *Server) deleteWebAuthnCredentialHandler(c *gin.Context) {
 		return
 	}
 
-	err := s.mfaService.DeleteWebAuthnCredential(ctx, userID, credentialID)
+	req := mfa.DisableMFARequest{
+		UserID:   userID,
+		ConfigID: credentialID,
+		Method:   mfa.MethodWebAuthn,
+	}
+	err := s.mfaService.DisableMFA(ctx, &req)
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "delete_webauthn_credential", "mfa")
+			s.trackError(ctx, err, monitoring.CategorySystem, "delete_webauthn_credential", "mfa")
 		}
 		s.handleServiceError(c, err)
 		return
@@ -510,7 +530,7 @@ func (s *Server) generateBackupCodesHandler(c *gin.Context) {
 
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "generate_backup_codes", "mfa")
+			s.trackError(ctx, err, monitoring.CategorySystem, "generate_backup_codes", "mfa")
 		}
 		s.handleServiceError(c, err)
 		return
@@ -553,7 +573,7 @@ func (s *Server) verifyBackupCodeHandler(c *gin.Context) {
 
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "verify_backup_code", "mfa")
+			s.trackError(ctx, err, monitoring.CategorySystem, "verify_backup_code", "mfa")
 			s.monitoring.RecordMFAFailure("backup_code", "verification_failed")
 		}
 		s.handleServiceError(c, err)
@@ -591,10 +611,13 @@ func (s *Server) getMFAStatusHandler(c *gin.Context) {
 		return
 	}
 
-	status, err := s.mfaService.GetMFAStatus(ctx, userID)
+	req := mfa.ValidateMFAForLoginRequest{
+		UserID: userID,
+	}
+	status, err := s.mfaService.ValidateMFAForLogin(ctx, &req)
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "get_mfa_status", "mfa")
+			s.trackError(ctx, err, monitoring.CategorySystem, "get_mfa_status", "mfa")
 		}
 		s.handleServiceError(c, err)
 		return
@@ -612,10 +635,10 @@ func (s *Server) getMFAMethodsHandler(c *gin.Context) {
 		return
 	}
 
-	methods, err := s.mfaService.GetMFAMethods(ctx, userID)
+	methods, err := s.mfaService.GetUserMFAMethods(ctx, userID)
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "get_mfa_methods", "mfa")
+			s.trackError(ctx, err, monitoring.CategorySystem, "get_mfa_methods", "mfa")
 		}
 		s.handleServiceError(c, err)
 		return
@@ -636,16 +659,32 @@ func (s *Server) disableAllMFAHandler(c *gin.Context) {
 		return
 	}
 
-	err := s.mfaService.DisableAllMFA(ctx, userID)
-	duration := time.Since(start)
-
+	// Get all user MFA methods first
+	methods, err := s.mfaService.GetUserMFAMethods(ctx, userID)
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "disable_all_mfa", "mfa")
+			s.trackError(ctx, err, monitoring.CategorySystem, "disable_all_mfa", "mfa")
 		}
 		s.handleServiceError(c, err)
 		return
 	}
+
+	// Disable each MFA method
+	for _, method := range methods.Methods {
+		req := mfa.DisableMFARequest{
+			UserID:   userID,
+			ConfigID: method.ID.String(),
+			Method:   method.Method,
+		}
+		if err := s.mfaService.DisableMFA(ctx, &req); err != nil {
+			if s.monitoring != nil {
+				s.trackError(ctx, err, monitoring.CategorySystem, "disable_all_mfa", "mfa")
+			}
+			// Continue with other methods even if one fails
+		}
+	}
+
+	duration := time.Since(start)
 
 	if s.monitoring != nil {
 		s.trackSecurityEvent(ctx, "all_mfa_disabled", "critical", map[string]interface{}{

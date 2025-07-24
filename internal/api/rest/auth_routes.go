@@ -36,7 +36,7 @@ func (s *Server) registerHandler(c *gin.Context) {
 		if s.monitoring != nil {
 			err := fmt.Errorf("invalid registration request")
 			s.monitoring.FinishTrace(ctx, trace, err)
-			s.trackError(ctx, err, monitoring.ErrorCategoryValidation, "register", "auth")
+			s.trackError(ctx, err, monitoring.CategoryValidation, "register", "auth")
 		}
 		return
 	}
@@ -65,7 +65,7 @@ func (s *Server) registerHandler(c *gin.Context) {
 				"error": err.Error(),
 				"ip":    ipAddress,
 			})
-			s.trackError(ctx, err, monitoring.ErrorCategoryAuth, "register", "auth")
+			s.trackError(ctx, err, monitoring.CategoryAuth, "register", "auth")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		s.handleServiceError(c, err)
@@ -113,7 +113,7 @@ func (s *Server) loginHandler(c *gin.Context) {
 		if s.monitoring != nil {
 			err := fmt.Errorf("invalid login request")
 			s.monitoring.FinishTrace(ctx, trace, err)
-			s.trackError(ctx, err, monitoring.ErrorCategoryValidation, "login", "auth")
+			s.trackError(ctx, err, monitoring.CategoryValidation, "login", "auth")
 		}
 		return
 	}
@@ -149,7 +149,7 @@ func (s *Server) loginHandler(c *gin.Context) {
 				"ip":         ipAddress,
 				"error":      err.Error(),
 			})
-			s.trackError(ctx, err, monitoring.ErrorCategoryAuth, "login", "auth")
+			s.trackError(ctx, err, monitoring.CategoryAuth, "login", "auth")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		s.handleServiceError(c, err)
@@ -202,7 +202,7 @@ func (s *Server) logoutHandler(c *gin.Context) {
 		if s.monitoring != nil {
 			err := fmt.Errorf("invalid logout request")
 			s.monitoring.FinishTrace(ctx, trace, err)
-			s.trackError(ctx, err, monitoring.ErrorCategoryValidation, "logout", "auth")
+			s.trackError(ctx, err, monitoring.CategoryValidation, "logout", "auth")
 		}
 		return
 	}
@@ -231,7 +231,7 @@ func (s *Server) logoutHandler(c *gin.Context) {
 				"ip":         ipAddress,
 				"user_agent": userAgent,
 			})
-			s.trackError(ctx, err, monitoring.ErrorCategoryAuth, "logout", "auth")
+			s.trackError(ctx, err, monitoring.CategoryAuth, "logout", "auth")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		s.handleServiceError(c, err)
@@ -280,7 +280,7 @@ func (s *Server) refreshTokenHandler(c *gin.Context) {
 		if s.monitoring != nil {
 			err := fmt.Errorf("invalid refresh token request")
 			s.monitoring.FinishTrace(ctx, trace, err)
-			s.trackError(ctx, err, monitoring.ErrorCategoryValidation, "refresh_token", "auth")
+			s.trackError(ctx, err, monitoring.CategoryValidation, "refresh_token", "auth")
 		}
 		return
 	}
@@ -303,7 +303,7 @@ func (s *Server) refreshTokenHandler(c *gin.Context) {
 				"ip":         ipAddress,
 				"user_agent": userAgent,
 			})
-			s.trackError(ctx, err, monitoring.ErrorCategoryAuth, "refresh_token", "auth")
+			s.trackError(ctx, err, monitoring.CategoryAuth, "refresh_token", "auth")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		s.handleServiceError(c, err)
@@ -347,7 +347,7 @@ func (s *Server) validateTokenHandler(c *gin.Context) {
 		if s.monitoring != nil {
 			err := fmt.Errorf("invalid token validation request")
 			s.monitoring.FinishTrace(ctx, trace, err)
-			s.trackError(ctx, err, monitoring.ErrorCategoryValidation, "validate_token", "auth")
+			s.trackError(ctx, err, monitoring.CategoryValidation, "validate_token", "auth")
 		}
 		return
 	}
@@ -368,7 +368,7 @@ func (s *Server) validateTokenHandler(c *gin.Context) {
 				"ip":         ipAddress,
 				"user_agent": userAgent,
 			})
-			s.trackError(ctx, err, monitoring.ErrorCategoryAuth, "validate_token", "auth")
+			s.trackError(ctx, err, monitoring.CategoryAuth, "validate_token", "auth")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		s.handleServiceError(c, err)

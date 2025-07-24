@@ -458,7 +458,7 @@ func (s *Server) monitoringHealthHandler(c *gin.Context) {
 	// Perform health check
 	err := s.monitoring.HealthCheck(ctx)
 	if err != nil {
-		s.monitoring.TrackError(ctx, err, monitoring.ErrorCategorySystem, "health_check", "monitoring")
+		s.monitoring.TrackError(ctx, err, monitoring.CategorySystem, "health_check", "monitoring")
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"status":    "unhealthy",
 			"error":     err.Error(),

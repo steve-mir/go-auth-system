@@ -80,17 +80,17 @@ func getValidationErrorMessage(err validator.FieldError) string {
 	}
 }
 
-// bindAndValidate binds JSON request and validates it
-func (s *Server) bindAndValidate(c *gin.Context, req interface{}) bool {
-	if err := c.ShouldBindJSON(req); err != nil {
-		s.badRequestResponse(c, "Invalid JSON format", map[string]interface{}{
-			"error": err.Error(),
-		})
-		return false
-	}
+// // bindAndValidate binds JSON request and validates it
+// func (s *Server) bindAndValidate(c *gin.Context, req interface{}) bool {
+// 	if err := c.ShouldBindJSON(req); err != nil {
+// 		s.badRequestResponse(c, "Invalid JSON format", map[string]interface{}{
+// 			"error": err.Error(),
+// 		})
+// 		return false
+// 	}
 
-	return s.validateRequest(c, req)
-}
+// 	return s.validateRequest(c, req)
+// }
 
 // bindQueryAndValidate binds query parameters and validates them
 func (s *Server) bindQueryAndValidate(c *gin.Context, req interface{}) bool {

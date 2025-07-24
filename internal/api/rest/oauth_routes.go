@@ -55,7 +55,7 @@ func (s *Server) oauthLoginHandler(c *gin.Context) {
 
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "oauth_login", "sso")
+			s.trackError(ctx, err, monitoring.CategorySystem, "oauth_login", "sso")
 			s.trackSecurityEvent(ctx, "oauth_login_failed", "medium", map[string]interface{}{
 				"provider": provider,
 				"error":    err.Error(),
@@ -95,7 +95,7 @@ func (s *Server) oauthCallbackHandler(c *gin.Context) {
 
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "oauth_callback", "sso")
+			s.trackError(ctx, err, monitoring.CategorySystem, "oauth_callback", "sso")
 			s.trackSecurityEvent(ctx, "oauth_callback_failed", "high", map[string]interface{}{
 				"provider": provider,
 				"error":    err.Error(),
@@ -142,7 +142,7 @@ func (s *Server) oauthUnlinkHandler(c *gin.Context) {
 
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "oauth_unlink", "sso")
+			s.trackError(ctx, err, monitoring.CategorySystem, "oauth_unlink", "sso")
 		}
 		s.handleServiceError(c, err)
 		return
@@ -177,7 +177,7 @@ func (s *Server) getLinkedAccountsHandler(c *gin.Context) {
 
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "get_linked_accounts", "sso")
+			s.trackError(ctx, err, monitoring.CategorySystem, "get_linked_accounts", "sso")
 		}
 		s.handleServiceError(c, err)
 		return
@@ -203,7 +203,7 @@ func (s *Server) samlMetadataHandler(c *gin.Context) {
 	metadata, err := s.ssoService.GetSAMLMetadata(ctx)
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "saml_metadata", "sso")
+			s.trackError(ctx, err, monitoring.CategorySystem, "saml_metadata", "sso")
 		}
 		s.handleServiceError(c, err)
 		return
@@ -227,7 +227,7 @@ func (s *Server) samlLoginHandler(c *gin.Context) {
 	result, err := s.ssoService.InitiateSAMLLogin(ctx, req.IDPEntityID, req.RelayState)
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "saml_login", "sso")
+			s.trackError(ctx, err, monitoring.CategorySystem, "saml_login", "sso")
 		}
 		s.handleServiceError(c, err)
 		return
@@ -262,7 +262,7 @@ func (s *Server) samlCallbackHandler(c *gin.Context) {
 
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "saml_callback", "sso")
+			s.trackError(ctx, err, monitoring.CategorySystem, "saml_callback", "sso")
 			s.trackSecurityEvent(ctx, "saml_callback_failed", "high", map[string]interface{}{
 				"error": err.Error(),
 				"ip":    c.ClientIP(),
@@ -308,7 +308,7 @@ func (s *Server) oidcLoginHandler(c *gin.Context) {
 	url, err := s.ssoService.GetOIDCAuthURL(ctx, provider, state, nonce)
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "oidc_login", "sso")
+			s.trackError(ctx, err, monitoring.CategorySystem, "oidc_login", "sso")
 		}
 		s.handleServiceError(c, err)
 		return
@@ -344,7 +344,7 @@ func (s *Server) oidcCallbackHandler(c *gin.Context) {
 
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "oidc_callback", "sso")
+			s.trackError(ctx, err, monitoring.CategorySystem, "oidc_callback", "sso")
 			s.trackSecurityEvent(ctx, "oidc_callback_failed", "high", map[string]interface{}{
 				"provider": provider,
 				"error":    err.Error(),
@@ -393,7 +393,7 @@ func (s *Server) oidcRefreshHandler(c *gin.Context) {
 
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "oidc_refresh", "sso")
+			s.trackError(ctx, err, monitoring.CategorySystem, "oidc_refresh", "sso")
 		}
 		s.handleServiceError(c, err)
 		return

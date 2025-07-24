@@ -540,6 +540,27 @@ func (s *Service) ExportLogMetrics(format string) ([]byte, error) {
 	return nil, fmt.Errorf("log aggregator not enabled")
 }
 
+// RecordMFAAttempt records an MFA attempt
+func (s *Service) RecordMFAAttempt(method string) {
+	if s.metrics != nil {
+		s.metrics.RecordMFAAttempt(method)
+	}
+}
+
+// RecordMFASuccess records a successful MFA verification
+func (s *Service) RecordMFASuccess(method string) {
+	if s.metrics != nil {
+		s.metrics.RecordMFASuccess(method)
+	}
+}
+
+// RecordMFAFailure records a failed MFA verification
+func (s *Service) RecordMFAFailure(method, reason string) {
+	if s.metrics != nil {
+		s.metrics.RecordMFAFailure(method, reason)
+	}
+}
+
 // Close closes the monitoring service and any open resources
 func (s *Service) Close() error {
 	if s.logger != nil {

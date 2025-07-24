@@ -46,7 +46,7 @@ func (s *Server) getUserProfileHandler(c *gin.Context) {
 	if userID == "" {
 		if s.monitoring != nil {
 			err := fmt.Errorf("user ID not found in context")
-			s.trackError(ctx, err, monitoring.ErrorCategoryAuth, "get_profile", "user")
+			s.trackError(ctx, err, monitoring.CategoryAuth, "get_profile", "user")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		s.unauthorizedResponse(c, "User ID not found in context")
@@ -58,7 +58,7 @@ func (s *Server) getUserProfileHandler(c *gin.Context) {
 
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "get_profile", "user")
+			s.trackError(ctx, err, monitoring.CategorySystem, "get_profile", "user")
 			s.trackUserEvent(ctx, "profile_access_failed", userID, map[string]interface{}{
 				"error":    err.Error(),
 				"duration": duration.Milliseconds(),
@@ -96,7 +96,7 @@ func (s *Server) updateUserProfileHandler(c *gin.Context) {
 	if userID == "" {
 		if s.monitoring != nil {
 			err := fmt.Errorf("user ID not found in context")
-			s.trackError(ctx, err, monitoring.ErrorCategoryAuth, "update_profile", "user")
+			s.trackError(ctx, err, monitoring.CategoryAuth, "update_profile", "user")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		s.unauthorizedResponse(c, "User ID not found in context")
@@ -107,7 +107,7 @@ func (s *Server) updateUserProfileHandler(c *gin.Context) {
 	if !s.bindAndValidate(c, &req) {
 		if s.monitoring != nil {
 			err := fmt.Errorf("invalid update profile request")
-			s.trackError(ctx, err, monitoring.ErrorCategoryValidation, "update_profile", "user")
+			s.trackError(ctx, err, monitoring.CategoryValidation, "update_profile", "user")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		return
@@ -129,7 +129,7 @@ func (s *Server) updateUserProfileHandler(c *gin.Context) {
 
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "update_profile", "user")
+			s.trackError(ctx, err, monitoring.CategorySystem, "update_profile", "user")
 			s.trackUserEvent(ctx, "profile_update_failed", userID, map[string]interface{}{
 				"error":    err.Error(),
 				"duration": duration.Milliseconds(),
@@ -169,7 +169,7 @@ func (s *Server) changePasswordHandler(c *gin.Context) {
 	if userID == "" {
 		if s.monitoring != nil {
 			err := fmt.Errorf("user ID not found in context")
-			s.trackError(ctx, err, monitoring.ErrorCategoryAuth, "change_password", "user")
+			s.trackError(ctx, err, monitoring.CategoryAuth, "change_password", "user")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		s.unauthorizedResponse(c, "User ID not found in context")
@@ -180,7 +180,7 @@ func (s *Server) changePasswordHandler(c *gin.Context) {
 	if !s.bindAndValidate(c, &req) {
 		if s.monitoring != nil {
 			err := fmt.Errorf("invalid change password request")
-			s.trackError(ctx, err, monitoring.ErrorCategoryValidation, "change_password", "user")
+			s.trackError(ctx, err, monitoring.CategoryValidation, "change_password", "user")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		return
@@ -191,7 +191,7 @@ func (s *Server) changePasswordHandler(c *gin.Context) {
 
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "change_password", "user")
+			s.trackError(ctx, err, monitoring.CategorySystem, "change_password", "user")
 			s.trackSecurityEvent(ctx, "password_change_failed", "medium", map[string]interface{}{
 				"user_id": userID,
 				"error":   err.Error(),
@@ -237,7 +237,7 @@ func (s *Server) deleteUserAccountHandler(c *gin.Context) {
 	if userID == "" {
 		if s.monitoring != nil {
 			err := fmt.Errorf("user ID not found in context")
-			s.trackError(ctx, err, monitoring.ErrorCategoryAuth, "delete_account", "user")
+			s.trackError(ctx, err, monitoring.CategoryAuth, "delete_account", "user")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		s.unauthorizedResponse(c, "User ID not found in context")
@@ -249,7 +249,7 @@ func (s *Server) deleteUserAccountHandler(c *gin.Context) {
 
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "delete_account", "user")
+			s.trackError(ctx, err, monitoring.CategorySystem, "delete_account", "user")
 			s.trackSecurityEvent(ctx, "account_deletion_failed", "medium", map[string]interface{}{
 				"user_id": userID,
 				"error":   err.Error(),
@@ -295,7 +295,7 @@ func (s *Server) getUserRolesHandler(c *gin.Context) {
 	if userID == "" {
 		if s.monitoring != nil {
 			err := fmt.Errorf("user ID not found in context")
-			s.trackError(ctx, err, monitoring.ErrorCategoryAuth, "get_roles", "user")
+			s.trackError(ctx, err, monitoring.CategoryAuth, "get_roles", "user")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		s.unauthorizedResponse(c, "User ID not found in context")
@@ -307,7 +307,7 @@ func (s *Server) getUserRolesHandler(c *gin.Context) {
 
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "get_roles", "user")
+			s.trackError(ctx, err, monitoring.CategorySystem, "get_roles", "user")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		s.handleServiceError(c, err)

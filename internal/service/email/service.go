@@ -9,7 +9,17 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/steve-mir/go-auth-system/internal/errors"
 	"github.com/steve-mir/go-auth-system/internal/interfaces"
+)
+
+// Email service specific errors
+var (
+	ErrTemplateNotFound = errors.New(
+		errors.ErrorTypeNotFound,
+		"TEMPLATE_NOT_FOUND",
+		"Email template not found",
+	)
 )
 
 // Service implements the EmailService interface

@@ -4,20 +4,21 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	// "github.com/steve-mir/go-auth-system/internal/interfaces"
 )
 
 // Helper methods for REST API handlers
 
-// // bindAndValidate binds JSON request body and validates it
-// func (s *Server) bindAndValidate(c *gin.Context, obj interface{}) bool {
-// 	if err := c.ShouldBindJSON(obj); err != nil {
-// 		s.badRequestResponse(c, "Invalid request body", map[string]interface{}{
-// 			"error": err.Error(),
-// 		})
-// 		return false
-// 	}
-// 	return true
-// }
+// bindAndValidate binds JSON request body and validates it
+func (s *Server) bindAndValidate(c *gin.Context, obj interface{}) bool {
+	if err := c.ShouldBindJSON(obj); err != nil {
+		s.badRequestResponse(c, "Invalid request body", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return false
+	}
+	return true
+}
 
 // // parseUUIDParam parses UUID parameter from URL
 // func (s *Server) parseUUIDParam(c *gin.Context, param string) (string, bool) {
@@ -109,7 +110,7 @@ func (s *Server) getClientInfo(c *gin.Context) (ipAddress, userAgent string) {
 
 // Response helper methods
 
-// // successResponse sends a successful response
+// successResponse sends a successful response
 // func (s *Server) successResponse(c *gin.Context, statusCode int, data interface{}) {
 // 	c.JSON(statusCode, gin.H{
 // 		"success": true,
@@ -117,7 +118,7 @@ func (s *Server) getClientInfo(c *gin.Context) (ipAddress, userAgent string) {
 // 	})
 // }
 
-// // paginatedResponse sends a paginated response
+// paginatedResponse sends a paginated response
 // func (s *Server) paginatedResponse(c *gin.Context, statusCode int, data interface{}, pagination interfaces.PaginationInfo) {
 // 	c.JSON(statusCode, gin.H{
 // 		"success":    true,
@@ -149,7 +150,7 @@ func (s *Server) getClientInfo(c *gin.Context) (ipAddress, userAgent string) {
 // 	})
 // }
 
-// // forbiddenResponse sends a forbidden response
+// forbiddenResponse sends a forbidden response
 // func (s *Server) forbiddenResponse(c *gin.Context, message string) {
 // 	c.JSON(http.StatusForbidden, gin.H{
 // 		"success": false,
@@ -191,7 +192,7 @@ func (s *Server) getClientInfo(c *gin.Context) (ipAddress, userAgent string) {
 
 // Utility functions
 
-// // calculatePagination calculates pagination information
+// calculatePagination calculates pagination information
 // func calculatePagination(page, limit int, total int64) PaginationInfo {
 // 	totalPages := int((total + int64(limit) - 1) / int64(limit))
 

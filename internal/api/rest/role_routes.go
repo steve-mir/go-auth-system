@@ -49,7 +49,7 @@ func (s *Server) createRoleHandler(c *gin.Context) {
 	if !s.bindAndValidate(c, &req) {
 		if s.monitoring != nil {
 			err := fmt.Errorf("invalid create role request")
-			s.trackError(ctx, err, monitoring.ErrorCategoryValidation, "create_role", "role")
+			s.trackError(ctx, err, monitoring.CategoryValidation, "create_role", "role")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		return
@@ -67,7 +67,7 @@ func (s *Server) createRoleHandler(c *gin.Context) {
 
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "create_role", "role")
+			s.trackError(ctx, err, monitoring.CategorySystem, "create_role", "role")
 			s.trackSecurityEvent(ctx, "role_creation_failed", "medium", map[string]interface{}{
 				"admin_user_id": adminUserID,
 				"role_name":     req.Name,
@@ -115,7 +115,7 @@ func (s *Server) listRolesHandler(c *gin.Context) {
 	if !valid {
 		if s.monitoring != nil {
 			err := fmt.Errorf("invalid pagination parameters")
-			s.trackError(ctx, err, monitoring.ErrorCategoryValidation, "list_roles", "role")
+			s.trackError(ctx, err, monitoring.CategoryValidation, "list_roles", "role")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		return
@@ -131,7 +131,7 @@ func (s *Server) listRolesHandler(c *gin.Context) {
 
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "list_roles", "role")
+			s.trackError(ctx, err, monitoring.CategorySystem, "list_roles", "role")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		s.handleServiceError(c, err)
@@ -170,7 +170,7 @@ func (s *Server) getRoleHandler(c *gin.Context) {
 	if !valid {
 		if s.monitoring != nil {
 			err := fmt.Errorf("invalid role ID parameter")
-			s.trackError(ctx, err, monitoring.ErrorCategoryValidation, "get_role", "role")
+			s.trackError(ctx, err, monitoring.CategoryValidation, "get_role", "role")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		return
@@ -179,7 +179,7 @@ func (s *Server) getRoleHandler(c *gin.Context) {
 	roleID, err := uuid.Parse(roleIDStr)
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryValidation, "get_role", "role")
+			s.trackError(ctx, err, monitoring.CategoryValidation, "get_role", "role")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		s.badRequestResponse(c, "Invalid role ID format", nil)
@@ -191,7 +191,7 @@ func (s *Server) getRoleHandler(c *gin.Context) {
 
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "get_role", "role")
+			s.trackError(ctx, err, monitoring.CategorySystem, "get_role", "role")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		s.handleServiceError(c, err)
@@ -228,7 +228,7 @@ func (s *Server) updateRoleHandler(c *gin.Context) {
 	if !valid {
 		if s.monitoring != nil {
 			err := fmt.Errorf("invalid role ID parameter")
-			s.trackError(ctx, err, monitoring.ErrorCategoryValidation, "update_role", "role")
+			s.trackError(ctx, err, monitoring.CategoryValidation, "update_role", "role")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		return
@@ -237,7 +237,7 @@ func (s *Server) updateRoleHandler(c *gin.Context) {
 	roleID, err := uuid.Parse(roleIDStr)
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryValidation, "update_role", "role")
+			s.trackError(ctx, err, monitoring.CategoryValidation, "update_role", "role")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		s.badRequestResponse(c, "Invalid role ID format", nil)
@@ -248,7 +248,7 @@ func (s *Server) updateRoleHandler(c *gin.Context) {
 	if !s.bindAndValidate(c, &req) {
 		if s.monitoring != nil {
 			err := fmt.Errorf("invalid update role request")
-			s.trackError(ctx, err, monitoring.ErrorCategoryValidation, "update_role", "role")
+			s.trackError(ctx, err, monitoring.CategoryValidation, "update_role", "role")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		return
@@ -270,7 +270,7 @@ func (s *Server) updateRoleHandler(c *gin.Context) {
 
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "update_role", "role")
+			s.trackError(ctx, err, monitoring.CategorySystem, "update_role", "role")
 			s.trackSecurityEvent(ctx, "role_update_failed", "medium", map[string]interface{}{
 				"admin_user_id": adminUserID,
 				"role_id":       roleID.String(),
@@ -318,7 +318,7 @@ func (s *Server) deleteRoleHandler(c *gin.Context) {
 	if !valid {
 		if s.monitoring != nil {
 			err := fmt.Errorf("invalid role ID parameter")
-			s.trackError(ctx, err, monitoring.ErrorCategoryValidation, "delete_role", "role")
+			s.trackError(ctx, err, monitoring.CategoryValidation, "delete_role", "role")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		return
@@ -327,7 +327,7 @@ func (s *Server) deleteRoleHandler(c *gin.Context) {
 	roleID, err := uuid.Parse(roleIDStr)
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryValidation, "delete_role", "role")
+			s.trackError(ctx, err, monitoring.CategoryValidation, "delete_role", "role")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		s.badRequestResponse(c, "Invalid role ID format", nil)
@@ -342,7 +342,7 @@ func (s *Server) deleteRoleHandler(c *gin.Context) {
 
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "delete_role", "role")
+			s.trackError(ctx, err, monitoring.CategorySystem, "delete_role", "role")
 			s.trackSecurityEvent(ctx, "role_deletion_failed", "high", map[string]interface{}{
 				"admin_user_id": adminUserID,
 				"role_id":       roleID.String(),
@@ -390,7 +390,7 @@ func (s *Server) assignRoleToUserHandler(c *gin.Context) {
 	if !valid {
 		if s.monitoring != nil {
 			err := fmt.Errorf("invalid role ID parameter")
-			s.trackError(ctx, err, monitoring.ErrorCategoryValidation, "assign_role", "role")
+			s.trackError(ctx, err, monitoring.CategoryValidation, "assign_role", "role")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		return
@@ -400,7 +400,7 @@ func (s *Server) assignRoleToUserHandler(c *gin.Context) {
 	if !valid {
 		if s.monitoring != nil {
 			err := fmt.Errorf("invalid user ID parameter")
-			s.trackError(ctx, err, monitoring.ErrorCategoryValidation, "assign_role", "role")
+			s.trackError(ctx, err, monitoring.CategoryValidation, "assign_role", "role")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		return
@@ -409,7 +409,7 @@ func (s *Server) assignRoleToUserHandler(c *gin.Context) {
 	roleID, err := uuid.Parse(roleIDStr)
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryValidation, "assign_role", "role")
+			s.trackError(ctx, err, monitoring.CategoryValidation, "assign_role", "role")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		s.badRequestResponse(c, "Invalid role ID format", nil)
@@ -419,7 +419,7 @@ func (s *Server) assignRoleToUserHandler(c *gin.Context) {
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryValidation, "assign_role", "role")
+			s.trackError(ctx, err, monitoring.CategoryValidation, "assign_role", "role")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		s.badRequestResponse(c, "Invalid user ID format", nil)
@@ -431,7 +431,7 @@ func (s *Server) assignRoleToUserHandler(c *gin.Context) {
 	assignedBy, err := uuid.Parse(adminUserID)
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryAuth, "assign_role", "role")
+			s.trackError(ctx, err, monitoring.CategoryAuth, "assign_role", "role")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		s.internalServerErrorResponse(c, "Invalid admin user ID")
@@ -443,7 +443,7 @@ func (s *Server) assignRoleToUserHandler(c *gin.Context) {
 
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "assign_role", "role")
+			s.trackError(ctx, err, monitoring.CategorySystem, "assign_role", "role")
 			s.trackSecurityEvent(ctx, "role_assignment_failed", "high", map[string]interface{}{
 				"admin_user_id":  adminUserID,
 				"target_user_id": userID.String(),
@@ -494,7 +494,7 @@ func (s *Server) removeRoleFromUserHandler(c *gin.Context) {
 	if !valid {
 		if s.monitoring != nil {
 			err := fmt.Errorf("invalid role ID parameter")
-			s.trackError(ctx, err, monitoring.ErrorCategoryValidation, "remove_role", "role")
+			s.trackError(ctx, err, monitoring.CategoryValidation, "remove_role", "role")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		return
@@ -504,7 +504,7 @@ func (s *Server) removeRoleFromUserHandler(c *gin.Context) {
 	if !valid {
 		if s.monitoring != nil {
 			err := fmt.Errorf("invalid user ID parameter")
-			s.trackError(ctx, err, monitoring.ErrorCategoryValidation, "remove_role", "role")
+			s.trackError(ctx, err, monitoring.CategoryValidation, "remove_role", "role")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		return
@@ -513,7 +513,7 @@ func (s *Server) removeRoleFromUserHandler(c *gin.Context) {
 	roleID, err := uuid.Parse(roleIDStr)
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryValidation, "remove_role", "role")
+			s.trackError(ctx, err, monitoring.CategoryValidation, "remove_role", "role")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		s.badRequestResponse(c, "Invalid role ID format", nil)
@@ -523,7 +523,7 @@ func (s *Server) removeRoleFromUserHandler(c *gin.Context) {
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryValidation, "remove_role", "role")
+			s.trackError(ctx, err, monitoring.CategoryValidation, "remove_role", "role")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		s.badRequestResponse(c, "Invalid user ID format", nil)
@@ -538,7 +538,7 @@ func (s *Server) removeRoleFromUserHandler(c *gin.Context) {
 
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "remove_role", "role")
+			s.trackError(ctx, err, monitoring.CategorySystem, "remove_role", "role")
 			s.trackSecurityEvent(ctx, "role_removal_failed", "high", map[string]interface{}{
 				"admin_user_id":  adminUserID,
 				"target_user_id": userID.String(),
@@ -589,7 +589,7 @@ func (s *Server) getRoleUsersHandler(c *gin.Context) {
 	if !valid {
 		if s.monitoring != nil {
 			err := fmt.Errorf("invalid role ID parameter")
-			s.trackError(ctx, err, monitoring.ErrorCategoryValidation, "get_role_users", "role")
+			s.trackError(ctx, err, monitoring.CategoryValidation, "get_role_users", "role")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		return
@@ -598,7 +598,7 @@ func (s *Server) getRoleUsersHandler(c *gin.Context) {
 	roleID, err := uuid.Parse(roleIDStr)
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryValidation, "get_role_users", "role")
+			s.trackError(ctx, err, monitoring.CategoryValidation, "get_role_users", "role")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		s.badRequestResponse(c, "Invalid role ID format", nil)
@@ -610,7 +610,7 @@ func (s *Server) getRoleUsersHandler(c *gin.Context) {
 
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "get_role_users", "role")
+			s.trackError(ctx, err, monitoring.CategorySystem, "get_role_users", "role")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		s.handleServiceError(c, err)
@@ -658,7 +658,7 @@ func (s *Server) validatePermissionHandler(c *gin.Context) {
 	if !s.bindAndValidate(c, &req) {
 		if s.monitoring != nil {
 			err := fmt.Errorf("invalid validate permission request")
-			s.trackError(ctx, err, monitoring.ErrorCategoryValidation, "validate_permission", "role")
+			s.trackError(ctx, err, monitoring.CategoryValidation, "validate_permission", "role")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		return
@@ -667,7 +667,7 @@ func (s *Server) validatePermissionHandler(c *gin.Context) {
 	userID, err := uuid.Parse(req.UserID)
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryValidation, "validate_permission", "role")
+			s.trackError(ctx, err, monitoring.CategoryValidation, "validate_permission", "role")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		s.badRequestResponse(c, "Invalid user ID format", nil)
@@ -686,7 +686,7 @@ func (s *Server) validatePermissionHandler(c *gin.Context) {
 
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "validate_permission", "role")
+			s.trackError(ctx, err, monitoring.CategorySystem, "validate_permission", "role")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		s.handleServiceError(c, err)
@@ -738,7 +738,7 @@ func (s *Server) validateAccessHandler(c *gin.Context) {
 	if !s.bindAndValidate(c, &req) {
 		if s.monitoring != nil {
 			err := fmt.Errorf("invalid validate access request")
-			s.trackError(ctx, err, monitoring.ErrorCategoryValidation, "validate_access", "role")
+			s.trackError(ctx, err, monitoring.CategoryValidation, "validate_access", "role")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		return
@@ -749,7 +749,7 @@ func (s *Server) validateAccessHandler(c *gin.Context) {
 
 	if err != nil {
 		if s.monitoring != nil {
-			s.trackError(ctx, err, monitoring.ErrorCategoryService, "validate_access", "role")
+			s.trackError(ctx, err, monitoring.CategorySystem, "validate_access", "role")
 			s.monitoring.FinishTrace(ctx, trace, err)
 		}
 		s.handleServiceError(c, err)
