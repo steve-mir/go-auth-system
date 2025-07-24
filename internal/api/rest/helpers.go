@@ -164,26 +164,6 @@ func (s *Server) handleServiceError(c *gin.Context, err error) {
 	s.internalServerErrorResponse(c, err.Error())
 }
 
-// Middleware methods
-
-// authenticationMiddleware validates authentication tokens
-func (s *Server) authenticationMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// Implementation would depend on your auth service
-		// This is a placeholder
-		c.Next()
-	}
-}
-
-// adminAuthorizationMiddleware checks for admin privileges
-func (s *Server) adminAuthorizationMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// Implementation would depend on your role service
-		// This is a placeholder
-		c.Next()
-	}
-}
-
 // Utility functions
 
 // sanitizeStringField sanitizes string input

@@ -1,7 +1,6 @@
 package rest
 
 import (
-	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -14,21 +13,21 @@ func (s *Server) authenticationMiddleware() gin.HandlerFunc {
 		// Extract token from Authorization header
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			s.errorResponse(c, http.StatusUnauthorized, "MISSING_AUTH_HEADER", "Authorization header is required", nil)
+			s.unauthorizedResponse(c, "Authorization header is required")
 			c.Abort()
 			return
 		}
 
 		// Check Bearer token format
 		if !strings.HasPrefix(authHeader, "Bearer ") {
-			s.errorResponse(c, http.StatusUnauthorized, "INVALID_AUTH_FORMAT", "Authorization header must be in format 'Bearer <token>'", nil)
+			s.unauthorizedResponse(c, "Authorization header must be in format 'Bearer <token>'")
 			c.Abort()
 			return
 		}
 
 		token := strings.TrimPrefix(authHeader, "Bearer ")
 		if token == "" {
-			s.errorResponse(c, http.StatusUnauthorized, "MISSING_TOKEN", "Token is required", nil)
+			s.unauthorizedResponse(c, "Token is required")
 			c.Abort()
 			return
 		}
@@ -40,15 +39,13 @@ func (s *Server) authenticationMiddleware() gin.HandlerFunc {
 
 		validateResp, err := s.authService.ValidateToken(c.Request.Context(), validateReq)
 		if err != nil {
-			s.errorResponse(c, http.StatusUnauthorized, "INVALID_TOKEN", "Token validation failed", map[string]interface{}{
-				"error": err.Error(),
-			})
+			s.unauthorizedResponse(c, "Token validation failed")
 			c.Abort()
 			return
 		}
 
 		if !validateResp.Valid {
-			s.errorResponse(c, http.StatusUnauthorized, "TOKEN_INVALID", "Token is invalid or expired", nil)
+			s.unauthorizedResponse(c, "Token is invalid or expired")
 			c.Abort()
 			return
 		}
@@ -70,14 +67,14 @@ func (s *Server) adminAuthorizationMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		roles, exists := c.Get("user_roles")
 		if !exists {
-			s.errorResponse(c, http.StatusForbidden, "NO_ROLES", "User roles not found in context", nil)
+			s.forbiddenResponse(c, "User roles not found in context")
 			c.Abort()
 			return
 		}
 
 		userRoles, ok := roles.([]string)
 		if !ok {
-			s.errorResponse(c, http.StatusForbidden, "INVALID_ROLES", "Invalid roles format in context", nil)
+			s.forbiddenResponse(c, "Invalid roles format in context")
 			c.Abort()
 			return
 		}
@@ -92,7 +89,7 @@ func (s *Server) adminAuthorizationMiddleware() gin.HandlerFunc {
 		}
 
 		if !hasAdminRole {
-			s.errorResponse(c, http.StatusForbidden, "INSUFFICIENT_PERMISSIONS", "Admin role required", nil)
+			s.forbiddenResponse(c, "Admin role required")
 			c.Abort()
 			return
 		}
@@ -106,14 +103,14 @@ func (s *Server) roleAuthorizationMiddleware(requiredRoles ...string) gin.Handle
 	return func(c *gin.Context) {
 		roles, exists := c.Get("user_roles")
 		if !exists {
-			s.errorResponse(c, http.StatusForbidden, "NO_ROLES", "User roles not found in context", nil)
+			s.forbiddenResponse(c, "User roles not found in context")
 			c.Abort()
 			return
 		}
 
 		userRoles, ok := roles.([]string)
 		if !ok {
-			s.errorResponse(c, http.StatusForbidden, "INVALID_ROLES", "Invalid roles format in context", nil)
+			s.forbiddenResponse(c, "Invalid roles format in context")
 			c.Abort()
 			return
 		}
@@ -133,10 +130,7 @@ func (s *Server) roleAuthorizationMiddleware(requiredRoles ...string) gin.Handle
 		}
 
 		if !hasRequiredRole {
-			s.errorResponse(c, http.StatusForbidden, "INSUFFICIENT_PERMISSIONS", "Required role not found", map[string]interface{}{
-				"required_roles": requiredRoles,
-				"user_roles":     userRoles,
-			})
+			s.forbiddenResponse(c, "Required role not found")
 			c.Abort()
 			return
 		}

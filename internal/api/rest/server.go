@@ -308,10 +308,10 @@ func (s *Server) setupRoutes() {
 			// MFA routes
 			s.setupMFARoutes(protected)
 
-			//TODO: Admin routes (require admin role)
-			// adminGroup := protected.Group("/admin")
-			// adminGroup.Use(s.adminAuthorizationMiddleware())
-			// s.setupAdminRoutes(adminGroup)
+			// Admin routes (require admin role)
+			adminGroup := protected.Group("/admin")
+			adminGroup.Use(s.adminAuthorizationMiddleware())
+			s.setupAdminRoutes(adminGroup)
 		}
 	}
 }
