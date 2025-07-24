@@ -14,6 +14,7 @@ import (
 
 	// "github.com/steve-mir/go-auth-system/internal/service/admin"
 	"github.com/steve-mir/go-auth-system/internal/service/auth"
+	"github.com/steve-mir/go-auth-system/internal/service/mfa"
 	// "github.com/steve-mir/go-auth-system/internal/service/role"
 	// "github.com/steve-mir/go-auth-system/internal/service/user"
 )
@@ -30,6 +31,7 @@ type Server struct {
 	authService   auth.AuthService
 	userService   interfaces.UserService
 	roleService   interfaces.RoleService
+	mfaService    mfa.MFAService
 	healthService HealthService
 	ssoService    SSOService
 }
@@ -139,6 +141,7 @@ func NewServer(
 	authService auth.AuthService,
 	userService interfaces.UserService,
 	roleService interfaces.RoleService,
+	mfaService mfa.MFAService,
 	adminService interfaces.AdminService,
 	healthService HealthService,
 	ssoService SSOService,
@@ -166,6 +169,7 @@ func NewServer(
 		authService:   authService,
 		userService:   userService,
 		roleService:   roleService,
+		mfaService:    mfaService,
 		adminService:  adminService,
 		healthService: healthService,
 		ssoService:    ssoService,
@@ -252,6 +256,9 @@ func (s *Server) setupRoutes() {
 			roleGroup := protected.Group("/roles")
 			s.setupRoleRoutes(roleGroup)
 
+			// MFA routes
+			s.setupMFARoutes(protected)
+
 			//TODO: Admin routes (require admin role)
 			// adminGroup := protected.Group("/admin")
 			// adminGroup.Use(s.adminAuthorizationMiddleware())
@@ -295,6 +302,7 @@ func (s *Server) rootHandler(c *gin.Context) {
 				"auth":  "/api/v1/auth",
 				"users": "/api/v1/users",
 				"roles": "/api/v1/roles",
+				"mfa":   "/api/v1/mfa",
 				"admin": "/api/v1/admin",
 			},
 		},
