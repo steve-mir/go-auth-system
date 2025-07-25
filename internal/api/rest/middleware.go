@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/steve-mir/go-auth-system/internal/service/auth"
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
 )
 
 // authenticationMiddleware validates JWT tokens and sets user context
@@ -33,7 +33,7 @@ func (s *Server) authenticationMiddleware() gin.HandlerFunc {
 		}
 
 		// Validate token using auth service
-		validateReq := &auth.ValidateTokenRequest{
+		validateReq := &interfaces.ValidateTokenRequest{
 			Token: token,
 		}
 

@@ -82,3 +82,22 @@ func (c *Client) FlushDB(ctx context.Context) error {
 func (c *Client) FlushAll(ctx context.Context) error {
 	return c.Client.FlushAll(ctx).Err()
 }
+
+// TODO: Implement these
+// func (c *Client) Set(ctx context.Context, key string, data []byte, expiration int64) error {
+// 	return c.Client.Set(ctx, key, data, time.Duration(expiration)).Err()
+// }
+
+// func (c *Client) Delete(ctx context.Context, key string) error {
+// 	return c.Client.Delete(ctx, key).Err()
+// }
+
+// // FlushAll flushes all databases (use with extreme caution)
+// func (c *Client) Delete(ctx context.Context) error {
+// 	return c.Client.FlushAll(ctx).Err()
+// }
+
+// FlushAll flushes all databases (use with extreme caution)
+// func (c *Client) Get(ctx context.Context, key string) ([]byte, error) {
+// 	return nil, nil
+// }

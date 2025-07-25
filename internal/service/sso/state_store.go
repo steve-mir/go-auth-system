@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/redis/go-redis/v9"
+	"github.com/steve-mir/go-auth-system/internal/repository/redis"
 )
 
 // RedisStateStore implements StateStore using Redis
@@ -48,7 +48,7 @@ func (r *RedisStateStore) GetState(ctx context.Context, stateKey string) (*OAuth
 
 	data, err := r.client.Get(ctx, key).Result()
 	if err != nil {
-		if err == redis.Nil {
+		if err == nil {
 			return nil, fmt.Errorf("OAuth state not found or expired")
 		}
 		return nil, fmt.Errorf("failed to get OAuth state from Redis: %w", err)

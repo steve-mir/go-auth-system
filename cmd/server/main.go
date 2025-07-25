@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,6 +17,7 @@ import (
 	"github.com/steve-mir/go-auth-system/internal/api/rest"
 	"github.com/steve-mir/go-auth-system/internal/config"
 	"github.com/steve-mir/go-auth-system/internal/health"
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
 	"github.com/steve-mir/go-auth-system/internal/middleware"
 	"github.com/steve-mir/go-auth-system/internal/monitoring"
 	"github.com/steve-mir/go-auth-system/internal/repository/postgres"
@@ -26,9 +28,11 @@ import (
 	"github.com/steve-mir/go-auth-system/internal/security/token"
 	"github.com/steve-mir/go-auth-system/internal/service/admin"
 	"github.com/steve-mir/go-auth-system/internal/service/auth"
+	"github.com/steve-mir/go-auth-system/internal/service/email"
 	"github.com/steve-mir/go-auth-system/internal/service/mfa"
 	"github.com/steve-mir/go-auth-system/internal/service/role"
-	"github.com/steve-mir/go-auth-system/internal/service/sso"
+
+	// "github.com/steve-mir/go-auth-system/internal/service/sso"
 	"github.com/steve-mir/go-auth-system/internal/service/user"
 )
 
@@ -82,7 +86,7 @@ func printConfigSummary(cfg *config.Config) {
 	fmt.Printf("MFA: %t\n", cfg.Features.MFA.Enabled)
 	fmt.Printf("Admin Dashboard: %t\n", cfg.Features.AdminDashboard.Enabled)
 	fmt.Printf("Audit Logging: %t\n", cfg.Features.AuditLogging.Enabled)
-	fmt.Printf("Monitoring: %t\n", cfg.External.Monitoring.Enabled)
+	fmt.Printf("Monitoring: %t\n, %s", cfg.External.Monitoring.Enabled, cfg.External.Monitoring.Prometheus.Port)
 	fmt.Printf("\nConfiguration loaded successfully!\n")
 }
 
@@ -277,49 +281,67 @@ func runServer(ctx context.Context, cfg *config.Config) error {
 
 	// Initialize MFA service
 	log.Printf("Initializing MFA service...")
+	mfaRepo := mfa.NewPostgresMFARepository(db, store)
+	mfaUserRepo := mfa.NewPostgresUserRepository(db, store, encryptorSvc.GetEncryptor())
+	smsService := mfa.NewSMSServiceStub()
+	mfaCacheService := mfa.NewRedisCacheService(redisClient)
+
+	// Initialize email service for MFA
+	emailService, err := initializeEmailService(cfg, redisClient)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize email service for MFA: %v", err)
+		emailService = nil
+	}
+
+	var mfaEmailService mfa.EmailService
+	if emailService != nil {
+		mfaEmailService = mfa.NewEmailServiceAdapter(emailService)
+	}
+
 	mfaService := mfa.NewMFAService(cfg, &mfa.Dependencies{
-		MFARepo:      nil, //mfa.NewPostgresMFARepository(db, store),
-		UserRepo:     nil, //mfa.NewPostgresUserRepository(db, store),
-		SMSService:   nil, //mfa.NewSMSService(cfg),
-		EmailService: nil, //mfa.NewEmailService(cfg),
-		CacheService: nil, //mfa.NewRedisCacheService(redisClient),
+		MFARepo:      mfaRepo,
+		UserRepo:     mfaUserRepo,
+		SMSService:   smsService,
+		EmailService: mfaEmailService,
+		CacheService: mfaCacheService,
 		Encryptor:    encryptorSvc.GetEncryptor(),
 	})
 	log.Printf("MFA service initialized")
 
 	// Initialize admin service
+	log.Printf("Initializing admin service...")
+	sessionRepo := admin.NewPostgresSessionRepository(db, store)
+	auditService := admin.NewStubAuditService()
+	alertRepo := admin.NewPostgresAlertRepository(db, store)
+	notificationRepo := admin.NewPostgresNotificationRepository(db, store)
+
 	adminService := admin.NewService(admin.Dependencies{
-		Config:      cfg,
-		UserService: userService,
-		RoleService: roleService,
-		// SessionRepo: sessionStore,
-		// AuditService      audit.AuditService
-		// MonitoringService *monitoring.Service
-		// SessionRepo       SessionRepository
-		// AlertRepo         AlertRepository
-		// NotificationRepo  NotificationRepository
+		Config:            cfg,
+		UserService:       userService,
+		RoleService:       roleService,
+		AuditService:      auditService,
+		MonitoringService: monitoringSvc,
+		SessionRepo:       sessionRepo,
+		AlertRepo:         alertRepo,
+		NotificationRepo:  notificationRepo,
 	})
+	log.Printf("Admin service initialized")
 
 	// Initialize SSO service
-	log.Printf("Initializing SSO service...")
-	// socialAccountRepo := postgres.NewSocialAccountRepository(store)
+	// log.Printf("Initializing SSO service...")
+	// socialAccountRepo := sso.NewPostgresSocialAccountRepository(db, store)
 	// stateStore := sso.NewRedisStateStore(redisClient)
-
-	// // Create SSO user repository adapter
-	// ssoUserRepo := &SSOUserRepositoryAdapter{
-	// 	authRepo:  authUserRepo,
-	// 	encryptor: encryptorSvc.GetEncryptor(),
-	// }
+	// ssoUserRepo := sso.NewSSOUserRepositoryAdapter(authUserRepo, encryptorSvc.GetEncryptor())
 
 	// ssoService := sso.NewSSOService(
 	// 	cfg,
-	// 	nil, //ssoUserRepo,
-	// 	nil, //socialAccountRepo,
-	// 	nil, //stateStore,
+	// 	ssoUserRepo,
+	// 	socialAccountRepo,
+	// 	stateStore,
 	// 	hashSvc,
 	// 	encryptorSvc.GetEncryptor(),
 	// )
-	log.Printf("SSO service initialized")
+	// log.Printf("SSO service initialized")
 
 	log.Printf("Business services initialized")
 
@@ -335,7 +357,7 @@ func runServer(ctx context.Context, cfg *config.Config) error {
 		mfaService,
 		adminService,
 		healthSvc,
-		nil, //ssoService,
+		nil, // ssoService,
 	)
 	// httpServer := server.NewHTTPServer(&cfg.Server, healthSvc)
 
@@ -379,7 +401,7 @@ func runServer(ctx context.Context, cfg *config.Config) error {
 			}()
 
 			if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				errChan <- fmt.Errorf("Prometheus metrics server error: %w", err)
+				errChan <- fmt.Errorf("prometheus metrics server error: %w", err)
 			}
 		}()
 	}
@@ -425,130 +447,43 @@ func runServer(ctx context.Context, cfg *config.Config) error {
 	return nil
 }
 
-// SSOUserRepositoryAdapter adapts auth.UserRepository to sso.UserRepository interface
-type SSOUserRepositoryAdapter struct {
-	authRepo  auth.UserRepository
-	encryptor crypto.Encryptor
-}
-
-func (a *SSOUserRepositoryAdapter) GetUserByEmail(ctx context.Context, email string) (*sso.UserData, error) {
-	authUser, err := a.authRepo.GetUserByEmail(ctx, email)
-	if err != nil {
-		return nil, err
+// initializeEmailService initializes the email service with basic configuration
+func initializeEmailService(cfg *config.Config, redisClient *redis.Client) (*email.Service, error) {
+	// Create a basic email configuration
+	emailConfig := &email.EmailConfig{
+		DefaultProvider: interfaces.ProviderSMTP,
+		Providers: map[string]email.ProviderConfig{
+			"smtp": {
+				Type:    interfaces.ProviderSMTP,
+				Enabled: true,
+				SMTP: &interfaces.SMTPConfig{
+					Host:     "localhost",
+					Port:     587,
+					Username: "test@example.com",
+					Password: "password",
+					TLS:      true,
+				},
+			},
+		},
+		Templates: email.TemplateConfig{
+			BaseURL: fmt.Sprintf("http://%s:%d", cfg.Server.Host, cfg.Server.Port),
+		},
+		Retry: email.RetryConfig{
+			Enabled:      true,
+			MaxRetries:   3,
+			InitialDelay: 5 * time.Second,
+			MaxDelay:     30 * time.Second,
+			Multiplier:   2.0,
+		},
 	}
 
-	return &sso.UserData{
-		ID:                 authUser.ID,
-		Email:              authUser.Email,
-		Username:           authUser.Username,
-		PasswordHash:       authUser.PasswordHash,
-		HashAlgorithm:      authUser.HashAlgorithm,
-		FirstNameEncrypted: authUser.FirstNameEncrypted,
-		LastNameEncrypted:  authUser.LastNameEncrypted,
-		PhoneEncrypted:     authUser.PhoneEncrypted,
-		EmailVerified:      authUser.EmailVerified,
-		PhoneVerified:      authUser.PhoneVerified,
-		AccountLocked:      authUser.AccountLocked,
-		FailedAttempts:     authUser.FailedAttempts,
-		LastLoginAt:        authUser.LastLoginAt,
-		CreatedAt:          authUser.CreatedAt,
-		UpdatedAt:          authUser.UpdatedAt,
-	}, nil
-}
+	// Create stub repositories for email service
+	templateRepo := email.NewStubTemplateRepository()
+	queueRepo := email.NewStubQueueRepository()
+	analyticsRepo := email.NewStubAnalyticsRepository()
 
-func (a *SSOUserRepositoryAdapter) CreateUser(ctx context.Context, user *sso.CreateUserData) (*sso.UserData, error) {
-	// Encrypt sensitive data
-	var firstNameEncrypted, lastNameEncrypted, phoneEncrypted []byte
-	var err error
+	// Create a simple logger
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	if user.FirstName != "" {
-		firstNameEncrypted, err = a.encryptor.Encrypt([]byte(user.FirstName))
-		if err != nil {
-			return nil, fmt.Errorf("failed to encrypt first name: %w", err)
-		}
-	}
-
-	if user.LastName != "" {
-		lastNameEncrypted, err = a.encryptor.Encrypt([]byte(user.LastName))
-		if err != nil {
-			return nil, fmt.Errorf("failed to encrypt last name: %w", err)
-		}
-	}
-
-	if user.Phone != "" {
-		phoneEncrypted, err = a.encryptor.Encrypt([]byte(user.Phone))
-		if err != nil {
-			return nil, fmt.Errorf("failed to encrypt phone: %w", err)
-		}
-	}
-
-	authUser := &auth.CreateUserData{
-		Email:              user.Email,
-		Username:           user.Username,
-		PasswordHash:       user.PasswordHash,
-		HashAlgorithm:      user.HashAlgorithm,
-		FirstNameEncrypted: firstNameEncrypted,
-		LastNameEncrypted:  lastNameEncrypted,
-		PhoneEncrypted:     phoneEncrypted,
-	}
-
-	createdUser, err := a.authRepo.CreateUser(ctx, authUser)
-	if err != nil {
-		return nil, err
-	}
-
-	return &sso.UserData{
-		ID:                 createdUser.ID,
-		Email:              createdUser.Email,
-		Username:           createdUser.Username,
-		PasswordHash:       createdUser.PasswordHash,
-		HashAlgorithm:      createdUser.HashAlgorithm,
-		FirstNameEncrypted: createdUser.FirstNameEncrypted,
-		LastNameEncrypted:  createdUser.LastNameEncrypted,
-		PhoneEncrypted:     createdUser.PhoneEncrypted,
-		EmailVerified:      createdUser.EmailVerified,
-		PhoneVerified:      createdUser.PhoneVerified,
-		AccountLocked:      createdUser.AccountLocked,
-		FailedAttempts:     createdUser.FailedAttempts,
-		LastLoginAt:        createdUser.LastLoginAt,
-		CreatedAt:          createdUser.CreatedAt,
-		UpdatedAt:          createdUser.UpdatedAt,
-	}, nil
-}
-
-func (a *SSOUserRepositoryAdapter) UpdateUser(ctx context.Context, user *sso.UpdateUserData) error {
-	// Encrypt sensitive data if provided
-	var firstNameEncrypted, lastNameEncrypted, phoneEncrypted []byte
-	var err error
-
-	if user.FirstName != "" {
-		firstNameEncrypted, err = a.encryptor.Encrypt([]byte(user.FirstName))
-		if err != nil {
-			return fmt.Errorf("failed to encrypt first name: %w", err)
-		}
-	}
-
-	if user.LastName != "" {
-		lastNameEncrypted, err = a.encryptor.Encrypt([]byte(user.LastName))
-		if err != nil {
-			return fmt.Errorf("failed to encrypt last name: %w", err)
-		}
-	}
-
-	if user.Phone != "" {
-		phoneEncrypted, err = a.encryptor.Encrypt([]byte(user.Phone))
-		if err != nil {
-			return fmt.Errorf("failed to encrypt phone: %w", err)
-		}
-	}
-
-	authUser := &auth.UpdateUserData{
-		ID:                 user.ID,
-		Username:           user.Username,
-		FirstNameEncrypted: firstNameEncrypted,
-		LastNameEncrypted:  lastNameEncrypted,
-		PhoneEncrypted:     phoneEncrypted,
-	}
-
-	return a.authRepo.UpdateUser(ctx, authUser)
+	return email.NewService(emailConfig, templateRepo, queueRepo, analyticsRepo, logger)
 }

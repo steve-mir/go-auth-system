@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/steve-mir/go-auth-system/internal/config"
 	"github.com/steve-mir/go-auth-system/internal/errors"
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
 	"github.com/steve-mir/go-auth-system/internal/security/token"
 )
 
@@ -25,7 +26,7 @@ type authService struct {
 }
 
 // NewAuthService creates a new authentication service
-func NewAuthService(cfg *config.Config, deps *Dependencies) AuthService {
+func NewAuthService(cfg *config.Config, deps *Dependencies) interfaces.AuthService {
 	return &authService{
 		config:        cfg,
 		userRepo:      deps.UserRepo,
@@ -38,7 +39,7 @@ func NewAuthService(cfg *config.Config, deps *Dependencies) AuthService {
 }
 
 // Register creates a new user account with encrypted sensitive data
-func (s *authService) Register(ctx context.Context, req *RegisterRequest) (*RegisterResponse, error) {
+func (s *authService) Register(ctx context.Context, req *interfaces.RegisterRequest) (*interfaces.RegisterResponse, error) {
 	// Validate request
 	if err := s.validateRegisterRequest(req); err != nil {
 		return nil, err
@@ -86,7 +87,7 @@ func (s *authService) Register(ctx context.Context, req *RegisterRequest) (*Regi
 	}
 
 	// Create user data
-	userData := &CreateUserData{
+	userData := &interfaces.CreateUserData{
 		Email:              req.Email,
 		Username:           req.Username,
 		PasswordHash:       passwordHash,
@@ -102,7 +103,7 @@ func (s *authService) Register(ctx context.Context, req *RegisterRequest) (*Regi
 		return nil, errors.Wrap(err, errors.ErrorTypeInternal, "USER_CREATION_FAILED", "Failed to create user")
 	}
 
-	return &RegisterResponse{
+	return &interfaces.RegisterResponse{
 		UserID:    uuid.MustParse(createdUser.ID),
 		Email:     createdUser.Email,
 		Username:  createdUser.Username,
@@ -112,14 +113,14 @@ func (s *authService) Register(ctx context.Context, req *RegisterRequest) (*Regi
 }
 
 // Login authenticates a user and returns tokens
-func (s *authService) Login(ctx context.Context, req *LoginRequest) (*LoginResponse, error) {
+func (s *authService) Login(ctx context.Context, req *interfaces.LoginRequest) (*interfaces.LoginResponse, error) {
 	// Validate request
 	if err := s.validateLoginRequest(req); err != nil {
 		return nil, err
 	}
 
 	// Get user by email or username
-	var user *UserData
+	var user *interfaces.UserData
 	var err error
 
 	if req.Email != "" {
@@ -146,7 +147,7 @@ func (s *authService) Login(ctx context.Context, req *LoginRequest) (*LoginRespo
 
 	// Reset failed login attempts on successful login
 	now := time.Now().Unix()
-	loginInfo := &LoginInfo{
+	loginInfo := &interfaces.LoginInfo{
 		FailedAttempts: 0,
 		AccountLocked:  false,
 		LastLoginAt:    &now,
@@ -180,7 +181,7 @@ func (s *authService) Login(ctx context.Context, req *LoginRequest) (*LoginRespo
 	}
 
 	// Create session
-	sessionData := &SessionData{
+	sessionData := &interfaces.SessionData{
 		ID:        uuid.New().String(),
 		UserID:    user.ID,
 		TokenHash: s.hashToken(tokenPair.AccessToken),
@@ -198,7 +199,7 @@ func (s *authService) Login(ctx context.Context, req *LoginRequest) (*LoginRespo
 		// In production, you might want to handle this differently
 	}
 
-	return &LoginResponse{
+	return &interfaces.LoginResponse{
 		UserID:       uuid.MustParse(user.ID),
 		Email:        user.Email,
 		Username:     user.Username,
@@ -211,7 +212,7 @@ func (s *authService) Login(ctx context.Context, req *LoginRequest) (*LoginRespo
 }
 
 // Logout invalidates user session tokens
-func (s *authService) Logout(ctx context.Context, req *LogoutRequest) error {
+func (s *authService) Logout(ctx context.Context, req *interfaces.LogoutRequest) error {
 	var tokenToRevoke string
 	var userID string
 
@@ -264,7 +265,7 @@ func (s *authService) Logout(ctx context.Context, req *LogoutRequest) error {
 }
 
 // RefreshToken generates new tokens using a valid refresh token
-func (s *authService) RefreshToken(ctx context.Context, req *RefreshTokenRequest) (*TokenResponse, error) {
+func (s *authService) RefreshToken(ctx context.Context, req *interfaces.RefreshTokenRequest) (*interfaces.TokenResponse, error) {
 	// Validate refresh token
 	claims, err := s.tokenService.ValidateToken(ctx, req.RefreshToken)
 	if err != nil {
@@ -341,7 +342,7 @@ func (s *authService) RefreshToken(ctx context.Context, req *RefreshTokenRequest
 		}
 	}
 
-	return &TokenResponse{
+	return &interfaces.TokenResponse{
 		AccessToken:  tokenPair.AccessToken,
 		RefreshToken: tokenPair.RefreshToken,
 		TokenType:    tokenPair.TokenType,
@@ -351,26 +352,26 @@ func (s *authService) RefreshToken(ctx context.Context, req *RefreshTokenRequest
 }
 
 // ValidateToken validates a token and returns its claims
-func (s *authService) ValidateToken(ctx context.Context, req *ValidateTokenRequest) (*ValidateTokenResponse, error) {
+func (s *authService) ValidateToken(ctx context.Context, req *interfaces.ValidateTokenRequest) (*interfaces.ValidateTokenResponse, error) {
 	// Validate token format and signature
 	claims, err := s.tokenService.ValidateToken(ctx, req.Token)
 	if err != nil {
-		return &ValidateTokenResponse{Valid: false}, nil
+		return &interfaces.ValidateTokenResponse{Valid: false}, nil
 	}
 
 	// Check if token is blacklisted
 	isBlacklisted, err := s.tokenService.IsTokenRevoked(ctx, claims.JTI)
 	if err != nil {
-		return &ValidateTokenResponse{Valid: false}, nil
+		return &interfaces.ValidateTokenResponse{Valid: false}, nil
 	}
 	if isBlacklisted {
-		return &ValidateTokenResponse{Valid: false}, nil
+		return &interfaces.ValidateTokenResponse{Valid: false}, nil
 	}
 
 	// Check if user still exists and is not locked
 	user, err := s.userRepo.GetUserByID(ctx, claims.UserID)
 	if err != nil || user == nil || user.AccountLocked {
-		return &ValidateTokenResponse{Valid: false}, nil
+		return &interfaces.ValidateTokenResponse{Valid: false}, nil
 	}
 
 	// Convert claims to map for response
@@ -388,7 +389,7 @@ func (s *authService) ValidateToken(ctx context.Context, req *ValidateTokenReque
 		"jti":        claims.JTI,
 	}
 
-	return &ValidateTokenResponse{
+	return &interfaces.ValidateTokenResponse{
 		Valid:     true,
 		UserID:    claims.UserID,
 		Email:     claims.Email,
@@ -401,7 +402,7 @@ func (s *authService) ValidateToken(ctx context.Context, req *ValidateTokenReque
 }
 
 // GetUserProfile retrieves user profile information from token
-func (s *authService) GetUserProfile(ctx context.Context, tokenStr string) (*UserProfile, error) {
+func (s *authService) GetUserProfile(ctx context.Context, tokenStr string) (*interfaces.UserProfile, error) {
 	// Validate token
 	claims, err := s.tokenService.ValidateToken(ctx, tokenStr)
 	if err != nil {
@@ -441,7 +442,7 @@ func (s *authService) GetUserProfile(ctx context.Context, tokenStr string) (*Use
 		roles = []string{}
 	}
 
-	return &UserProfile{
+	return &interfaces.UserProfile{
 		ID:        uuid.MustParse(user.ID),
 		Email:     user.Email,
 		Username:  user.Username,
@@ -455,15 +456,15 @@ func (s *authService) GetUserProfile(ctx context.Context, tokenStr string) (*Use
 }
 
 // GetUserSessions retrieves active sessions for a user
-func (s *authService) GetUserSessions(ctx context.Context, userID string) ([]*SessionInfo, error) {
+func (s *authService) GetUserSessions(ctx context.Context, userID string) ([]*interfaces.SessionInfo, error) {
 	sessions, err := s.sessionRepo.GetUserSessions(ctx, userID)
 	if err != nil {
 		return nil, errors.Wrap(err, errors.ErrorTypeInternal, "SESSION_RETRIEVAL_FAILED", "Failed to retrieve user sessions")
 	}
 
-	var sessionInfos []*SessionInfo
+	var sessionInfos []*interfaces.SessionInfo
 	for _, session := range sessions {
-		sessionInfos = append(sessionInfos, &SessionInfo{
+		sessionInfos = append(sessionInfos, &interfaces.SessionInfo{
 			ID:        uuid.MustParse(session.ID),
 			UserID:    uuid.MustParse(session.UserID),
 			IPAddress: session.IPAddress,
@@ -515,7 +516,7 @@ func (s *authService) RevokeSession(ctx context.Context, sessionID string) error
 
 // Helper methods
 
-func (s *authService) validateRegisterRequest(req *RegisterRequest) error {
+func (s *authService) validateRegisterRequest(req *interfaces.RegisterRequest) error {
 	if req.Email == "" {
 		return ErrInvalidEmail
 	}
@@ -535,7 +536,7 @@ func (s *authService) validateRegisterRequest(req *RegisterRequest) error {
 	return nil
 }
 
-func (s *authService) validateLoginRequest(req *LoginRequest) error {
+func (s *authService) validateLoginRequest(req *interfaces.LoginRequest) error {
 	if req.Email == "" && req.Username == "" {
 		return ErrInvalidLoginRequest
 	}
@@ -573,11 +574,11 @@ func (s *authService) hashToken(token string) string {
 	return hex.EncodeToString(hash[:])
 }
 
-func (s *authService) handleFailedLogin(ctx context.Context, user *UserData) {
+func (s *authService) handleFailedLogin(ctx context.Context, user *interfaces.UserData) {
 	failedAttempts := user.FailedAttempts + 1
 	accountLocked := failedAttempts >= 5 // Lock after 5 failed attempts
 
-	loginInfo := &LoginInfo{
+	loginInfo := &interfaces.LoginInfo{
 		FailedAttempts: failedAttempts,
 		AccountLocked:  accountLocked,
 		LastLoginAt:    user.LastLoginAt,

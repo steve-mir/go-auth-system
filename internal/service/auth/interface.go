@@ -3,60 +3,31 @@ package auth
 import (
 	"context"
 
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
 	"github.com/steve-mir/go-auth-system/internal/security/crypto"
 	"github.com/steve-mir/go-auth-system/internal/security/hash"
 	"github.com/steve-mir/go-auth-system/internal/security/token"
 )
 
-// AuthService defines the interface for authentication operations
-type AuthService interface {
-	// Register creates a new user account with encrypted sensitive data
-	Register(ctx context.Context, req *RegisterRequest) (*RegisterResponse, error)
-
-	// Login authenticates a user and returns tokens
-	Login(ctx context.Context, req *LoginRequest) (*LoginResponse, error)
-
-	// Logout invalidates user session tokens
-	Logout(ctx context.Context, req *LogoutRequest) error
-
-	// RefreshToken generates new tokens using a valid refresh token
-	RefreshToken(ctx context.Context, req *RefreshTokenRequest) (*TokenResponse, error)
-
-	// ValidateToken validates a token and returns its claims
-	ValidateToken(ctx context.Context, req *ValidateTokenRequest) (*ValidateTokenResponse, error)
-
-	// GetUserProfile retrieves user profile information from token
-	GetUserProfile(ctx context.Context, token string) (*UserProfile, error)
-
-	// GetUserSessions retrieves active sessions for a user
-	GetUserSessions(ctx context.Context, userID string) ([]*SessionInfo, error)
-
-	// RevokeUserSessions revokes all sessions for a user
-	RevokeUserSessions(ctx context.Context, userID string) error
-
-	// RevokeSession revokes a specific session
-	RevokeSession(ctx context.Context, sessionID string) error
-}
-
 // Repository interfaces that the auth service depends on
 type UserRepository interface {
 	// CreateUser creates a new user in the database
-	CreateUser(ctx context.Context, user *CreateUserData) (*UserData, error)
+	CreateUser(ctx context.Context, user *interfaces.CreateUserData) (*interfaces.UserData, error)
 
 	// GetUserByEmail retrieves a user by email
-	GetUserByEmail(ctx context.Context, email string) (*UserData, error)
+	GetUserByEmail(ctx context.Context, email string) (*interfaces.UserData, error)
 
 	// GetUserByUsername retrieves a user by username
-	GetUserByUsername(ctx context.Context, username string) (*UserData, error)
+	GetUserByUsername(ctx context.Context, username string) (*interfaces.UserData, error)
 
 	// GetUserByID retrieves a user by ID
-	GetUserByID(ctx context.Context, userID string) (*UserData, error)
+	GetUserByID(ctx context.Context, userID string) (*interfaces.UserData, error)
 
 	// UpdateUser updates user profile information
-	UpdateUser(ctx context.Context, user *UpdateUserData) error
+	UpdateUser(ctx context.Context, user *interfaces.UpdateUserData) error
 
 	// UpdateUserLoginInfo updates user login information
-	UpdateUserLoginInfo(ctx context.Context, userID string, info *LoginInfo) error
+	UpdateUserLoginInfo(ctx context.Context, userID string, info *interfaces.LoginInfo) error
 
 	// GetUserRoles retrieves roles for a user
 	GetUserRoles(ctx context.Context, userID string) ([]string, error)
@@ -65,13 +36,13 @@ type UserRepository interface {
 // SessionRepository interface for session management
 type SessionRepository interface {
 	// CreateSession creates a new session
-	CreateSession(ctx context.Context, session *SessionData) error
+	CreateSession(ctx context.Context, session *interfaces.SessionData) error
 
 	// GetSession retrieves a session by ID
-	GetSession(ctx context.Context, sessionID string) (*SessionData, error)
+	GetSession(ctx context.Context, sessionID string) (*interfaces.SessionData, error)
 
 	// UpdateSession updates session information
-	UpdateSession(ctx context.Context, sessionID string, session *SessionData) error
+	UpdateSession(ctx context.Context, sessionID string, session *interfaces.SessionData) error
 
 	// DeleteSession deletes a session
 	DeleteSession(ctx context.Context, sessionID string) error
@@ -80,7 +51,7 @@ type SessionRepository interface {
 	DeleteUserSessions(ctx context.Context, userID string) error
 
 	// GetUserSessions retrieves all sessions for a user
-	GetUserSessions(ctx context.Context, userID string) ([]*SessionData, error)
+	GetUserSessions(ctx context.Context, userID string) ([]*interfaces.SessionData, error)
 }
 
 // TokenBlacklistRepository interface for token blacklisting
@@ -93,54 +64,6 @@ type TokenBlacklistRepository interface {
 
 	// BlacklistUserTokens blacklists all tokens for a user
 	BlacklistUserTokens(ctx context.Context, userID string, reason string) error
-}
-
-// Data transfer objects
-type CreateUserData struct {
-	Email              string
-	Username           string
-	PasswordHash       string
-	HashAlgorithm      string
-	FirstNameEncrypted []byte
-	LastNameEncrypted  []byte
-	PhoneEncrypted     []byte
-}
-
-type UserData struct {
-	ID                 string
-	Email              string
-	Username           string
-	PasswordHash       string
-	HashAlgorithm      string
-	FirstNameEncrypted []byte
-	LastNameEncrypted  []byte
-	PhoneEncrypted     []byte
-	EmailVerified      bool
-	PhoneVerified      bool
-	AccountLocked      bool
-	FailedAttempts     int32
-	LastLoginAt        *int64
-	CreatedAt          int64
-	UpdatedAt          int64
-}
-
-type LoginInfo struct {
-	FailedAttempts int32
-	AccountLocked  bool
-	LastLoginAt    *int64
-}
-
-type SessionData struct {
-	ID        string
-	UserID    string
-	TokenHash string
-	TokenType string
-	Roles     []string
-	ExpiresAt int64
-	IPAddress string
-	UserAgent string
-	CreatedAt int64
-	LastUsed  int64
 }
 
 // Dependencies interface for external services

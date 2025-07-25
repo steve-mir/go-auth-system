@@ -1,0 +1,57 @@
+groups:
+  - name: go-auth-system-alerts
+    rules:
+      # High error rate alert
+      - alert: HighErrorRate
+        expr: rate(errors_total{job="go-auth-system"}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          service: go-auth-system
+        annotations:
+          summary: "High error rate detected in Go Auth System"
+          description: "Error rate is {{ $value | humanize }} errors/sec for the last 5 minutes"
+
+      # Authentication failure alert
+      - alert: HighAuthFailureRate
+        expr: rate(auth_failures_total{job="go-auth-system"}[5m]) > 0.5
+        for: 1m
+        labels:
+          severity: critical
+          service: go-auth-system
+        annotations:
+          summary: "High authentication failure rate"
+          description: "Authentication failure rate is {{ $value | humanize }} failures/sec"
+
+      # Database connection alert
+      - alert: DatabaseConnectionHigh
+        expr: database_connections{job="go-auth-system",state="active"} / database_connections{job="go-auth-system",state="max"} > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: go-auth-system
+        annotations:
+          summary: "Database connection pool usage high"
+          description: "{{ $value | humanizePercentage }} of database connections are in use"
+
+      # High response time alert
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_duration_seconds_bucket{job="go-auth-system"}[5m])) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+          service: go-auth-system
+        annotations:
+          summary: "High response time detected"
+          description: "95th percentile response time is {{ $value | humanizeDuration }} for the last 5 minutes"
+
+      # Service down alert
+      - alert: ServiceDown
+        expr: up{job="go-auth-system"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: go-auth-system
+        annotations:
+          summary: "Go Auth System service is down"
+          description: "Go Auth System has been down for more than 1 minute"

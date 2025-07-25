@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
 	"github.com/steve-mir/go-auth-system/internal/monitoring"
-	"github.com/steve-mir/go-auth-system/internal/service/auth"
 )
 
 // setupAuthRoutes configures authentication routes
@@ -31,7 +31,7 @@ func (s *Server) registerHandler(c *gin.Context) {
 		c.Request = c.Request.WithContext(ctx)
 	}
 
-	var req auth.RegisterRequest
+	var req interfaces.RegisterRequest
 	if !s.bindAndValidate(c, &req) {
 		if s.monitoring != nil {
 			err := fmt.Errorf("invalid registration request")
@@ -108,7 +108,7 @@ func (s *Server) loginHandler(c *gin.Context) {
 		c.Request = c.Request.WithContext(ctx)
 	}
 
-	var req auth.LoginRequest
+	var req interfaces.LoginRequest
 	if !s.bindAndValidate(c, &req) {
 		if s.monitoring != nil {
 			err := fmt.Errorf("invalid login request")
@@ -197,7 +197,7 @@ func (s *Server) logoutHandler(c *gin.Context) {
 		c.Request = c.Request.WithContext(ctx)
 	}
 
-	var req auth.LogoutRequest
+	var req interfaces.LogoutRequest
 	if !s.bindAndValidate(c, &req) {
 		if s.monitoring != nil {
 			err := fmt.Errorf("invalid logout request")
@@ -275,7 +275,7 @@ func (s *Server) refreshTokenHandler(c *gin.Context) {
 		c.Request = c.Request.WithContext(ctx)
 	}
 
-	var req auth.RefreshTokenRequest
+	var req interfaces.RefreshTokenRequest
 	if !s.bindAndValidate(c, &req) {
 		if s.monitoring != nil {
 			err := fmt.Errorf("invalid refresh token request")
@@ -342,7 +342,7 @@ func (s *Server) validateTokenHandler(c *gin.Context) {
 		c.Request = c.Request.WithContext(ctx)
 	}
 
-	var req auth.ValidateTokenRequest
+	var req interfaces.ValidateTokenRequest
 	if !s.bindAndValidate(c, &req) {
 		if s.monitoring != nil {
 			err := fmt.Errorf("invalid token validation request")

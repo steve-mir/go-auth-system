@@ -14,7 +14,7 @@ import (
 	"github.com/steve-mir/go-auth-system/internal/monitoring"
 
 	// "github.com/steve-mir/go-auth-system/internal/service/admin"
-	"github.com/steve-mir/go-auth-system/internal/service/auth"
+	// "github.com/steve-mir/go-auth-system/internal/service/auth"
 	"github.com/steve-mir/go-auth-system/internal/service/mfa"
 	// "github.com/steve-mir/go-auth-system/internal/service/role"
 	// "github.com/steve-mir/go-auth-system/internal/service/user"
@@ -32,7 +32,7 @@ type Server struct {
 
 	// Service dependencies
 	adminService  interfaces.AdminService
-	authService   auth.AuthService
+	authService   interfaces.AuthService
 	userService   interfaces.UserService
 	roleService   interfaces.RoleService
 	mfaService    mfa.MFAService
@@ -143,7 +143,7 @@ func NewServer(
 	cfg *config.ServerConfig,
 	middlewareManager *middleware.MiddlewareManager,
 	monitoringService *monitoring.Service,
-	authService auth.AuthService,
+	authService interfaces.AuthService,
 	userService interfaces.UserService,
 	roleService interfaces.RoleService,
 	mfaService mfa.MFAService,

@@ -770,3 +770,10 @@ const (
 	StatusBounced   DeliveryStatus = "bounced"
 	StatusFailed    DeliveryStatus = "failed"
 )
+
+// EmailEvent represents an email event
+type EmailEvent struct {
+	Type      string                 `json:"type"`
+	Timestamp time.Time              `json:"timestamp"`
+	Data      map[string]interface{} `json:"data,omitempty"`
+}

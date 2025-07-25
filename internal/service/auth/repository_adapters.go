@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/steve-mir/go-auth-system/internal/errors"
+	"github.com/steve-mir/go-auth-system/internal/interfaces"
 	"github.com/steve-mir/go-auth-system/internal/repository/postgres"
 	"github.com/steve-mir/go-auth-system/internal/repository/postgres/db"
 	"github.com/steve-mir/go-auth-system/internal/repository/redis"
@@ -28,7 +29,7 @@ func NewPostgresUserRepository(queries *postgres.DB, store *db.Store) UserReposi
 	}
 }
 
-func (r *PostgresUserRepository) CreateUser(ctx context.Context, user *CreateUserData) (*UserData, error) {
+func (r *PostgresUserRepository) CreateUser(ctx context.Context, user *interfaces.CreateUserData) (*interfaces.UserData, error) {
 	var username pgtype.Text
 	if user.Username != "" {
 		username = pgtype.Text{String: user.Username, Valid: true}
@@ -52,7 +53,7 @@ func (r *PostgresUserRepository) CreateUser(ctx context.Context, user *CreateUse
 	return r.convertDBUserToUserData(&dbUser), nil
 }
 
-func (r *PostgresUserRepository) GetUserByEmail(ctx context.Context, email string) (*UserData, error) {
+func (r *PostgresUserRepository) GetUserByEmail(ctx context.Context, email string) (*interfaces.UserData, error) {
 	dbUser, err := r.store.GetUserByEmail(ctx, email)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -64,7 +65,7 @@ func (r *PostgresUserRepository) GetUserByEmail(ctx context.Context, email strin
 	return r.convertDBUserToUserData(&dbUser), nil
 }
 
-func (r *PostgresUserRepository) GetUserByUsername(ctx context.Context, username string) (*UserData, error) {
+func (r *PostgresUserRepository) GetUserByUsername(ctx context.Context, username string) (*interfaces.UserData, error) {
 	usernameParam := pgtype.Text{String: username, Valid: true}
 	dbUser, err := r.store.GetUserByUsername(ctx, usernameParam)
 	if err != nil {
@@ -77,7 +78,7 @@ func (r *PostgresUserRepository) GetUserByUsername(ctx context.Context, username
 	return r.convertDBUserToUserData(&dbUser), nil
 }
 
-func (r *PostgresUserRepository) GetUserByID(ctx context.Context, userID string) (*UserData, error) {
+func (r *PostgresUserRepository) GetUserByID(ctx context.Context, userID string) (*interfaces.UserData, error) {
 	id, err := uuid.Parse(userID)
 	if err != nil {
 		return nil, errors.New(errors.ErrorTypeValidation, "INVALID_USER_ID", "Invalid user ID format")
@@ -94,7 +95,7 @@ func (r *PostgresUserRepository) GetUserByID(ctx context.Context, userID string)
 	return r.convertDBUserToUserData(&dbUser), nil
 }
 
-func (r *PostgresUserRepository) UpdateUser(ctx context.Context, user *UpdateUserData) error {
+func (r *PostgresUserRepository) UpdateUser(ctx context.Context, user *interfaces.UpdateUserData) error {
 	id, err := uuid.Parse(user.ID)
 	if err != nil {
 		return errors.New(errors.ErrorTypeValidation, "INVALID_USER_ID", "Invalid user ID format")
@@ -125,7 +126,7 @@ func (r *PostgresUserRepository) UpdateUser(ctx context.Context, user *UpdateUse
 	return err
 }
 
-func (r *PostgresUserRepository) UpdateUserLoginInfo(ctx context.Context, userID string, info *LoginInfo) error {
+func (r *PostgresUserRepository) UpdateUserLoginInfo(ctx context.Context, userID string, info *interfaces.LoginInfo) error {
 	id, err := uuid.Parse(userID)
 	if err != nil {
 		return errors.New(errors.ErrorTypeValidation, "INVALID_USER_ID", "Invalid user ID format")
@@ -168,7 +169,7 @@ func (r *PostgresUserRepository) GetUserRoles(ctx context.Context, userID string
 	return roleNames, nil
 }
 
-func (r *PostgresUserRepository) convertDBUserToUserData(dbUser *db.User) *UserData {
+func (r *PostgresUserRepository) convertDBUserToUserData(dbUser *db.User) *interfaces.UserData {
 	var username string
 	if dbUser.Username.Valid {
 		username = dbUser.Username.String
@@ -203,7 +204,7 @@ func (r *PostgresUserRepository) convertDBUserToUserData(dbUser *db.User) *UserD
 		updatedAt = dbUser.UpdatedAt.Time.Unix()
 	}
 
-	return &UserData{
+	return &interfaces.UserData{
 		ID:                 dbUser.ID.String(),
 		Email:              dbUser.Email,
 		Username:           username,
@@ -234,7 +235,7 @@ func NewRedisSessionRepository(sessionStore *redis.SessionStore) SessionReposito
 	}
 }
 
-func (r *RedisSessionRepository) CreateSession(ctx context.Context, session *SessionData) error {
+func (r *RedisSessionRepository) CreateSession(ctx context.Context, session *interfaces.SessionData) error {
 	redisSession := &redis.SessionData{
 		UserID:    session.UserID,
 		Roles:     session.Roles, // Now properly populated with user roles
@@ -248,13 +249,13 @@ func (r *RedisSessionRepository) CreateSession(ctx context.Context, session *Ses
 	return r.sessionStore.Store(ctx, session.ID, redisSession, ttl)
 }
 
-func (r *RedisSessionRepository) GetSession(ctx context.Context, sessionID string) (*SessionData, error) {
+func (r *RedisSessionRepository) GetSession(ctx context.Context, sessionID string) (*interfaces.SessionData, error) {
 	redisSession, err := r.sessionStore.Get(ctx, sessionID)
 	if err != nil {
 		return nil, errors.New(errors.ErrorTypeNotFound, "SESSION_NOT_FOUND", "Session not found")
 	}
 
-	return &SessionData{
+	return &interfaces.SessionData{
 		ID:        sessionID,
 		UserID:    redisSession.UserID,
 		IPAddress: redisSession.IPAddress,
@@ -265,7 +266,7 @@ func (r *RedisSessionRepository) GetSession(ctx context.Context, sessionID strin
 	}, nil
 }
 
-func (r *RedisSessionRepository) UpdateSession(ctx context.Context, sessionID string, session *SessionData) error {
+func (r *RedisSessionRepository) UpdateSession(ctx context.Context, sessionID string, session *interfaces.SessionData) error {
 	redisSession := &redis.SessionData{
 		UserID:    session.UserID,
 		Roles:     session.Roles, // Now properly populated with user roles
@@ -287,15 +288,15 @@ func (r *RedisSessionRepository) DeleteUserSessions(ctx context.Context, userID 
 	return r.sessionStore.DeleteUserSessions(ctx, userID)
 }
 
-func (r *RedisSessionRepository) GetUserSessions(ctx context.Context, userID string) ([]*SessionData, error) {
+func (r *RedisSessionRepository) GetUserSessions(ctx context.Context, userID string) ([]*interfaces.SessionData, error) {
 	redisSessions, err := r.sessionStore.GetUserSessions(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user sessions: %w", err)
 	}
 
-	var sessions []*SessionData
+	var sessions []*interfaces.SessionData
 	for _, redisSession := range redisSessions {
-		sessions = append(sessions, &SessionData{
+		sessions = append(sessions, &interfaces.SessionData{
 			UserID:    redisSession.UserID,
 			IPAddress: redisSession.IPAddress,
 			UserAgent: redisSession.UserAgent,

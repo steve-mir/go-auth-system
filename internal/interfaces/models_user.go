@@ -20,12 +20,12 @@ type UserProfile struct {
 	Verified  struct {
 		Email bool `json:"email"`
 		Phone bool `json:"phone"`
-	} `json:"verified"`
+	} `json:"verified,omitempty"`
 	Status struct {
 		Locked         bool       `json:"locked"`
 		FailedAttempts int32      `json:"failed_attempts"`
 		LastLogin      *time.Time `json:"last_login,omitempty"`
-	} `json:"status"`
+	} `json:"status,omitempty"`
 }
 
 // UpdateProfileRequest represents a profile update request
